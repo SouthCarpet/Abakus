@@ -1,0 +1,9 @@
+target/
+node_modules/
+dist/
+*.db
+*.db-journal
+fixtures/private/*
+!fixtures/private/.gitkeep
+src-tauri/resources/pdfium/
+src-tauri/gen/

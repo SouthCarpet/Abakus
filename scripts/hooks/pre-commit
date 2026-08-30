@@ -1,0 +1,17 @@
+#!/bin/sh
+# D9: never commit a PDF; never commit an IBAN that is not on the synthetic
+# allowlist. No directory is exempt (review fix 2026-08-30: the old
+# directory exemptions both blocked legitimate inline tests under crates/*/src
+# and allowed a real IBAN inside the exempt dirs).
+set -e
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+pdfs=$(printf '%s\n' "$staged" | grep -iE '\.pdf$' || true)
+if [ -n "$pdfs" ]; then echo "blocked: PDF files are never committed:"; echo "$pdfs"; exit 1; fi
+# The five synthetic IBANs of this repo (valid check digits, fake accounts) plus the public Wikipedia example.
+ALLOW="SK4411000000000012345678 SK3711000000000098765432 SK0281800000007000000001 SK0902000000005230000001 SK3112000000198742637541"
+hits=$(git diff --cached -U0 | grep -E '^\+' | grep -oE 'SK[0-9]{2} ?[0-9]{4} ?[0-9]{4} ?[0-9]{4} ?[0-9]{4} ?[0-9]{4}' | tr -d ' ' | sort -u || true)
+bad=""
+for h in $hits; do
+  case " $ALLOW " in *" $h "*) ;; *) bad="$bad $h";; esac
+done
+if [ -n "$bad" ]; then echo "blocked: IBAN not on the synthetic allowlist:$bad"; exit 1; fi
