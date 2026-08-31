@@ -9,6 +9,7 @@ chrono.workspace = true
 serde.workspace = true
 regex.workspace = true
 thiserror.workspace = true
+unicode-normalization = "0.1"
 
 [lints]
 workspace = true
