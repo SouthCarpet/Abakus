@@ -6,7 +6,7 @@ use chrono::NaiveDate;
 use parser::{AccountKind, Checksum};
 use rules::Status;
 use serde_json::json;
-use store::{Summary, TxFilter, TxRow};
+use store::{RecentStatement, Summary, TxFilter, TxRow};
 
 /// Tauri deserializes each command argument from its own JSON field (there is
 /// no single Rust struct for a multi-parameter command); these local structs
@@ -20,6 +20,9 @@ struct AssignArgs {
     #[serde(rename = "categoryId")] category_id: i64,
     #[serde(rename = "applyToMatching")] apply_to_matching: bool,
 }
+
+#[derive(serde::Deserialize)]
+struct RecentStatementsArgs { limit: usize }
 
 #[test]
 fn import_statements_args_match_the_ui_call() {
@@ -107,4 +110,27 @@ fn checksum_off_by_serializes_with_tag_and_content() {
     let v = serde_json::to_value(Checksum::OffBy(32)).unwrap();
     assert_eq!(v, json!({"status": "off_by", "off_by": 32}));
     assert_eq!(serde_json::to_value(Checksum::Ok).unwrap(), json!({"status": "ok"}));
+}
+
+#[test]
+fn recent_statements_args_match_the_ui_call() {
+    let args: RecentStatementsArgs = serde_json::from_value(json!({"limit": 5})).unwrap();
+    assert_eq!(args.limit, 5);
+}
+
+#[test]
+fn recent_statement_serializes_snake_case() {
+    let row = RecentStatement {
+        statement_id: 1,
+        number: 6,
+        period_end: NaiveDate::from_ymd_opt(2026, 6, 30).unwrap(),
+        account_label: "Osobný".into(),
+        transaction_count: 8,
+        checksum: Checksum::Ok,
+    };
+    let v = serde_json::to_value(&row).unwrap();
+    assert_eq!(v["statement_id"], json!(1));
+    assert_eq!(v["transaction_count"], json!(8));
+    assert_eq!(v["checksum"], json!({"status": "ok"}));
+    assert!(v.get("statementId").is_none(), "RecentStatement keeps snake_case field names, no camelCase");
 }

@@ -8,8 +8,8 @@ type Screen = 'overview' | 'transactions' | 'import' | 'categories' | 'settings'
 
 const RAIL_ITEMS: { id: Screen; label: string }[] = [
   { id: 'overview', label: 'Prehľad' },
-  { id: 'transactions', label: 'Transakcie' },
   { id: 'import', label: 'Import' },
+  { id: 'transactions', label: 'Transakcie' },
   { id: 'categories', label: 'Kategórie' },
   { id: 'settings', label: 'Nastavenia' },
 ]
@@ -26,7 +26,7 @@ export function App() {
       <section className="k-page">
         {screen === 'overview' ? <Placeholder title="Prehľad" /> : null}
         {screen === 'transactions' ? <Placeholder title="Transakcie" /> : null}
-        {screen === 'import' ? <Import /> : null}
+        {screen === 'import' ? <Import onNavigateToTransactions={() => setScreen('transactions')} /> : null}
         {screen === 'categories' ? <Placeholder title="Kategórie" /> : null}
         {screen === 'settings' ? <Settings /> : null}
       </section>

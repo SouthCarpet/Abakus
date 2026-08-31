@@ -111,3 +111,8 @@ pub fn bad_checksums(state: State<AppState>) -> Result<Vec<store::BadChecksum>, 
 pub fn data_dir(state: State<AppState>) -> String {
     state.data_dir.to_string_lossy().to_string()
 }
+
+#[tauri::command]
+pub fn recent_statements(state: State<AppState>, limit: usize) -> Result<Vec<store::RecentStatement>, String> {
+    lock(&state)?.recent_statements(limit).map_err(|e| e.to_string())
+}

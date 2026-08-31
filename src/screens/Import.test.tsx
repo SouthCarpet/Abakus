@@ -11,6 +11,7 @@ vi.mock('../api', () => ({
     importStatements: vi.fn(),
     importWithPassword: vi.fn(),
     saveAccount: vi.fn(),
+    recentStatements: vi.fn().mockResolvedValue([]),
   },
 }))
 

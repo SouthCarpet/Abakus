@@ -1,8 +1,8 @@
 //! Filtered transaction listing (`TxFilter` over numbered SQL parameters).
-use crate::import::status_parse;
+use crate::import::{checksum_from_cols, status_parse};
 use crate::{Result, Store};
 use chrono::NaiveDate;
-use parser::AccountKind;
+use parser::{AccountKind, Checksum};
 use rules::Status;
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +39,17 @@ pub struct TxRow {
     pub status: Status,
     pub source: String,
     pub raw_block: String,
+}
+
+/// Row for the Import screen's "Posledné importy" list (spec: newest first).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RecentStatement {
+    pub statement_id: i64,
+    pub number: i64,
+    pub period_end: NaiveDate,
+    pub account_label: String,
+    pub transaction_count: i64,
+    pub checksum: Checksum,
 }
 
 pub(crate) const BASE_SELECT: &str = "SELECT t.id, t.account_id, a.kind, s.number, t.posted_date, t.tx_date, t.kind, t.amount_cents, t.orig_amount_cents, t.orig_currency, t.merchant_raw, t.place, t.counterparty_name, t.counterparty_iban, t.category_id, c.name, p.name, t.status, t.source, t.raw_block FROM transactions t JOIN accounts a ON a.id = t.account_id JOIN statements s ON s.id = t.statement_id LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN categories p ON p.id = c.parent_id";
@@ -92,6 +103,37 @@ impl Store {
         let mut st = self.conn.prepare(&format!("{BASE_SELECT}{w} ORDER BY t.tx_date DESC, t.id DESC"))?;
         let refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let rows = st.query_map(refs.as_slice(), row_to_tx)?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
+
+    /// Newest-first statements for the Import screen's history section, with
+    /// their transaction count and checksum badge; `limit` bounds the list
+    /// (Settings passes a large limit to read the total count off `.len()`
+    /// instead of a dedicated counting command).
+    pub fn recent_statements(&self, limit: usize) -> Result<Vec<RecentStatement>> {
+        let mut st = self.conn.prepare(
+            "SELECT s.id, s.number, s.period_end, a.label, COUNT(t.id), s.checksum_status, s.checksum_off_by \
+             FROM statements s \
+             JOIN accounts a ON a.id = s.account_id \
+             LEFT JOIN transactions t ON t.statement_id = s.id \
+             GROUP BY s.id \
+             ORDER BY s.imported_at DESC, s.id DESC \
+             LIMIT ?1",
+        )?;
+        let rows = st.query_map([limit as i64], |r| {
+            let period_end: String = r.get(2)?;
+            let status: String = r.get(5)?;
+            let off_by: Option<i64> = r.get(6)?;
+            Ok(RecentStatement {
+                statement_id: r.get(0)?,
+                number: r.get(1)?,
+                period_end: NaiveDate::parse_from_str(&period_end, "%Y-%m-%d")
+                    .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(e)))?,
+                account_label: r.get(3)?,
+                transaction_count: r.get(4)?,
+                checksum: checksum_from_cols(&status, off_by),
+            })
+        })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 }

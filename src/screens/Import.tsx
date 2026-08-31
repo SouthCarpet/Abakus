@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { open } from '@tauri-apps/plugin-dialog'
-import type { AccountKind, Checksum, ImportReport } from '../api'
+import type { AccountKind, Checksum, ImportReport, RecentStatement } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { checksumLabel, formatDate, importStatusLabel } from '../lib/format'
+
+const RECENT_STATEMENTS_LIMIT = 8
+const SUCCESS_STATUSES = new Set(['imported', 'already_imported'])
 
 function fileName(path: string): string {
   const parts = path.split(/[\\/]/)
@@ -80,7 +83,7 @@ function LockedAction({
       >
         <Field label="Heslo">
           <input
-            className="k-input"
+            className="k-input k-well"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -116,13 +119,26 @@ export function ImportResultCard({
   report,
   onPassword,
   onAddAccount,
+  onContinue,
 }: {
   report: ImportReport
   onPassword: (password: string, remember: boolean) => void
   onAddAccount: (iban: string, kind: AccountKind) => void
+  onContinue?: () => void
 }) {
+  const canContinue = onContinue && SUCCESS_STATUSES.has(report.status)
   return (
-    <Card title={fileName(report.path)} badge={importStatusLabel(report.status)}>
+    <Card
+      title={fileName(report.path)}
+      badge={importStatusLabel(report.status)}
+      footer={
+        canContinue ? (
+          <Button variant="primary" onClick={onContinue}>
+            Pokračovať na Transakcie
+          </Button>
+        ) : undefined
+      }
+    >
       <div className="k-row">
         <span>{report.accountLabel ?? report.ibanMasked ?? '-'}</span>
         {report.statementNumber !== null ? <span className="k-num">č. {report.statementNumber}</span> : null}
@@ -147,23 +163,65 @@ interface AddAccountTarget {
   kind: AccountKind
 }
 
-export function Import() {
+function RecentImportsRow({ statement }: { statement: RecentStatement }) {
+  const danger = statement.checksum.status === 'off_by'
+  return (
+    <div className="k-round-row">
+      <span>{formatDate(statement.period_end)}</span>
+      <span>{statement.account_label}</span>
+      <span className="k-num">č. {statement.number}</span>
+      <span className="k-num">{statement.transaction_count} transakcií</span>
+      <span className={danger ? 'k-card-badge k-text-danger' : 'k-card-badge'}>{checksumLabel(statement.checksum)}</span>
+    </div>
+  )
+}
+
+function RecentImports({ statements }: { statements: RecentStatement[] }) {
+  return (
+    <Card title="Posledné importy">
+      {statements.length === 0 ? (
+        <p>Zatiaľ žiadne importy.</p>
+      ) : (
+        <div className="k-round-list">
+          {statements.map((s) => (
+            <RecentImportsRow key={s.statement_id} statement={s} />
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?: () => void }) {
   const [reports, setReports] = useState<ImportReport[]>([])
+  const [recent, setRecent] = useState<RecentStatement[]>([])
   const [addAccount, setAddAccount] = useState<AddAccountTarget | null>(null)
   const [accountLabel, setAccountLabel] = useState('')
   const passwordsRef = useRef<Record<string, { password: string; remember: boolean }>>({})
 
-  const mergeReports = useCallback((incoming: ImportReport[]) => {
-    setReports((prev) => {
-      const next = [...prev]
-      for (const r of incoming) {
-        const i = next.findIndex((p) => p.path === r.path)
-        if (i >= 0) next[i] = r
-        else next.unshift(r)
-      }
-      return next
-    })
+  const loadRecent = useCallback(() => {
+    void api.recentStatements(RECENT_STATEMENTS_LIMIT).then(setRecent)
   }, [])
+
+  useEffect(() => {
+    loadRecent()
+  }, [loadRecent])
+
+  const mergeReports = useCallback(
+    (incoming: ImportReport[]) => {
+      setReports((prev) => {
+        const next = [...prev]
+        for (const r of incoming) {
+          const i = next.findIndex((p) => p.path === r.path)
+          if (i >= 0) next[i] = r
+          else next.unshift(r)
+        }
+        return next
+      })
+      loadRecent()
+    },
+    [loadRecent],
+  )
 
   const runImport = useCallback(
     async (paths: string[]) => {
@@ -221,7 +279,7 @@ export function Import() {
 
   return (
     <div className="k-section">
-      <div className="k-dropzone">
+      <div className="k-well k-dropzone">
         <p>Presuňte výpisy sem alebo</p>
         <Button variant="primary" onClick={() => void pickFiles()}>
           Vybrať PDF
@@ -233,8 +291,10 @@ export function Import() {
           report={report}
           onPassword={(password, remember) => void handlePassword(report.path, password, remember)}
           onAddAccount={(iban, kind) => handleAddAccount(report.path, iban, kind)}
+          onContinue={onNavigateToTransactions}
         />
       ))}
+      <RecentImports statements={recent} />
       <Dialog
         open={addAccount !== null}
         title="Pridať účet"
@@ -251,11 +311,11 @@ export function Import() {
         }
       >
         <Field label="Názov účtu">
-          <input className="k-input" value={accountLabel} onChange={(e) => setAccountLabel(e.target.value)} />
+          <input className="k-input k-well" value={accountLabel} onChange={(e) => setAccountLabel(e.target.value)} />
         </Field>
         <Field label="Druh účtu">
           <select
-            className="k-select"
+            className="k-select k-well"
             value={addAccount?.kind ?? 'personal'}
             onChange={(e) =>
               setAddAccount((prev) => (prev ? { ...prev, kind: e.target.value as AccountKind } : prev))

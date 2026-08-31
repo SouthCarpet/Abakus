@@ -33,6 +33,7 @@ pub fn run() {
             commands::export_csv,
             commands::bad_checksums,
             commands::data_dir,
+            commands::recent_statements,
         ])
         .run(tauri::generate_context!())
         .expect("abakus failed to start");

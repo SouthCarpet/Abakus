@@ -8,6 +8,11 @@ import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { fromSkParts, maskIban } from '../lib/iban'
 
+// Large enough that every statement a single-user local install could hold
+// comes back in one page, so its length also serves as the total count
+// (spec: no dedicated counting command).
+const ALL_STATEMENTS_LIMIT = 100000
+
 const BANK_REF = /^\d{4}\/\d{1,6}-\d{1,10}$/
 
 function resolveIban(input: string): string {
@@ -39,6 +44,7 @@ function AccountRow({ account, onForgetPassword }: { account: Account; onForgetP
 export function Settings() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [dataDir, setDataDir] = useState('')
+  const [statementCount, setStatementCount] = useState(0)
   const [addOpen, setAddOpen] = useState(false)
   const [ibanInput, setIbanInput] = useState('')
   const [label, setLabel] = useState('')
@@ -52,6 +58,7 @@ export function Settings() {
   useEffect(() => {
     void refresh()
     void api.dataDir().then(setDataDir)
+    void api.recentStatements(ALL_STATEMENTS_LIMIT).then((list) => setStatementCount(list.length))
   }, [])
 
   async function saveAccount() {
@@ -80,37 +87,52 @@ export function Settings() {
 
   return (
     <div className="k-section">
-      <Card
-        title="Účty"
-        footer={
-          <Button variant="primary" onClick={() => setAddOpen(true)}>
-            Pridať účet
-          </Button>
-        }
-      >
-        <table className="k-table">
-          <thead>
-            <tr>
-              <th>Názov</th>
-              <th>Druh</th>
-              <th>IBAN</th>
-              <th>Heslo</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map((account) => (
-              <AccountRow key={account.id} account={account} onForgetPassword={(id) => void forgetPassword(id)} />
-            ))}
-          </tbody>
-        </table>
-      </Card>
-      <Card title="Údaje">
-        <p>Priečinok s dátami: {dataDir}</p>
-        <Button variant="secondary" onClick={() => void exportCsv()}>
-          Exportovať CSV
-        </Button>
-      </Card>
+      <div className="k-row" style={{ alignItems: 'stretch' }}>
+        <div className="k-section" style={{ flex: 1, minWidth: 320 }}>
+          <Card
+            title="Účty"
+            footer={
+              <Button variant="primary" onClick={() => setAddOpen(true)}>
+                Pridať účet
+              </Button>
+            }
+          >
+            <table className="k-table">
+              <thead>
+                <tr>
+                  <th>Názov</th>
+                  <th>Druh</th>
+                  <th>IBAN</th>
+                  <th>Heslo</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((account) => (
+                  <AccountRow key={account.id} account={account} onForgetPassword={(id) => void forgetPassword(id)} />
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          <Card title="Údaje">
+            <p>Priečinok s dátami: {dataDir}</p>
+            <Button variant="secondary" onClick={() => void exportCsv()}>
+              Exportovať CSV
+            </Button>
+          </Card>
+        </div>
+        <div style={{ flex: 1, minWidth: 320 }}>
+          <Card title="Stav">
+            <p>Priečinok s dátami: {dataDir}</p>
+            <p>
+              Účty: <span className="k-num">{accounts.length}</span>
+            </p>
+            <p>
+              Výpisy: <span className="k-num">{statementCount}</span>
+            </p>
+          </Card>
+        </div>
+      </div>
       <Dialog
         open={addOpen}
         title="Pridať účet"
@@ -127,13 +149,13 @@ export function Settings() {
         }
       >
         <Field label="IBAN alebo kód banky/číslo účtu">
-          <input className="k-input" value={ibanInput} onChange={(e) => setIbanInput(e.target.value)} />
+          <input className="k-input k-well" value={ibanInput} onChange={(e) => setIbanInput(e.target.value)} />
         </Field>
         <Field label="Názov účtu">
-          <input className="k-input" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <input className="k-input k-well" value={label} onChange={(e) => setLabel(e.target.value)} />
         </Field>
         <Field label="Druh účtu">
-          <select className="k-select" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
+          <select className="k-select k-well" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
             <option value="personal">Osobný</option>
             <option value="business">Firemný</option>
           </select>

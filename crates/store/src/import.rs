@@ -16,6 +16,11 @@ pub fn fingerprint(iban: &str, t: &Transaction) -> String {
 
 fn checksum_cols(c: Checksum) -> (&'static str, Option<i64>) { match c { Checksum::Ok => ("ok", None), Checksum::OffBy(d) => ("off", Some(d)), Checksum::NotVerifiable => ("not_verifiable", None) } }
 
+/// Reverse of `checksum_cols`, for reading `checksum_status`/`checksum_off_by` back out.
+pub(crate) fn checksum_from_cols(status: &str, off_by: Option<i64>) -> Checksum {
+    match status { "ok" => Checksum::Ok, "off" => Checksum::OffBy(off_by.unwrap_or(0)), _ => Checksum::NotVerifiable }
+}
+
 impl Store {
     /// Statement insert, transaction loop and classification run in one SQLite
     /// transaction (amendment A1): any failure rolls the whole import back

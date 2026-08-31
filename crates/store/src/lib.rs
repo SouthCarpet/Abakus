@@ -12,7 +12,7 @@ pub use accounts::Account;
 pub use assign::AssignOutcome;
 pub use categories::{Category, CategoryKind};
 pub use import::ImportOutcome;
-pub use query::{TxFilter, TxRow};
+pub use query::{RecentStatement, TxFilter, TxRow};
 pub use rules_repo::RuleView;
 pub use summary::*;
 

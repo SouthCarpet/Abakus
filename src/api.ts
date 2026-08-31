@@ -14,6 +14,7 @@ export interface TxRow { id: number; account_id: number; account_kind: AccountKi
 export interface ImportReport { path: string; status: ImportStatus; accountLabel: string | null; accountKind: AccountKind | null; ibanMasked: string | null; iban: string | null; statementNumber: number | null; periodStart: string | null; periodEnd: string | null; inserted: number; duplicates: number; checksum: Checksum | null; warnings: string[]; message: string | null }
 export interface Summary { income_cents: number; expense_cents: number; transfer_cents: number; net_cents: number; unassigned_count: number; suggested_count: number; by_category: { category_id: number; name: string; parent_name: string | null; cents: number }[]; by_month: { month: string; income_cents: number; expense_cents: number }[]; by_month_category: { month: string; category_id: number; name: string; cents: number }[]; top_merchants: { merchant: string; cents: number; count: number }[] }
 export interface BadChecksum { statement_id: number; number: number; account_label: string; off_by_cents: number }
+export interface RecentStatement { statement_id: number; number: number; period_end: string; account_label: string; transaction_count: number; checksum: Checksum }
 
 export const api = {
   importStatements: (paths: string[]) => invoke<ImportReport[]>('import_statements', { paths }),
@@ -33,6 +34,7 @@ export const api = {
   exportCsv: (filter: TxFilter, path: string) => invoke<number>('export_csv', { filter, path }),
   badChecksums: () => invoke<BadChecksum[]>('bad_checksums'),
   dataDir: () => invoke<string>('data_dir'),
+  recentStatements: (limit: number) => invoke<RecentStatement[]>('recent_statements', { limit }),
 }
 
 export function formatEur(cents: number): string {
