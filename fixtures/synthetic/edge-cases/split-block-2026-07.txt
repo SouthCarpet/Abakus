@@ -1,0 +1,21 @@
+Osobný účet     SK44 1100 0000 0000 1234 5678          Mena  EUR                          BIC (SWIFT)   TATRSKBX
+IBAN SK44 1100 0000 0000 1234 5678
+Číslo klienta:  1234567
+Majiteľ účtu:   JANA VZOROVÁ
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+Dialog  0800 00 1100              ID:   00                                    Výpis číslo:       11
+Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 31.07.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  30.06.2026                                                       300.00
+--------------------------------------------------------------------------------------------------
+01.07.2026    EUR AP nákup POS                                                                  5.00-
+              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁOsobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 31.07.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+              Miesto platby:    Neuss                 ALDI SUED
+              Dátum:  29.06.26  Čas:  12:13:57        Suma:          5.00- EUR
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                       295.00
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:       11        Strana:        1

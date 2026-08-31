@@ -1,0 +1,40 @@
+Podnikateľský účet   SK37 1100 0000 0000 9876 5432       Mena  EUR                       BIC (SWIFT)   TATRSKBX
+IBAN SK37 1100 0000 0000 9876 5432
+Číslo klienta:  7654321
+Majiteľ účtu:   JANA VZOROVÁ
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+CENTRÁLA/HEAD OFFICE              ID:   00                                    Výpis číslo:        6
+Podnikateľský účet   SK37 1100 0000 0000 9876 5432   Majiteľ Jana Vzorová              Dátum 30.06.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  30.05.2026                                                     2,210.63
+01.06.2026    EUR AP nákup POS                                                                 88.89-
+              Číslo karty:      423473******9357      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    NEUSS                 BAUHAUS
+              Dátum:  28.05.26  Čas:  13:54:33        Suma:         88.89- EUR
+--------------------------------------------------------------------------------------------------
+03.06.2026    TPP 8180/000000-7000000001                                                      233.42-
+              Platba trvalým príkazom:
+              Referencia platiteľa:                   /VS1234567890/SS/KS
+              Suma:233.42EUR                          Kurz:1.00000000           Valuta:03.06.2026
+              Banka príjemcu:   SPSRSKBAXXXX
+              Príjemca:         SK0281800000007000000001
+--------------------------------------------------------------------------------------------------
+11.06.2026    Platba 1100/000000-0012345678                                                 1,300.00-
+              Odoslaná platba:                        VP26061158365074
+              Suma:1,300.00EUR                        Kurz:1.00000000           Valuta:11.06.2026
+              Banka príjemcu:   TATRSKBXXXX
+              Príjemca:         SK4411000000000012345678
+              Jana Vzorová
+--------------------------------------------------------------------------------------------------
+18.06.2026    Platba 0900/000000-0000004242                                                 1,500.00
+              Prijatá platba:                         P026061812345678
+              Suma:1,500.00EUR                        Kurz:1.00000000           Valuta:18.06.2026
+              Banka platiteľa:GIBASKBXXXX
+              Platiteľ:         Firma Alfa s.r.o.
+              Detail: FA 2026017
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                   2,088.32
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        6        Strana:        1

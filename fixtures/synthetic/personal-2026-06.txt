@@ -1,0 +1,66 @@
+Osobný účet     SK44 1100 0000 0000 1234 5678          Mena  EUR                          BIC (SWIFT)   TATRSKBX
+IBAN SK44 1100 0000 0000 1234 5678
+Číslo klienta:  1234567
+Majiteľ účtu:   JANA VZOROVÁ
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+Dialog  0800 00 1100              ID:   00                                    Výpis číslo:        6
+Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 30.06.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  30.05.2026                                                       693.92
+01.06.2026    EUR AP nákup POS                                                                  1.99-
+              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    Neuss                 ALDI SUED
+              Dátum:  29.05.26  Čas:  12:13:57        Suma:          1.99- EUR
+--------------------------------------------------------------------------------------------------
+01.06.2026    Platba 0200/000000-5230000001                                                    10.00
+              Prijatá platba:                         P026060148122371
+              Referencia banky platiteľa:             2615290001847966
+              Suma:10.00EUR                           Kurz:1.00000000           Valuta:01.06.2026
+              Banka platiteľa:SUBASKBXXXX
+              Platiteľ:
+              SK09 0200 0000 0052 3000 0001
+              Peter Vzorový
+--------------------------------------------------------------------------------------------------
+02.06.2026    EUR NÁVRAT POS                          29.05.2026                              43.00
+              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    LUXEMBOURG            AMAZON* NQ97D00C4
+              Dátum:  29.05.26  Čas:  00:00:00        Suma:         43.00  EUR
+--------------------------------------------------------------------------------------------------
+02.06.2026    Platba 0026060200022221                                                          40.00-
+              Odoslaná platba:                        0026060200022221
+              Suma:40.00EUR                           Kurz:1.00000000           Valuta:02.06.2026
+              Banka príjemcu:   MARKDEF1860
+              Príjemca:
+              Landesdirektion Sachsen
+              Detail: 2120415617
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        6        Strana:        1Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 30.06.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+04.06.2026    EUR VYB.HOTOV. BANKOMAT                                                         180.00-
+              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Miesto výberu:    ERFTTAL               Sparkasse Neuss
+              Dátum:  02.06.26  Čas:  07:08:05        Suma:        180.00- EUR
+--------------------------------------------------------------------------------------------------
+05.06.2026    TPP 1100/000000-0098765432                                                       80.00-
+              Platba trvalým príkazom:
+              Referencia platiteľa:                   /VS/KS
+              Suma:80.00EUR                           Kurz:1.00000000           Valuta:05.06.2026
+              Banka príjemcu:   TATRSKBXXXX
+              Príjemca:
+              Jana Vzorová
+--------------------------------------------------------------------------------------------------
+08.06.2026    POS nákup zahr.                                                                  13.69-
+              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Miesto platby/výberu: London            OF
+              Dátum:  05.06.26  Čas:  04:14:43        Suma:         13.69- EUR
+              Orig. suma:       15.38- USD            Kurz:          1.1237
+--------------------------------------------------------------------------------------------------
+09.06.2026    Poplatok za vedenie účtu                                                          7.00-
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                       424.24
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        6        Strana:        2Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 30.06.2026
+Týmto potvrdzujem, že váš vklad je chránený v zmysle zákona o ochrane vkladov.
+Mena    EUR                                          Výpis číslo:        6        Strana:        3

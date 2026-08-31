@@ -1,0 +1,15 @@
+Osobný účet     SK44 1100 0000 0000 1234 5678          Mena  EUR                          BIC (SWIFT)   TATRSKBX
+IBAN SK44 1100 0000 0000 1234 5678
+Číslo klienta:  1234567
+Majiteľ účtu:   JANA VZOROVÁ
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+Dialog  0800 00 1100              ID:   00                                    Výpis číslo:        9
+Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 31.07.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  30.06.2026                                                       250.00
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                       250.00
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        9        Strana:        1
