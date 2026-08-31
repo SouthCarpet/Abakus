@@ -97,9 +97,11 @@ impl Store {
 }
 
 fn row_to_tx(r: &rusqlite::Row) -> rusqlite::Result<TxRow> {
+    // A defaulted 1970 date would hide a corrupt row behind a plausible-looking date
+    // (adjudicated review finding); surface the parse failure as a real SQLite error instead.
     let date = |i: usize| -> rusqlite::Result<NaiveDate> {
         let s: String = r.get(i)?;
-        Ok(NaiveDate::parse_from_str(&s, "%Y-%m-%d").unwrap_or_default())
+        NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(|e| rusqlite::Error::FromSqlConversionFailure(i, rusqlite::types::Type::Text, Box::new(e)))
     };
     let kind_s: String = r.get(2)?;
     Ok(TxRow {

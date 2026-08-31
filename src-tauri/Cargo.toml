@@ -17,6 +17,9 @@ tauri-plugin-dialog = "2"
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
+sha2.workspace = true
+hex.workspace = true
+keyring = "4"
 parser = { path = "../crates/parser" }
 rules = { path = "../crates/rules" }
 store = { path = "../crates/store" }

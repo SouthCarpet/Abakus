@@ -1,6 +1,6 @@
 use crate::{Result, Store, StoreError};
 use rules::{Rule, RuleKind};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)] struct SeedFile { rule: Vec<SeedRule> }
 #[derive(Deserialize)] struct SeedRule { key: String, category: String }
@@ -43,4 +43,17 @@ impl Store {
         Ok(())
     }
     pub fn touch_rule(&mut self, id: i64) -> Result<()> { self.conn.execute("UPDATE rules SET hit_count = hit_count + 1 WHERE id = ?1", [id])?; Ok(()) }
+
+    /// Rules joined with their category (and its parent) for the rules-list screen.
+    pub fn list_rules_view(&self) -> Result<Vec<RuleView>> {
+        let mut st = self.conn.prepare("SELECT r.id, r.match_kind, r.key, r.place, r.category_id, c.name, p.name, r.hit_count FROM rules r JOIN categories c ON c.id = r.category_id LEFT JOIN categories p ON p.id = c.parent_id ORDER BY r.hit_count DESC, r.id")?;
+        let rows = st.query_map([], |row| {
+            let place: String = row.get(3)?;
+            Ok(RuleView { id: row.get(0)?, kind: kind_parse(&row.get::<_, String>(1)?), key: row.get(2)?, place: (!place.is_empty()).then_some(place), category_id: row.get(4)?, category_name: row.get(5)?, parent_name: row.get(6)?, hit_count: row.get(7)? })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
+    }
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RuleView { pub id: i64, pub kind: RuleKind, pub key: String, pub place: Option<String>, pub category_id: i64, pub category_name: String, pub parent_name: Option<String>, pub hit_count: i64 }

@@ -30,4 +30,26 @@ impl Store {
     fn top_level_id(&self, name: &str) -> Result<Option<i64>> { Ok(self.conn.query_row("SELECT id FROM categories WHERE parent_id IS NULL AND name = ?1", [name], |r| r.get(0)).ok()) }
     pub fn cash_category_id(&self) -> Result<Option<i64>> { self.category_by_path("Hotovosť/bankomat") }
     pub fn unassigned_category_id(&self) -> Result<i64> { self.category_by_path("Nezaradené")?.ok_or_else(|| StoreError::Db("Nezaradené missing".into())) }
+
+    /// Create (`id: None`) or rename/reparent (`id: Some`) a category. System
+    /// categories are protected from the `UPDATE` by `AND system = 0`.
+    pub fn save_category(&mut self, id: Option<i64>, parent_id: Option<i64>, name: &str, kind: CategoryKind) -> Result<Category> {
+        let name = name.trim();
+        if name.is_empty() { return Err(StoreError::Parse("názov je prázdny".into())); }
+        let id = match id {
+            Some(i) => { self.conn.execute("UPDATE categories SET name = ?2, parent_id = ?3 WHERE id = ?1 AND system = 0", rusqlite::params![i, name, parent_id])?; i }
+            None => {
+                self.conn.execute("INSERT INTO categories (parent_id, name, kind, sort) VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(sort),0)+1 FROM categories WHERE parent_id IS ?1))", rusqlite::params![parent_id, name, kind.as_str()])?;
+                self.conn.last_insert_rowid()
+            }
+        };
+        self.list_categories()?.into_iter().find(|c| c.id == id).ok_or_else(|| StoreError::Db("category vanished".into()))
+    }
+
+    /// Archives a category (soft delete); refused for system categories.
+    pub fn archive_category(&mut self, id: i64) -> Result<()> {
+        let n = self.conn.execute("UPDATE categories SET archived = 1 WHERE id = ?1 AND system = 0", [id])?;
+        if n == 0 { return Err(StoreError::Parse("systémovú kategóriu nemožno archivovať".into())); }
+        Ok(())
+    }
 }
