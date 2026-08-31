@@ -33,6 +33,14 @@ impl Store {
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
-    pub fn delete_rule(&mut self, id: i64) -> Result<()> { self.conn.execute("UPDATE transactions SET rule_id = NULL WHERE rule_id = ?1", [id])?; self.conn.execute("DELETE FROM rules WHERE id = ?1", [id])?; Ok(()) }
+    /// Reopens any row that was pointing at this rule: nulls `rule_id`, deletes
+    /// the rule, then reclassifies every open row (so a suggestion whose rule
+    /// just vanished returns to `unassigned` without a caller having to ask).
+    pub fn delete_rule(&mut self, id: i64) -> Result<()> {
+        self.conn.execute("UPDATE transactions SET rule_id = NULL WHERE rule_id = ?1", [id])?;
+        self.conn.execute("DELETE FROM rules WHERE id = ?1", [id])?;
+        self.reclassify_open()?;
+        Ok(())
+    }
     pub fn touch_rule(&mut self, id: i64) -> Result<()> { self.conn.execute("UPDATE rules SET hit_count = hit_count + 1 WHERE id = ?1", [id])?; Ok(()) }
 }

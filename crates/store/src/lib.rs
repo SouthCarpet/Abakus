@@ -1,15 +1,19 @@
 //! SQLite store: accounts, statements, transactions, categories, rules, summaries.
 pub mod accounts;
+pub mod assign;
 pub mod categories;
 pub mod import;
 pub mod query;
 pub mod rules_repo;
 pub mod seed_categories;
+pub mod summary;
 
 pub use accounts::Account;
+pub use assign::AssignOutcome;
 pub use categories::{Category, CategoryKind};
 pub use import::ImportOutcome;
 pub use query::{TxFilter, TxRow};
+pub use summary::*;
 
 use rusqlite::Connection;
 use std::path::Path;
