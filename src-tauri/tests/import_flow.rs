@@ -50,6 +50,19 @@ fn remember_password_is_not_called_for_an_unknown_account() {
     assert!(calls.borrow().is_empty(), "setter must not be called for unknown_account");
 }
 
+/// A12: a statement whose IBAN is on no registered account reports
+/// `unknown_account` even when it is the only fixture on the store (the store
+/// starts with zero accounts, mirroring a first-ever import).
+#[test]
+fn unknown_account_fixture_reports_unknown_account() {
+    let mut s = Store::open_in_memory().unwrap();
+    let unknown = parse_text(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/synthetic/edge-cases/unknown-account-2026-07.txt")).unwrap()).unwrap();
+    let r = import_parsed(&mut s, "x.pdf", Ok(unknown), "h1");
+    assert_eq!(r.status, ImportStatus::UnknownAccount);
+    assert_eq!(r.iban.as_deref(), Some("SK8911000000000055555555"));
+    assert_eq!(r.account_kind, Some(AccountKind::Personal));
+}
+
 /// Successful import does write through the injected setter and flips `has_password`.
 #[test]
 fn remember_password_writes_and_flags_the_account_on_success() {

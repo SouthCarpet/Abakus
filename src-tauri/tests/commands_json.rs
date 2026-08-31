@@ -5,9 +5,12 @@ use abakus_lib::import_flow::{ImportReport, ImportStatus};
 use abakus_lib::update::Release;
 use chrono::{NaiveDate, TimeZone, Utc};
 use parser::{AccountKind, Checksum};
-use rules::Status;
+use rules::{RuleKind, Status};
 use serde_json::json;
-use store::{NetLogRow, RecentStatement, Summary, TxFilter, TxRow};
+use store::{
+    Account, AssignOutcome, BadChecksum, Category, CategoryKind, NetLogRow, RecentStatement,
+    RuleView, Summary, TxFilter, TxRow,
+};
 
 /// Tauri deserializes each command argument from its own JSON field (there is
 /// no single Rust struct for a multi-parameter command); these local structs
@@ -30,6 +33,26 @@ struct SetCheckUpdatesArgs { on: bool }
 
 #[derive(serde::Deserialize)]
 struct NetLogArgs { limit: usize }
+
+#[derive(serde::Deserialize)]
+struct ClearPasswordArgs {
+    #[serde(rename = "accountId")] account_id: i64,
+}
+
+#[derive(serde::Deserialize)]
+struct SaveCategoryArgs {
+    id: Option<i64>,
+    #[serde(rename = "parentId")] parent_id: Option<i64>,
+    name: String,
+    kind: CategoryKind,
+}
+
+#[derive(serde::Deserialize)]
+struct SummaryArgs {
+    from: Option<String>,
+    to: Option<String>,
+    #[serde(rename = "accountId")] account_id: Option<i64>,
+}
 
 #[test]
 fn import_statements_args_match_the_ui_call() {
@@ -138,6 +161,29 @@ fn net_log_args_match_the_ui_call() {
 }
 
 #[test]
+fn clear_password_args_match_the_ui_call() {
+    let args: ClearPasswordArgs = serde_json::from_value(json!({"accountId": 3})).unwrap();
+    assert_eq!(args.account_id, 3);
+}
+
+#[test]
+fn save_category_args_match_the_ui_call() {
+    let args: SaveCategoryArgs = serde_json::from_value(json!({"id": null, "parentId": 2, "name": "nová", "kind": "expense"})).unwrap();
+    assert_eq!(args.id, None);
+    assert_eq!(args.parent_id, Some(2));
+    assert_eq!(args.name, "nová");
+    assert_eq!(args.kind, CategoryKind::Expense);
+}
+
+#[test]
+fn summary_args_match_the_ui_call() {
+    let args: SummaryArgs = serde_json::from_value(json!({"from": "2026-06-01", "to": null, "accountId": 1})).unwrap();
+    assert_eq!(args.from.as_deref(), Some("2026-06-01"));
+    assert_eq!(args.to, None);
+    assert_eq!(args.account_id, Some(1));
+}
+
+#[test]
 fn release_serializes_with_the_fields_the_ui_reads() {
     let release = Release { tag: "0.2.0".into(), url: "https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0".into(), notes: "poznamky".into() };
     let v = serde_json::to_value(&release).unwrap();
@@ -177,4 +223,41 @@ fn recent_statement_serializes_snake_case() {
     assert_eq!(v["transaction_count"], json!(8));
     assert_eq!(v["checksum"], json!({"status": "ok"}));
     assert!(v.get("statementId").is_none(), "RecentStatement keeps snake_case field names, no camelCase");
+}
+
+/// Controller addition from the t11 review: round-trip the result shapes the
+/// t11 reviewer verified by hand on 193287f, so drift is caught automatically.
+#[test]
+fn assign_outcome_serializes_snake_case_incl_skipped_transfers() {
+    let o = AssignOutcome { updated: 3, rules_created: 2, skipped_transfers: 1 };
+    let v = serde_json::to_value(&o).unwrap();
+    assert_eq!(v, json!({"updated": 3, "rules_created": 2, "skipped_transfers": 1}));
+}
+
+#[test]
+fn bad_checksum_serializes_snake_case_all_four_fields() {
+    let b = BadChecksum { statement_id: 5, number: 7, account_label: "Osobný".into(), off_by_cents: 32 };
+    let v = serde_json::to_value(&b).unwrap();
+    assert_eq!(v, json!({"statement_id": 5, "number": 7, "account_label": "Osobný", "off_by_cents": 32}));
+}
+
+#[test]
+fn account_serializes_snake_case() {
+    let a = Account { id: 1, iban: "SK4411000000000012345678".into(), kind: AccountKind::Personal, label: "Osobný".into(), has_password: true };
+    let v = serde_json::to_value(&a).unwrap();
+    assert_eq!(v, json!({"id": 1, "iban": "SK4411000000000012345678", "kind": "personal", "label": "Osobný", "has_password": true}));
+}
+
+#[test]
+fn category_serializes_snake_case() {
+    let c = Category { id: 4, parent_id: Some(1), name: "potraviny".into(), kind: CategoryKind::Expense, sort: 0, system: false, archived: false };
+    let v = serde_json::to_value(&c).unwrap();
+    assert_eq!(v, json!({"id": 4, "parent_id": 1, "name": "potraviny", "kind": "expense", "sort": 0, "system": false, "archived": false}));
+}
+
+#[test]
+fn rule_view_serializes_snake_case() {
+    let r = RuleView { id: 9, kind: RuleKind::Exact, key: "aldi".into(), place: Some("neuss".into()), category_id: 4, category_name: "potraviny".into(), parent_name: Some("Jedlo".into()), hit_count: 2 };
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(v, json!({"id": 9, "kind": "exact", "key": "aldi", "place": "neuss", "category_id": 4, "category_name": "potraviny", "parent_name": "Jedlo", "hit_count": 2}));
 }

@@ -37,7 +37,11 @@ impl Store {
         let name = name.trim();
         if name.is_empty() { return Err(StoreError::Parse("názov je prázdny".into())); }
         let id = match id {
-            Some(i) => { self.conn.execute("UPDATE categories SET name = ?2, parent_id = ?3 WHERE id = ?1 AND system = 0", rusqlite::params![i, name, parent_id])?; i }
+            Some(i) => {
+                let n = self.conn.execute("UPDATE categories SET name = ?2, parent_id = ?3 WHERE id = ?1 AND system = 0", rusqlite::params![i, name, parent_id])?;
+                if n == 0 { return Err(StoreError::Parse("systémovú kategóriu nemožno premenovať".into())); }
+                i
+            }
             None => {
                 self.conn.execute("INSERT INTO categories (parent_id, name, kind, sort) VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(sort),0)+1 FROM categories WHERE parent_id IS ?1))", rusqlite::params![parent_id, name, kind.as_str()])?;
                 self.conn.last_insert_rowid()

@@ -1,0 +1,15 @@
+Osobný účet     SK89 1100 0000 0000 5555 5555          Mena  EUR                          BIC (SWIFT)   TATRSKBX
+IBAN SK89 1100 0000 0000 5555 5555
+Číslo klienta:  7654321
+Majiteľ účtu:   NEZNÁMY KLIENT
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+Dialog  0800 00 1100              ID:   00                                    Výpis číslo:        1
+Osobný účet     SK89 1100 0000 0000 5555 5555     Majiteľ Neznámy Klient                  Dátum 31.07.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  30.06.2026                                                       100.00
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                       100.00
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        1        Strana:        1

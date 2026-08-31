@@ -68,3 +68,12 @@ fn d(y: i32, m: u32, day: u32) -> NaiveDate { NaiveDate::from_ymd_opt(y, m, day)
     assert_eq!(t.merchant_raw, "ALDI SUED"); assert_eq!(t.place.as_deref(), Some("Neuss")); assert_eq!(t.tx_date, d(2026, 6, 29));
     assert_eq!(s.checksum(), Checksum::Ok);
 }
+
+// A12: unknown-account fixture (IBAN not on any registered account), used by
+// Task 16's import test and by the Import screen's unknown-account screenshot.
+#[test] fn unknown_account_fixture_parses_with_its_own_iban() {
+    let s = load("edge-cases/unknown-account-2026-07.txt");
+    assert_eq!(s.iban, "SK8911000000000055555555"); assert_eq!(s.account_kind, AccountKind::Personal); assert_eq!(s.number, 1);
+    assert_eq!(s.transactions.len(), 0);
+    assert_eq!(s.checksum(), Checksum::Ok);
+}
