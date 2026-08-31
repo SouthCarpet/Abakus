@@ -16,6 +16,12 @@ const OSTATNE_NAME = 'Ostatné'
  * cycles back through the chart-1..6 palette: this caps the real series at
  * `limit` and gives the remainder a single, separately-styled slot.
  */
+// Donut/stacked-bar drilldown: a clicked slice's category_id maps to itself,
+// except the folded Ostatné slice, which maps to null (no drilldown target).
+export function sliceCategoryId(categoryId: number): number | null {
+  return categoryId === OSTATNE_ID ? null : categoryId
+}
+
 export function topCategories(rows: CategoryTotal[], limit: number): CategoryTotal[] {
   const totals = new Map<number, CategoryTotal>()
   for (const row of rows) {

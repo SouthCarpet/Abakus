@@ -8,7 +8,7 @@ import { IncomeExpense } from '../components/charts/IncomeExpense'
 import { MonthlyStacked } from '../components/charts/MonthlyStacked'
 import { Kpi } from '../components/Kpi'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
-import { periodRange } from '../lib/period'
+import { monthRange, periodRange } from '../lib/period'
 
 const ACCOUNT_KINDS: { id: 'all' | AccountKind; label: string }[] = [
   { id: 'all', label: 'Všetko' },
@@ -95,12 +95,15 @@ function SummaryBody({
   incomeSpan,
   expenseSpan,
   onNavigateToTransactions,
+  onMonthClick,
 }: {
   summary: Summary
   incomeSpan?: { min: number; max: number }
   expenseSpan?: { min: number; max: number }
-  onNavigateToTransactions: (entry: { statementId?: number; status?: Status }) => void
+  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number }) => void
+  onMonthClick: (month: string) => void
 }) {
+  const onCategoryClick = (categoryId: number) => onNavigateToTransactions({ categoryId })
   return (
     <>
       <div className="k-kpi-row">
@@ -117,17 +120,17 @@ function SummaryBody({
       <div className="k-row" style={{ alignItems: 'stretch' }}>
         <div style={{ flex: 1, minWidth: 320 }}>
           <Card title="Podľa kategórií a mesiacov">
-            <MonthlyStacked rows={summary.by_month_category} />
+            <MonthlyStacked rows={summary.by_month_category} onCategoryClick={onCategoryClick} />
           </Card>
         </div>
         <div style={{ flex: 1, minWidth: 320 }}>
           <Card title="Príjmy a výdavky">
-            <IncomeExpense rows={summary.by_month} />
+            <IncomeExpense rows={summary.by_month} onMonthClick={onMonthClick} />
           </Card>
         </div>
       </div>
       <Card title="Podľa kategórií">
-        <CategoryDonut rows={summary.by_month_category} />
+        <CategoryDonut rows={summary.by_month_category} onCategoryClick={onCategoryClick} />
       </Card>
       <TopMerchantsTable rows={summary.top_merchants} />
     </>
@@ -139,9 +142,10 @@ export function Overview({
   onNavigateToTransactions,
 }: {
   onNavigateToImport: () => void
-  onNavigateToTransactions: (entry: { statementId?: number; status?: Status }) => void
+  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number }) => void
 }) {
   const [period, setPeriod] = usePeriod()
+  const onMonthClick = (month: string) => setPeriod({ kind: 'custom', custom: monthRange(month) })
   const [accountKind, setAccountKind] = useState<'all' | AccountKind>('all')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -191,6 +195,7 @@ export function Overview({
             incomeSpan={incomeSpan}
             expenseSpan={expenseSpan}
             onNavigateToTransactions={onNavigateToTransactions}
+            onMonthClick={onMonthClick}
           />
         )
       ) : null}

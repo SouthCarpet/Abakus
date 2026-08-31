@@ -12,6 +12,7 @@ type Screen = 'overview' | 'transactions' | 'import' | 'categories' | 'settings'
 interface TransactionsEntry {
   statementId?: number
   status?: Status
+  categoryId?: number
 }
 
 const RAIL_ITEMS: { id: Screen; label: string }[] = [
@@ -44,7 +45,11 @@ export function App() {
           <Overview onNavigateToImport={() => setScreen('import')} onNavigateToTransactions={goToTransactions} />
         ) : null}
         {screen === 'transactions' ? (
-          <Transactions statementId={transactionsEntry.statementId} initialStatus={transactionsEntry.status ?? null} />
+          <Transactions
+            statementId={transactionsEntry.statementId}
+            initialStatus={transactionsEntry.status ?? null}
+            initialCategoryId={transactionsEntry.categoryId ?? null}
+          />
         ) : null}
         {screen === 'import' ? <Import onNavigateToTransactions={(statementId) => goToTransactions({ statementId })} /> : null}
         {screen === 'categories' ? <Categories /> : null}

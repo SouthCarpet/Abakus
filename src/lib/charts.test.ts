@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OSTATNE_ID, topCategories } from './charts'
+import { OSTATNE_ID, sliceCategoryId, topCategories } from './charts'
 
 const rows = [
   { category_id: 1, name: 'Jedlo', cents: 800 },
@@ -64,5 +64,15 @@ describe('topCategories', () => {
         [2, 300],
       ]),
     )
+  })
+})
+
+describe('sliceCategoryId', () => {
+  it('maps a real category slice to its own id', () => {
+    expect(sliceCategoryId(5)).toBe(5)
+  })
+
+  it('maps the folded Ostatné slice to null, so it never drills down', () => {
+    expect(sliceCategoryId(OSTATNE_ID)).toBeNull()
   })
 })

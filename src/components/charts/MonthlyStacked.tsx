@@ -2,6 +2,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import type { Summary } from '../../api'
 import { formatEur } from '../../api'
 import { OSTATNE_ID, topCategories } from '../../lib/charts'
+import { ChartTooltip } from './ChartTooltip'
 
 // Series 1..6 map to the six fixed chart-N tokens in order, never cycling
 // back: topCategories caps the real series at 6, so this index never runs
@@ -29,7 +30,13 @@ function pivotByMonth(rows: Summary['by_month_category'], categoryIds: Set<numbe
   })
 }
 
-export function MonthlyStacked({ rows }: { rows: Summary['by_month_category'] }) {
+export function MonthlyStacked({
+  rows,
+  onCategoryClick,
+}: {
+  rows: Summary['by_month_category']
+  onCategoryClick: (categoryId: number) => void
+}) {
   const categories = topCategories(rows, 6)
   const topIds = new Set(categories.filter((c) => c.category_id !== OSTATNE_ID).map((c) => c.category_id))
   const data = pivotByMonth(rows, topIds)
@@ -40,13 +47,21 @@ export function MonthlyStacked({ rows }: { rows: Summary['by_month_category'] })
           <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
           <XAxis dataKey="month" stroke="var(--color-text-muted)" fontSize={12} tickLine={false} />
           <YAxis stroke="var(--color-text-muted)" fontSize={12} tickLine={false} domain={[0, 'auto']} tickFormatter={(v: number) => formatEur(v)} />
-          <Tooltip formatter={(value) => formatEur(Number(value))} />
+          <Tooltip content={ChartTooltip} cursor={{ className: 'k-chart-cursor' }} />
           <Legend />
           {categories.map((cat, i) =>
             cat.category_id === OSTATNE_ID ? (
               <Bar key={cat.category_id} dataKey={String(cat.category_id)} name={cat.name} stackId="a" fill="var(--color-border)" className="k-chart-ostatne" />
             ) : (
-              <Bar key={cat.category_id} dataKey={String(cat.category_id)} name={cat.name} stackId="a" fill={CHART_COLORS[i]} />
+              <Bar
+                key={cat.category_id}
+                dataKey={String(cat.category_id)}
+                name={cat.name}
+                stackId="a"
+                fill={CHART_COLORS[i]}
+                className="k-chart-slice"
+                onClick={() => onCategoryClick(cat.category_id)}
+              />
             ),
           )}
         </BarChart>

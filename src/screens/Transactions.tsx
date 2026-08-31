@@ -177,16 +177,18 @@ export function TransactionRow({
 export function Transactions({
   statementId,
   initialStatus,
+  initialCategoryId,
 }: {
   statementId?: number | null
   initialStatus?: Status | null
+  initialCategoryId?: number | null
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [rows, setRows] = useState<TxRow[]>([])
   const [period, setPeriod] = usePeriod()
   const [accountId, setAccountId] = useState<number | null>(null)
-  const [categoryId, setCategoryId] = useState<number | null>(null)
+  const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId ?? null)
   const [status, setStatus] = useState<Status | null>(initialStatus ?? null)
   const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS)
   const [selected, setSelected] = useState<Set<number>>(new Set())
