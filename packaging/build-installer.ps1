@@ -60,7 +60,12 @@ if (-not $SkipBuild) {
 
         Write-Host "Building release binary (cargo jobs=4)..."
         $env:CARGO_BUILD_JOBS = '4'
-        cargo build --release --jobs 4 --manifest-path src-tauri\Cargo.toml
+        # --features custom-protocol is what makes this a PRODUCTION binary.
+        # tauri-codegen sets `dev: cfg!(not(feature = "custom-protocol"))`, so
+        # without it cargo produces a dev-mode exe that loads build.devUrl
+        # (http://localhost:1420) and embeds no frontend. tauri-cli passes this
+        # feature itself; a bare `cargo build` must pass it by hand.
+        cargo build --release --features custom-protocol --jobs 4 --manifest-path src-tauri\Cargo.toml
         if ($LASTEXITCODE -ne 0) {
             throw "cargo build failed with exit code $LASTEXITCODE"
         }
@@ -120,6 +125,17 @@ while (-not $compiled -and $attempt -lt $maxAttempts) {
     } else {
         Write-Warning "ISCC attempt $attempt failed (exit $LASTEXITCODE). ESET real-time protection can lock a freshly written setup exe; retrying."
         if ($attempt -lt $maxAttempts) {
+            # Delete the half-written setup before retrying. Without this the
+            # loop could never recover: ISCC aborts with "The output file
+            # appears to be in use (5)", leaves the partial exe behind, and
+            # the scanner keeps that leftover locked, so every later attempt
+            # fails on the SAME stale file rather than on a fresh write.
+            # Observed 2026-08-31: 6 attempts failed in a row, then one
+            # attempt after deleting the leftover succeeded immediately.
+            $partial = Join-Path $outputDir "abakus-setup-$version.exe"
+            if (Test-Path -LiteralPath $partial) {
+                Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
+            }
             Start-Sleep -Seconds 15
         }
     }

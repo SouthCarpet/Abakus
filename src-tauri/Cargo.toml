@@ -33,3 +33,13 @@ tokio = { version = "1", features = ["rt", "macros"] }
 
 [lints]
 workspace = true
+
+# Tauri decides dev-vs-production at COMPILE time from this feature:
+# `tauri-codegen`'s context.rs sets `dev: cfg!(not(feature = "custom-protocol"))`.
+# Without it the binary keeps `build.devUrl` (http://localhost:1420) and embeds
+# no frontend at all, so an installed exe opens WebView2 on a dev server that
+# never runs and shows ERR_CONNECTION_REFUSED. `tauri dev` must NOT set it (it
+# wants the live dev server), so the release build passes it explicitly instead
+# of the dependency enabling it always. Grok t16b-verify FAIL, 2026-08-31.
+[features]
+custom-protocol = ["tauri/custom-protocol"]
