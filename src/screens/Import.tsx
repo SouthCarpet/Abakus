@@ -124,7 +124,7 @@ export function ImportResultCard({
   return (
     <Card title={fileName(report.path)} badge={importStatusLabel(report.status)}>
       <div className="k-row">
-        <span>{report.accountLabel ?? report.ibanMasked ?? '—'}</span>
+        <span>{report.accountLabel ?? report.ibanMasked ?? '-'}</span>
         {report.statementNumber !== null ? <span className="k-num">č. {report.statementNumber}</span> : null}
         <PeriodLine report={report} />
       </div>
@@ -151,7 +151,7 @@ export function Import() {
   const [reports, setReports] = useState<ImportReport[]>([])
   const [addAccount, setAddAccount] = useState<AddAccountTarget | null>(null)
   const [accountLabel, setAccountLabel] = useState('')
-  const passwordsRef = useRef<Record<string, string>>({})
+  const passwordsRef = useRef<Record<string, { password: string; remember: boolean }>>({})
 
   const mergeReports = useCallback((incoming: ImportReport[]) => {
     setReports((prev) => {
@@ -194,7 +194,7 @@ export function Import() {
   }
 
   async function handlePassword(path: string, password: string, remember: boolean) {
-    passwordsRef.current[path] = password
+    passwordsRef.current[path] = { password, remember }
     const report = await api.importWithPassword(path, password, remember)
     mergeReports([report])
   }
@@ -205,8 +205,10 @@ export function Import() {
   }
 
   async function retryImport(path: string) {
-    const password = passwordsRef.current[path]
-    const report = password ? await api.importWithPassword(path, password, false) : (await api.importStatements([path]))[0]
+    const stored = passwordsRef.current[path]
+    const report = stored
+      ? await api.importWithPassword(path, stored.password, stored.remember)
+      : (await api.importStatements([path]))[0]
     if (report) mergeReports([report])
   }
 

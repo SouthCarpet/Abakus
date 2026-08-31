@@ -1,4 +1,4 @@
-/* Kaliber base — ported class-for-class from design/gallery-web/gallery.css
+/* Kaliber base, ported class-for-class from design/gallery-web/gallery.css
    for the classes the app screens use, plus a .k-rail / .k-shell / .k-modal-root /
    .k-dropzone geometry block for the app shell (not present in the gallery,
    which has no navigation or app-wide dialog). Every colour, size and
