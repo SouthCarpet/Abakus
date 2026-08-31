@@ -111,8 +111,8 @@ export function Settings() {
     void api.recentStatements(ALL_STATEMENTS_LIMIT).then((list) => setStatementCount(list.length))
     void refreshNetLog()
     // Boot gating (spec A14): the check runs only when the persisted flag is
-    // on, at the moment Nastavenia is opened — the one place its result is
-    // ever shown.
+    // on, at the moment Nastavenia is opened. Nastavenia is the one place
+    // its result is ever shown.
     void api.getCheckUpdates().then((on) => {
       setCheckUpdates(on)
       if (on) void api.checkUpdateNow().then(setRelease)

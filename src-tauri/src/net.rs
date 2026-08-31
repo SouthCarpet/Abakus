@@ -1,6 +1,8 @@
-//! The one module allowed to speak HTTP (spec D9/A14b). `update::check` is
-//! the only caller of `audited_get`; `no_network.rs`'s `no_reqwest_outside_net`
-//! test greps the rest of `src-tauri/src` to keep it that way.
+//! The one module allowed to speak HTTP (spec D9/A14b). `update::check` (via
+//! `audited_get`) and `update::check_with` (via `fetch_and_log`, its
+//! test-injected transport) are the only callers of the request path this
+//! module owns; `no_network.rs`'s scanner greps the rest of `src-tauri/src`
+//! to keep it that way.
 //!
 //! `sample_connections` is a separate, lower-level check: it never opens a
 //! connection itself, it only reads which sockets this process already has
@@ -13,6 +15,9 @@ use store::Store;
 
 const USER_AGENT: &str = concat!("abakus/", env!("CARGO_PKG_VERSION"));
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
+/// A response larger than this is treated the same as any other transport
+/// failure: logged and returned as an error, never buffered without limit.
+const MAX_BODY_BYTES: usize = 1024 * 1024;
 
 /// One unauthenticated GET, logged to `net_log` whether it succeeds or
 /// fails. Returns the HTTP status and body on success.
@@ -28,14 +33,20 @@ pub async fn audited_get(store: &Mutex<Store>, url: &str) -> Result<(u16, Vec<u8
 /// The testable half of `audited_get`: `send` stands in for the real
 /// network call, so a test can inject a result and assert on the `net_log`
 /// row it produced without ever opening a socket.
-async fn fetch_and_log<F, Fut>(store: &Mutex<Store>, url: &str, send: F) -> Result<(u16, Vec<u8>), String>
+pub(crate) async fn fetch_and_log<F, Fut>(store: &Mutex<Store>, url: &str, send: F) -> Result<(u16, Vec<u8>), String>
 where
     F: FnOnce(String) -> Fut,
     Fut: Future<Output = Result<(u16, Vec<u8>), String>>,
 {
     let started_at = chrono::Utc::now();
     let started = Instant::now();
-    let result = send(url.to_string()).await;
+    let result = send(url.to_string()).await.and_then(|(status, body)| {
+        if body.len() > MAX_BODY_BYTES {
+            Err(format!("response body of {} bytes exceeds the {MAX_BODY_BYTES} byte cap", body.len()))
+        } else {
+            Ok((status, body))
+        }
+    });
     let duration_ms = started.elapsed().as_millis() as i64;
     let (status, bytes_in) = match &result {
         Ok((status, body)) => (status.to_string(), body.len() as i64),
@@ -47,8 +58,16 @@ where
     result
 }
 
-async fn send_request(url: String) -> Result<(u16, Vec<u8>), String> {
-    let response = reqwest::Client::new()
+pub(crate) async fn send_request(url: String) -> Result<(u16, Vec<u8>), String> {
+    // The one sanctioned call must not silently move: with redirects
+    // disabled, a 3xx response comes back as-is and `update::check_with`'s
+    // 200-299 range check turns it into a quiet `Status(code)` failure
+    // instead of the client following it to an unaudited host.
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
         .get(&url)
         .header(reqwest::header::USER_AGENT, USER_AGENT)
         .timeout(REQUEST_TIMEOUT)
@@ -60,12 +79,20 @@ async fn send_request(url: String) -> Result<(u16, Vec<u8>), String> {
     Ok((status, body))
 }
 
-/// `true` only for loopback addresses (127.0.0.0/8, `::1`). A listening
-/// socket's "any" address (`0.0.0.0`, `::`) is neither loopback nor a real
-/// remote peer; `sample_connections` drops those by TCP state before this
-/// ever runs, rather than folding that case into the classifier.
+/// `true` for loopback addresses (127.0.0.0/8, `::1`) and for an
+/// IPv4-mapped IPv6 loopback (`::ffff:127.0.0.1`), which `is_loopback()`
+/// alone does not catch. A listening socket's "any" address (`0.0.0.0`,
+/// `::`) is neither loopback nor a real remote peer; `sample_connections`
+/// drops those by TCP state before this ever runs, rather than folding that
+/// case into the classifier.
 pub fn is_localhost(addr: IpAddr) -> bool {
-    addr.is_loopback()
+    if addr.is_loopback() {
+        return true;
+    }
+    match addr {
+        IpAddr::V6(v6) => v6.to_ipv4_mapped().is_some_and(|v4| v4.is_loopback()),
+        IpAddr::V4(_) => false,
+    }
 }
 
 /// Reads this process's own live TCP table and logs every non-localhost
@@ -132,5 +159,24 @@ mod tests {
         assert!(!is_localhost("8.8.8.8".parse().unwrap()));
         assert!(!is_localhost("0.0.0.0".parse().unwrap()), "the any-address is not a real peer, but it is also not loopback");
         assert!(!is_localhost("::".parse().unwrap()));
+    }
+
+    #[test]
+    fn is_localhost_classifies_ipv4_mapped_loopback_too() {
+        assert!(is_localhost("::ffff:127.0.0.1".parse().unwrap()));
+        assert!(!is_localhost("::ffff:8.8.8.8".parse().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn fetch_and_log_rejects_a_body_over_the_cap_and_logs_it() {
+        let store = Mutex::new(Store::open_in_memory().unwrap());
+        let oversized = vec![0u8; MAX_BODY_BYTES + 1];
+        let result = fetch_and_log(&store, "https://api.github.com/x", move |_| async move { Ok((200, oversized)) }).await;
+        assert!(result.is_err(), "a body over the cap must not be returned to the caller");
+
+        let rows = store.lock().unwrap().net_log(10).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].status.starts_with("error:"), "the rejection must still be logged");
+        assert_eq!(rows[0].bytes_in, 0);
     }
 }

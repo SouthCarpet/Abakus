@@ -50,14 +50,19 @@ fn only_the_app_crate_declares_reqwest() {
 }
 
 /// A14b: `net::audited_get` must be the app's only reqwest callsite. Scans
-/// every `.rs` file under `src/` except `net.rs` itself for a `reqwest::`
-/// reference.
+/// every `.rs` file under `src/` except `net.rs` itself for any mention of
+/// `reqwest`, not only `reqwest::`, so an alias (`use reqwest as r;`) or a
+/// bare re-export can't slip the scan the narrower pattern missed. `net.rs`
+/// is the one allowed callsite; this test file names itself too, in case
+/// the scan is ever pointed at a wider tree that includes it.
+const ALLOWED_REQWEST_FILES: &[&str] = &["net.rs", "no_network.rs"];
+
 #[test]
 fn reqwest_is_used_only_inside_net_rs() {
     let src_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut offenders = Vec::new();
     collect_reqwest_offenders(&src_dir, &mut offenders);
-    assert!(offenders.is_empty(), "reqwest:: used outside net.rs: {offenders:?}");
+    assert!(offenders.is_empty(), "reqwest used outside net.rs: {offenders:?}");
 }
 
 fn collect_reqwest_offenders(dir: &std::path::Path, offenders: &mut Vec<String>) {
@@ -67,14 +72,14 @@ fn collect_reqwest_offenders(dir: &std::path::Path, offenders: &mut Vec<String>)
             collect_reqwest_offenders(&path, offenders);
             continue;
         }
-        if path.file_name().and_then(|n| n.to_str()) == Some("net.rs") {
+        if path.file_name().and_then(|n| n.to_str()).is_some_and(|n| ALLOWED_REQWEST_FILES.contains(&n)) {
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("rs") {
             continue;
         }
         let text = fs::read_to_string(&path).unwrap();
-        if text.contains("reqwest::") {
+        if text.contains("reqwest") {
             offenders.push(path.display().to_string());
         }
     }

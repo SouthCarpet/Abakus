@@ -4,6 +4,7 @@ use crate::import_flow::{self, import_path, ImportReport};
 use crate::secrets;
 use crate::state::AppState;
 use crate::{net, update};
+use std::sync::Mutex;
 use tauri::State;
 
 fn lock<'a>(state: &'a State<AppState>) -> Result<std::sync::MutexGuard<'a, store::Store>, String> {
@@ -132,7 +133,29 @@ pub fn set_check_updates(state: State<AppState>, on: bool) -> Result<(), String>
 /// collapses to `None`; the UI never distinguishes them (spec A14).
 #[tauri::command]
 pub async fn check_update_now(state: State<'_, AppState>) -> Result<Option<update::Release>, String> {
-    Ok(update::check(env!("CARGO_PKG_VERSION"), &state.store).await.ok().flatten())
+    check_update_now_inner(&state.store, env!("CARGO_PKG_VERSION"), net::send_request).await
+}
+
+/// The testable body of `check_update_now`: reads the opt-in setting itself
+/// rather than trusting the caller to have checked it first, so any command
+/// invocation (not only the one path the UI happens to use) is gated at the
+/// same place. `send` stands in for the real network transport, so a test
+/// can prove the gate with a recording fake that must never fire while the
+/// setting is off (Grok review t15b).
+pub async fn check_update_now_inner<F, Fut>(
+    store: &Mutex<store::Store>,
+    version: &str,
+    send: F,
+) -> Result<Option<update::Release>, String>
+where
+    F: FnOnce(String) -> Fut,
+    Fut: std::future::Future<Output = Result<(u16, Vec<u8>), String>>,
+{
+    let check_updates = store.lock().map_err(|_| "store busy".to_string())?.get_check_updates().map_err(|e| e.to_string())?;
+    if !update::wants_check(check_updates) {
+        return Ok(None);
+    }
+    Ok(update::check_with(version, store, send).await.ok().flatten())
 }
 
 #[tauri::command]
