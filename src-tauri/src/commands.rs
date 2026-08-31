@@ -3,6 +3,7 @@
 use crate::import_flow::{self, import_path, ImportReport};
 use crate::secrets;
 use crate::state::AppState;
+use crate::{net, update};
 use tauri::State;
 
 fn lock<'a>(state: &'a State<AppState>) -> Result<std::sync::MutexGuard<'a, store::Store>, String> {
@@ -116,3 +117,32 @@ pub fn data_dir(state: State<AppState>) -> String {
 pub fn recent_statements(state: State<AppState>, limit: usize) -> Result<Vec<store::RecentStatement>, String> {
     lock(&state)?.recent_statements(limit).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn get_check_updates(state: State<AppState>) -> Result<bool, String> {
+    lock(&state)?.get_check_updates().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_check_updates(state: State<AppState>, on: bool) -> Result<(), String> {
+    lock(&state)?.set_check_updates(on).map_err(|e| e.to_string())
+}
+
+/// Every failure (offline, rate limit, malformed body, nothing newer)
+/// collapses to `None`; the UI never distinguishes them (spec A14).
+#[tauri::command]
+pub async fn check_update_now(state: State<'_, AppState>) -> Result<Option<update::Release>, String> {
+    Ok(update::check(env!("CARGO_PKG_VERSION"), &state.store).await.ok().flatten())
+}
+
+#[tauri::command]
+pub fn net_log(state: State<AppState>, limit: usize) -> Result<Vec<store::NetLogRow>, String> {
+    lock(&state)?.net_log(limit).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn run_net_audit(state: State<AppState>) -> Result<usize, String> {
+    let mut s = lock(&state)?;
+    net::sample_connections(&mut s)
+}
+

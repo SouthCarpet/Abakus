@@ -2,11 +2,12 @@
 //! argument shape and result struct, round-trip the exact JSON the UI sends
 //! (literals copied from `src/api.ts` call sites) against the real Rust types.
 use abakus_lib::import_flow::{ImportReport, ImportStatus};
-use chrono::NaiveDate;
+use abakus_lib::update::Release;
+use chrono::{NaiveDate, TimeZone, Utc};
 use parser::{AccountKind, Checksum};
 use rules::Status;
 use serde_json::json;
-use store::{RecentStatement, Summary, TxFilter, TxRow};
+use store::{NetLogRow, RecentStatement, Summary, TxFilter, TxRow};
 
 /// Tauri deserializes each command argument from its own JSON field (there is
 /// no single Rust struct for a multi-parameter command); these local structs
@@ -23,6 +24,12 @@ struct AssignArgs {
 
 #[derive(serde::Deserialize)]
 struct RecentStatementsArgs { limit: usize }
+
+#[derive(serde::Deserialize)]
+struct SetCheckUpdatesArgs { on: bool }
+
+#[derive(serde::Deserialize)]
+struct NetLogArgs { limit: usize }
 
 #[test]
 fn import_statements_args_match_the_ui_call() {
@@ -116,6 +123,43 @@ fn checksum_off_by_serializes_with_tag_and_content() {
 fn recent_statements_args_match_the_ui_call() {
     let args: RecentStatementsArgs = serde_json::from_value(json!({"limit": 5})).unwrap();
     assert_eq!(args.limit, 5);
+}
+
+#[test]
+fn set_check_updates_args_match_the_ui_call() {
+    let args: SetCheckUpdatesArgs = serde_json::from_value(json!({"on": true})).unwrap();
+    assert!(args.on);
+}
+
+#[test]
+fn net_log_args_match_the_ui_call() {
+    let args: NetLogArgs = serde_json::from_value(json!({"limit": 20})).unwrap();
+    assert_eq!(args.limit, 20);
+}
+
+#[test]
+fn release_serializes_with_the_fields_the_ui_reads() {
+    let release = Release { tag: "0.2.0".into(), url: "https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0".into(), notes: "poznamky".into() };
+    let v = serde_json::to_value(&release).unwrap();
+    assert_eq!(v["tag"], json!("0.2.0"));
+    assert_eq!(v["url"], json!("https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0"));
+    assert_eq!(v["notes"], json!("poznamky"));
+}
+
+#[test]
+fn net_log_row_serializes_snake_case() {
+    let row = NetLogRow {
+        id: 1,
+        started_at: Utc.with_ymd_and_hms(2026, 8, 31, 10, 0, 0).unwrap(),
+        url: "https://api.github.com/repos/SouthCarpet/Abakus/releases/latest".into(),
+        status: "200".into(),
+        duration_ms: 120,
+        bytes_in: 512,
+    };
+    let v = serde_json::to_value(&row).unwrap();
+    assert_eq!(v["duration_ms"], json!(120));
+    assert_eq!(v["bytes_in"], json!(512));
+    assert!(v.get("durationMs").is_none(), "NetLogRow keeps snake_case field names, no camelCase");
 }
 
 #[test]

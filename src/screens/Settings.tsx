@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { save } from '@tauri-apps/plugin-dialog'
-import type { Account, AccountKind } from '../api'
+import type { Account, AccountKind, NetLogRow, Release } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
@@ -9,6 +9,46 @@ import { Field } from '../components/Field'
 import { usePeriod } from '../components/PeriodPicker'
 import { fromSkParts, maskIban } from '../lib/iban'
 import { periodRange } from '../lib/period'
+
+const NET_LOG_LIMIT = 20
+
+function formatLogTime(startedAt: string): string {
+  return startedAt.replace('T', ' ').replace('Z', '').slice(0, 19)
+}
+
+function NetLogSection({ rows, onScanNow }: { rows: NetLogRow[]; onScanNow: () => void }) {
+  return (
+    <div className="k-section">
+      <p className="k-card-title">Sieťová aktivita</p>
+      {rows.length === 0 ? (
+        <p>Žiadna sieťová aktivita</p>
+      ) : (
+        <table className="k-table">
+          <thead>
+            <tr>
+              <th>Čas</th>
+              <th>Adresa</th>
+              <th>Stav</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id}>
+                <td>{formatLogTime(row.started_at)}</td>
+                <td>{row.url}</td>
+                <td>{row.status}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p>Vzorkovanie nemusí zachytiť krátke pripojenia. Skutočnú záruku dávajú CSP politika a test závislostí.</p>
+      <Button variant="secondary" onClick={onScanNow}>
+        Skenovať teraz
+      </Button>
+    </div>
+  )
+}
 
 // Large enough that every statement a single-user local install could hold
 // comes back in one page, so its length also serves as the total count
@@ -53,16 +93,43 @@ export function Settings() {
   const [kind, setKind] = useState<AccountKind>('personal')
   const [error, setError] = useState('')
   const [period] = usePeriod()
+  const [checkUpdates, setCheckUpdates] = useState(false)
+  const [release, setRelease] = useState<Release | null>(null)
+  const [netLog, setNetLog] = useState<NetLogRow[]>([])
 
   async function refresh() {
     setAccounts(await api.listAccounts())
+  }
+
+  async function refreshNetLog() {
+    setNetLog(await api.netLog(NET_LOG_LIMIT))
   }
 
   useEffect(() => {
     void refresh()
     void api.dataDir().then(setDataDir)
     void api.recentStatements(ALL_STATEMENTS_LIMIT).then((list) => setStatementCount(list.length))
+    void refreshNetLog()
+    // Boot gating (spec A14): the check runs only when the persisted flag is
+    // on, at the moment Nastavenia is opened — the one place its result is
+    // ever shown.
+    void api.getCheckUpdates().then((on) => {
+      setCheckUpdates(on)
+      if (on) void api.checkUpdateNow().then(setRelease)
+    })
   }, [])
+
+  async function toggleCheckUpdates(next: boolean) {
+    await api.setCheckUpdates(next)
+    setCheckUpdates(next)
+    setRelease(next ? await api.checkUpdateNow() : null)
+    await refreshNetLog()
+  }
+
+  async function scanNow() {
+    await api.runNetAudit()
+    await refreshNetLog()
+  }
 
   async function saveAccount() {
     setError('')
@@ -134,6 +201,18 @@ export function Settings() {
             <p>
               Výpisy: <span className="k-num">{statementCount}</span>
             </p>
+            <label className="k-checkbox">
+              <input type="checkbox" checked={checkUpdates} onChange={(e) => void toggleCheckUpdates(e.target.checked)} />
+              Kontrolovať aktualizácie (GitHub)
+            </label>
+            <p>Toto je jediné sieťové volanie aplikácie. V predvolenom stave je vypnuté.</p>
+            {release ? (
+              <>
+                <p>Dostupná aktualizácia {release.tag}</p>
+                <p>{release.url}</p>
+              </>
+            ) : null}
+            <NetLogSection rows={netLog} onScanNow={() => void scanNow()} />
           </Card>
         </div>
       </div>

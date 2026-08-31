@@ -3,15 +3,18 @@ pub mod accounts;
 pub mod assign;
 pub mod categories;
 pub mod import;
+pub mod net_log;
 pub mod query;
 pub mod rules_repo;
 pub mod seed_categories;
+pub mod settings;
 pub mod summary;
 
 pub use accounts::Account;
 pub use assign::AssignOutcome;
 pub use categories::{Category, CategoryKind};
 pub use import::ImportOutcome;
+pub use net_log::NetLogRow;
 pub use query::{RecentStatement, TxFilter, TxRow};
 pub use rules_repo::RuleView;
 pub use summary::*;

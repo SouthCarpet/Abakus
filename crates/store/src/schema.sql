@@ -10,3 +10,5 @@ CREATE INDEX IF NOT EXISTS tx_status_idx ON transactions(status);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- Same NULL-distinct trap for top-level categories: UNIQUE (parent_id, name) does not fire when parent_id IS NULL.
 CREATE UNIQUE INDEX IF NOT EXISTS categories_top_uniq ON categories(name) WHERE parent_id IS NULL;
+-- Spec A14b: every outbound request net::audited_get makes, plus net::sample_connections observations.
+CREATE TABLE IF NOT EXISTS net_log (id INTEGER PRIMARY KEY, started_at TEXT NOT NULL, url TEXT NOT NULL, status TEXT NOT NULL, duration_ms INTEGER NOT NULL, bytes_in INTEGER NOT NULL);
