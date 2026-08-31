@@ -29,9 +29,13 @@
   printed original amount because of this rounding; the parser keeps both the printed
   original amount and the rate rather than recomputing one from the other, so this
   affects only a hypothetical future feature, not any value shown today.
-- **No installer in v1.** `src-tauri/tauri.conf.json` has `bundle.active: false`. Abakus
-  ships as a repo you build and run (`npm run tauri dev` or a built binary you copy
-  yourself), not as a signed installer or an auto-updating package.
+- **Installer exists but is unsigned, and there is still no release.**
+  `packaging/abakus.iss` and `packaging/build-installer.ps1` build a per-user
+  Inno Setup installer (see `packaging/INSTALL.md`). `src-tauri/tauri.conf.json`
+  keeps `bundle.active: false` on purpose: Inno is the bundler, not Tauri's
+  built-in one. The installer is not signed, and there is no GitHub release or
+  tag yet, so the in-app update check has nothing to find (see the next
+  entry).
 - **Update check needs a published release.** `check_update_now` reads GitHub's
   `releases/latest` endpoint (`src-tauri/src/update.rs`). Until the repo has a
   published release with a tag, that endpoint has nothing to return, so a fresh

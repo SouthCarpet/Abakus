@@ -9,3 +9,4 @@ fixtures/private/*
 !fixtures/private/.gitkeep
 src-tauri/resources/pdfium/
 src-tauri/gen/
+packaging/output/
