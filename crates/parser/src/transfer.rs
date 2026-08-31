@@ -56,17 +56,17 @@ mod tests {
         parse_transfer(&first_line(&blk).unwrap(), &blk)
     }
     #[test] fn incoming_with_explicit_iban_and_name_lines() {
-        let t = parse(&["01.06.2026    Platba 0200/000000-5230000001            10.00", "   Prijatá platba:                         P026060148122371", "   Suma:10.00EUR      Kurz:1.00000000     Valuta:01.06.2026", "   Platiteľ:", "   SK09 0200 0000 0052 3000 0001", "   Peter Vzorový"]);
+        let t = parse(&["01.06.2026    Platba 0200/000000-5230000001            10.00", "   Prijatá platba:                         P099990000000001", "   Suma:10.00EUR      Kurz:1.00000000     Valuta:01.06.2026", "   Platiteľ:", "   SK09 0200 0000 0052 3000 0001", "   Peter Vzorový"]);
         assert_eq!(t.kind, TxKind::TransferIn); assert_eq!(t.counterparty_iban.as_deref(), Some("SK0902000000005230000001"));
-        assert_eq!(t.counterparty_name.as_deref(), Some("Peter Vzorový")); assert_eq!(t.reference.as_deref(), Some("P026060148122371")); assert_eq!(t.merchant_raw, "Peter Vzorový");
+        assert_eq!(t.counterparty_name.as_deref(), Some("Peter Vzorový")); assert_eq!(t.reference.as_deref(), Some("P099990000000001")); assert_eq!(t.merchant_raw, "Peter Vzorový");
     }
     #[test] fn account_ref_without_iban_line_is_derived() {
         let t = parse(&["05.06.2026    TPP 1100/000000-0098765432            80.00-", "   Platba trvalým príkazom:", "   Suma:80.00EUR   Kurz:1.00000000   Valuta:05.06.2026", "   Príjemca:", "   Jana Vzorová"]);
         assert_eq!(t.kind, TxKind::StandingOrder); assert_eq!(t.counterparty_iban.as_deref(), Some("SK3711000000000098765432")); assert_eq!(t.tx_date, chrono::NaiveDate::from_ymd_opt(2026, 6, 5).unwrap());
     }
     #[test] fn foreign_reference_has_no_iban_and_uses_detail_when_reference_missing() {
-        let t = parse(&["02.06.2026    Platba 0026060200022221            40.00-", "   Suma:40.00EUR   Kurz:1.00000000   Valuta:02.06.2026", "   Príjemca:", "   Landesdirektion Sachsen", "   Detail: 2120415617"]);
-        assert_eq!(t.kind, TxKind::TransferOut); assert_eq!(t.counterparty_iban, None); assert_eq!(t.counterparty_name.as_deref(), Some("Landesdirektion Sachsen")); assert_eq!(t.reference.as_deref(), Some("2120415617"));
+        let t = parse(&["02.06.2026    Platba 0026060200022221            40.00-", "   Suma:40.00EUR   Kurz:1.00000000   Valuta:02.06.2026", "   Príjemca:", "   Landesdirektion Sachsen", "   Detail: 2100000000"]);
+        assert_eq!(t.kind, TxKind::TransferOut); assert_eq!(t.counterparty_iban, None); assert_eq!(t.counterparty_name.as_deref(), Some("Landesdirektion Sachsen")); assert_eq!(t.reference.as_deref(), Some("2100000000"));
     }
     #[test] fn iban_on_the_label_line_and_name_below() {
         let t = parse(&["11.06.2026    Platba 1100/000000-0012345678         1,300.00-", "   Príjemca:         SK4411000000000012345678", "   Jana Vzorová"]);

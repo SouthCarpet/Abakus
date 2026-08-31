@@ -39,11 +39,15 @@ fn id_of(s: &Store, merchant: &str) -> i64 { s.list_transactions(&TxFilter::defa
     let row = s.list_transactions(&TxFilter { text: Some("OF".into()), ..Default::default() }).unwrap().into_iter().find(|r| r.merchant_raw == "OF").unwrap();
     assert_eq!((row.status, row.category_id), (Status::Confirmed, Some(cat)));
 }
+/// N1: pins the full effect, not just the status flip, so a regression that
+/// drops the exact-rule write (merchant + place) or leaves the row
+/// `suggested` fails this test.
 #[test] fn confirm_turns_a_suggestion_into_a_rule() {
     let mut s = loaded(); let aldi = id_of(&s, "ALDI SUED");
     assert_eq!(s.confirm(&[aldi]).unwrap(), 1);
     let row = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == aldi).unwrap();
-    assert_eq!(row.status, Status::Confirmed); assert!(s.list_rules().unwrap().iter().any(|r| r.kind == RuleKind::Exact && r.key == "aldi sued"));
+    assert_eq!(row.status, Status::Confirmed);
+    assert!(s.list_rules().unwrap().iter().any(|r| r.kind == RuleKind::Exact && r.key == "aldi sued" && r.place.as_deref() == Some("neuss")));
 }
 
 /// A4 rebuild: two genuine Amazon card purchases (not the personal fixture's

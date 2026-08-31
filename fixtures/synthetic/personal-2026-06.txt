@@ -10,13 +10,13 @@ Dátum sprac.  Popis                                     Dátum zúčt.         
 --------------------------------------------------------------------------------------------------
               Posledný výpis  30.05.2026                                                       693.92
 01.06.2026    EUR AP nákup POS                                                                  1.99-
-              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
               Miesto platby:    Neuss                 ALDI SUED
               Dátum:  29.05.26  Čas:  12:13:57        Suma:          1.99- EUR
 --------------------------------------------------------------------------------------------------
 01.06.2026    Platba 0200/000000-5230000001                                                    10.00
-              Prijatá platba:                         P026060148122371
-              Referencia banky platiteľa:             2615290001847966
+              Prijatá platba:                         P099990000000001
+              Referencia banky platiteľa:             2699990000000001
               Suma:10.00EUR                           Kurz:1.00000000           Valuta:01.06.2026
               Banka platiteľa:SUBASKBXXXX
               Platiteľ:
@@ -24,7 +24,7 @@ Dátum sprac.  Popis                                     Dátum zúčt.         
               Peter Vzorový
 --------------------------------------------------------------------------------------------------
 02.06.2026    EUR NÁVRAT POS                          29.05.2026                              43.00
-              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
               Miesto platby:    LUXEMBOURG            AMAZON* NQ97D00C4
               Dátum:  29.05.26  Čas:  00:00:00        Suma:         43.00  EUR
 --------------------------------------------------------------------------------------------------
@@ -34,12 +34,12 @@ Dátum sprac.  Popis                                     Dátum zúčt.         
               Banka príjemcu:   MARKDEF1860
               Príjemca:
               Landesdirektion Sachsen
-              Detail: 2120415617
+              Detail: 2100000000
 --------------------------------------------------------------------------------------------------
 Mena    EUR                                          Výpis číslo:        6        Strana:        1Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 30.06.2026
 Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
 04.06.2026    EUR VYB.HOTOV. BANKOMAT                                                         180.00-
-              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
               Miesto výberu:    ERFTTAL               Sparkasse Neuss
               Dátum:  02.06.26  Čas:  07:08:05        Suma:        180.00- EUR
 --------------------------------------------------------------------------------------------------
@@ -52,7 +52,7 @@ Dátum sprac.  Popis                                     Dátum zúčt.         
               Jana Vzorová
 --------------------------------------------------------------------------------------------------
 08.06.2026    POS nákup zahr.                                                                  13.69-
-              Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
               Miesto platby/výberu: London            OF
               Dátum:  05.06.26  Čas:  04:14:43        Suma:         13.69- EUR
               Orig. suma:       15.38- USD            Kurz:          1.1237

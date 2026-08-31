@@ -54,6 +54,24 @@ struct SummaryArgs {
     #[serde(rename = "accountId")] account_id: Option<i64>,
 }
 
+#[derive(serde::Deserialize)]
+struct ImportWithPasswordArgs { path: String, password: String, remember: bool }
+
+#[derive(serde::Deserialize)]
+struct SaveAccountArgs { iban: String, kind: AccountKind, label: String }
+
+#[derive(serde::Deserialize)]
+struct ArchiveCategoryArgs { id: i64 }
+
+#[derive(serde::Deserialize)]
+struct DeleteRuleArgs { id: i64 }
+
+#[derive(serde::Deserialize)]
+struct ConfirmArgs { ids: Vec<i64> }
+
+#[derive(serde::Deserialize)]
+struct ExportCsvArgs { filter: TxFilter, path: String }
+
 #[test]
 fn import_statements_args_match_the_ui_call() {
     let args: ImportStatementsArgs = serde_json::from_value(json!({"paths": ["x.pdf"]})).unwrap();
@@ -181,6 +199,61 @@ fn summary_args_match_the_ui_call() {
     assert_eq!(args.from.as_deref(), Some("2026-06-01"));
     assert_eq!(args.to, None);
     assert_eq!(args.account_id, Some(1));
+}
+
+#[test]
+fn import_with_password_args_match_the_ui_call() {
+    let args: ImportWithPasswordArgs = serde_json::from_value(json!({"path": "x.pdf", "password": "heslo", "remember": true})).unwrap();
+    assert_eq!(args.path, "x.pdf");
+    assert_eq!(args.password, "heslo");
+    assert!(args.remember);
+}
+
+#[test]
+fn save_account_args_match_the_ui_call() {
+    let args: SaveAccountArgs = serde_json::from_value(json!({"iban": "SK4411000000000012345678", "kind": "personal", "label": "Osobný"})).unwrap();
+    assert_eq!(args.iban, "SK4411000000000012345678");
+    assert_eq!(args.kind, AccountKind::Personal);
+    assert_eq!(args.label, "Osobný");
+}
+
+#[test]
+fn archive_category_args_match_the_ui_call() {
+    let args: ArchiveCategoryArgs = serde_json::from_value(json!({"id": 4})).unwrap();
+    assert_eq!(args.id, 4);
+}
+
+#[test]
+fn delete_rule_args_match_the_ui_call() {
+    let args: DeleteRuleArgs = serde_json::from_value(json!({"id": 9})).unwrap();
+    assert_eq!(args.id, 9);
+}
+
+#[test]
+fn confirm_args_match_the_ui_call() {
+    let args: ConfirmArgs = serde_json::from_value(json!({"ids": [1, 2, 3]})).unwrap();
+    assert_eq!(args.ids, vec![1, 2, 3]);
+}
+
+#[test]
+fn export_csv_args_match_the_ui_call() {
+    let v = json!({
+        "filter": {
+            "from": "2026-06-01",
+            "to": null,
+            "account_id": 1,
+            "category_id": null,
+            "status": "confirmed",
+            "text": null,
+            "statement_id": null
+        },
+        "path": "out.csv"
+    });
+    let args: ExportCsvArgs = serde_json::from_value(v).unwrap();
+    assert_eq!(args.filter.from, Some(NaiveDate::from_ymd_opt(2026, 6, 1).unwrap()));
+    assert_eq!(args.filter.account_id, Some(1));
+    assert_eq!(args.filter.status, Some(Status::Confirmed));
+    assert_eq!(args.path, "out.csv");
 }
 
 #[test]

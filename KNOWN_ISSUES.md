@@ -32,3 +32,14 @@
 - **No installer in v1.** `src-tauri/tauri.conf.json` has `bundle.active: false`. Abakus
   ships as a repo you build and run (`npm run tauri dev` or a built binary you copy
   yourself), not as a signed installer or an auto-updating package.
+- **Update check needs a published release.** `check_update_now` reads GitHub's
+  `releases/latest` endpoint (`src-tauri/src/update.rs`). Until the repo has a
+  published release with a tag, that endpoint has nothing to return, so a fresh
+  install reports "no update" even when the code on `main` is newer than the copy
+  the user built.
+- **"Použiť aj na podobné" never rewrites a confirmed row.** Applying a category to
+  matching transactions (`Store::assign` with `apply_to_matching`, see
+  `crates/store/src/assign.rs`) re-files only rows still `suggested` or
+  `unassigned`. A row already `confirmed` keeps the category the user chose for it.
+  This is intentional, not a gap: a confirmed choice is a decision Abakus never
+  silently overwrites (spec-adjudicated 2026-08-31).

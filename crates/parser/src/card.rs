@@ -48,9 +48,9 @@ mod tests {
         parse_card(&first_line(&blk).unwrap(), &blk)
     }
     #[test] fn card_purchase() {
-        let t = parse(&["01.06.2026    EUR AP nákup POS                                     1.99-", "   Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ", "   Miesto platby:    Neuss                 ALDI SUED", "   Dátum:  29.05.26  Čas:  12:13:57        Suma:          1.99- EUR"]);
+        let t = parse(&["01.06.2026    EUR AP nákup POS                                     1.99-", "   Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ", "   Miesto platby:    Neuss                 ALDI SUED", "   Dátum:  29.05.26  Čas:  12:13:57        Suma:          1.99- EUR"]);
         assert_eq!(t.kind, TxKind::Card); assert_eq!(t.amount_cents, -199); assert_eq!(t.merchant_raw, "ALDI SUED"); assert_eq!(t.place.as_deref(), Some("Neuss"));
-        assert_eq!(t.tx_date, NaiveDate::from_ymd_opt(2026, 5, 29).unwrap()); assert_eq!(t.posted_date, NaiveDate::from_ymd_opt(2026, 6, 1).unwrap()); assert_eq!(t.card_last4.as_deref(), Some("8776"));
+        assert_eq!(t.tx_date, NaiveDate::from_ymd_opt(2026, 5, 29).unwrap()); assert_eq!(t.posted_date, NaiveDate::from_ymd_opt(2026, 6, 1).unwrap()); assert_eq!(t.card_last4.as_deref(), Some("1111"));
     }
     #[test] fn refund_is_positive_refund() {
         let t = parse(&["02.06.2026    EUR NÁVRAT POS          29.05.2026        43.00", "   Miesto platby:    LUXEMBOURG            AMAZON* NQ97D00C4", "   Dátum:  29.05.26  Čas:  00:00:00        Suma:         43.00  EUR"]);

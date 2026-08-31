@@ -78,8 +78,8 @@ mod tests {
     }
     #[test] fn non_record_line_is_none() { assert!(first_line(&b(&["   Posledný výpis  30.05.2026      693.92"])).is_none()); }
     #[test] fn field_takes_first_piece_after_colon() {
-        let blk = b(&["x", "   Číslo karty:      440577******8776      Držiteľ: JANA VZOROVÁ"]);
-        assert_eq!(field(&blk, "cislo karty").as_deref(), Some("440577******8776")); assert_eq!(field(&blk, "drzitel").as_deref(), Some("JANA VZOROVÁ"));
+        let blk = b(&["x", "   Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ"]);
+        assert_eq!(field(&blk, "cislo karty").as_deref(), Some("440000******1111")); assert_eq!(field(&blk, "drzitel").as_deref(), Some("JANA VZOROVÁ"));
     }
     #[test] fn field_without_spaces_after_colon() {
         let blk = b(&["x", "   Suma:10.00EUR      Kurz:1.00000000     Valuta:01.06.2026"]);
@@ -90,9 +90,9 @@ mod tests {
     }
     #[test] fn line_after_label() { assert_eq!(line_after(&b(&["   Platiteľ:", "   Peter Vzorový"]), "platitel").as_deref(), Some("Peter Vzorový")); }
     #[test] fn platitel_does_not_match_referencia_banky_platitela() {
-        let blk = b(&["x", "   Referencia banky platiteľa:             2615290001847966", "   Platiteľ:", "   Peter Vzorový"]);
+        let blk = b(&["x", "   Referencia banky platiteľa:             2699990000000001", "   Platiteľ:", "   Peter Vzorový"]);
         assert_eq!(field(&blk, "platitel"), None); assert_eq!(line_after(&blk, "platitel").as_deref(), Some("Peter Vzorový"));
-        assert_eq!(field(&blk, "referencia banky platitela").as_deref(), Some("2615290001847966"));
+        assert_eq!(field(&blk, "referencia banky platitela").as_deref(), Some("2699990000000001"));
     }
     #[test] fn prijemca_does_not_match_banka_prijemcu() {
         let blk = b(&["x", "   Banka príjemcu:   MARKDEF1860", "   Príjemca:", "   Landesdirektion Sachsen"]);

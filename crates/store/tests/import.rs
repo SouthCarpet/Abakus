@@ -13,7 +13,16 @@ fn store_with_accounts() -> Store {
 #[test] fn seeds_every_category_and_every_seed_rule_resolves() {
     let s = Store::open_in_memory().unwrap();
     let cats = s.list_categories().unwrap();
-    assert!(cats.iter().any(|c| c.name == "Nezaradené" && c.system)); assert!(cats.iter().any(|c| c.name == "potraviny" && c.parent_id.is_some()));
+    assert!(cats.iter().any(|c| c.name == "Nezaradené" && c.system));
+    // N4b: specific parent/child pairs (exact names from seed_categories.rs), not just counts.
+    let pair = |parent: &str, child: &str| {
+        cats.iter().find(|p| p.name == parent)
+            .is_some_and(|p| cats.iter().any(|c| c.parent_id == Some(p.id) && c.name == child))
+    };
+    assert!(pair("Bývanie", "nájom SK"));
+    assert!(pair("Jedlo", "potraviny"));
+    assert!(pair("Nákupy", "obchod"));
+    assert!(pair("Odvody a poistenie", "zdravotka"));
     assert!(s.category_by_path("Jedlo/potraviny").unwrap().is_some());
     assert!(s.list_rules().unwrap().iter().all(|r| r.kind == rules::RuleKind::Seed)); assert!(s.list_rules().unwrap().len() >= 40);
 }
@@ -43,6 +52,40 @@ fn store_with_accounts() -> Store {
     assert_eq!(s.statement_count().unwrap(), 2);
     assert_eq!(o.checksum, Checksum::Ok);
 }
+/// Fix item 1 (S3): a health-insurer merchant classifies to the zdravotka
+/// subcategory through the seed dictionary, not through Nezaradené.
+const HEALTH_INSURER_STATEMENT: &str = "Osobný účet     SK44 1100 0000 0000 1234 5678          Mena  EUR                          BIC (SWIFT)   TATRSKBX
+IBAN SK44 1100 0000 0000 1234 5678
+Číslo klienta:  1234567
+Majiteľ účtu:   JANA VZOROVÁ
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+Dialog  0800 00 1100              ID:   00                                    Výpis číslo:        8
+Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 31.08.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  31.07.2026                                                       300.00
+01.08.2026    EUR AP nákup POS                                                                  61.81-
+              Miesto platby:    Bratislava            VSEOBECNA ZDRAVOTNA POISTOVNA
+              Dátum:  01.08.26  Čas:  12:00:00        Suma:          61.81- EUR
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                       238.19
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        8        Strana:        1
+";
+
+#[test] fn health_insurer_merchant_classifies_to_zdravotka_via_seed() {
+    let mut s = store_with_accounts();
+    let st = parse_text(HEALTH_INSURER_STATEMENT).unwrap();
+    s.import_statement(&st, "h1").unwrap();
+    #[allow(clippy::default_constructed_unit_structs)]
+    let rows = s.list_transactions(&store::TxFilter::default()).unwrap();
+    let row = rows.iter().find(|r| r.merchant_raw == "VSEOBECNA ZDRAVOTNA POISTOVNA").unwrap();
+    assert_eq!(row.status, Status::Suggested);
+    assert_eq!(row.category_name.as_deref(), Some("zdravotka"));
+    assert_eq!(row.parent_name.as_deref(), Some("Odvody a poistenie"));
+}
+
 #[test] fn own_account_transfer_and_seed_suggestions_are_classified_on_import() {
     let mut s = store_with_accounts();
     s.import_statement(&fixture("personal-2026-06.txt"), "h1").unwrap();
