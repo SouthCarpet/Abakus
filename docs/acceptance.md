@@ -1,4 +1,4 @@
-# Acceptance record — Task 16 mechanical gates (2026-08-31)
+# Acceptance record : Task 16 mechanical gates (2026-08-31)
 
 Every command below was run with:
 
