@@ -1,6 +1,8 @@
 target/
 node_modules/
 dist/
+dist-types/
+*.tsbuildinfo
 *.db
 *.db-journal
 fixtures/private/*

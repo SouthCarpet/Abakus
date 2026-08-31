@@ -1,0 +1,204 @@
+/* Kaliber base — ported class-for-class from design/gallery-web/gallery.css
+   for the classes the app screens use, plus a .k-rail / .k-shell / .k-modal-root /
+   .k-dropzone geometry block for the app shell (not present in the gallery,
+   which has no navigation or app-wide dialog). Every colour, size and
+   duration is a var(--...) reference into tokens.css; the tokens-only vitest
+   enforces it. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, ul, dl, figure { margin: 0; }
+ul { padding: 0; list-style: none; }
+
+:focus { outline: none; }
+:focus-visible, .is-focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.k-num {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+
+.k-page { max-width: 1392px; margin: 0 auto; padding: var(--space-6) var(--space-6) var(--space-8); display: flex; flex-direction: column; gap: var(--space-6); flex: 1 1 auto; }
+
+.k-section { display: flex; flex-direction: column; gap: var(--space-2); }
+.k-row { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+
+.k-milled {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-top);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raise), inset 0 1px 0 var(--color-milled);
+}
+.k-section-body { padding: var(--space-4); }
+
+.k-well {
+  background: var(--color-well);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* ---- buttons ------------------------------------------------------------ */
+.k-btn {
+  height: var(--control-h);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+}
+.k-btn:disabled, .k-btn.is-disabled { cursor: not-allowed; }
+
+.k-btn-primary { background: var(--color-accent); color: var(--color-on-accent); }
+.k-btn-primary:hover, .k-btn-primary.is-hover { background: var(--color-accent-hover); }
+.k-btn-primary:active, .k-btn-primary.is-active { background: var(--color-accent-active); }
+.k-btn-primary:disabled, .k-btn-primary.is-disabled { background: var(--color-disabled-fill); color: var(--color-text-muted); }
+
+.k-btn-secondary { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border); }
+.k-btn-secondary:hover, .k-btn-secondary.is-hover,
+.k-btn-ghost:hover, .k-btn-ghost.is-hover {
+  background: var(--color-surface-hover);
+}
+.k-btn-secondary:active, .k-btn-secondary.is-active,
+.k-btn-ghost:active, .k-btn-ghost.is-active { background: var(--color-well); }
+.k-btn-secondary:disabled, .k-btn-secondary.is-disabled { background: var(--color-disabled-fill); border-color: var(--color-disabled-fill); color: var(--color-text-muted); }
+
+.k-btn-ghost { background: transparent; color: var(--color-text); }
+.k-btn-ghost:disabled, .k-btn-ghost.is-disabled { color: var(--color-text-muted); background: transparent; }
+
+.k-btn-danger { background: var(--color-danger); color: var(--color-on-accent); }
+.k-btn-danger:hover, .k-btn-danger.is-hover { background: var(--color-danger-hover); }
+.k-btn-danger:active, .k-btn-danger.is-active { background: var(--color-danger-active); }
+.k-btn-danger:disabled, .k-btn-danger.is-disabled { background: var(--color-disabled-fill); color: var(--color-text-muted); }
+
+.k-btn.is-focus { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* ---- inputs --------------------------------------------------------------- */
+.k-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.k-field-label { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-input, .k-select {
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+.k-input.is-focus, .k-select.is-focus { border-color: var(--color-accent); }
+.k-input:disabled, .k-input.is-disabled { background: var(--color-disabled-fill); color: var(--color-text-muted); }
+
+.k-checkbox { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+
+/* ---- card ------------------------------------------------------------- */
+.k-card-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.k-card-title { font-size: var(--text-md); font-weight: 600; }
+.k-card-badge { font-size: var(--text-xs); color: var(--color-accent-soft-foreground); background: var(--color-accent-soft); padding: 2px var(--space-2); border-radius: var(--radius-pill); }
+.k-card-body { color: var(--color-text-muted); font-size: var(--text-sm); display: flex; flex-direction: column; gap: var(--space-2); }
+.k-card-footer { display: flex; gap: var(--space-2); justify-content: flex-end; padding-top: var(--space-3); margin-top: var(--space-3); border-top: 1px solid var(--color-border); }
+
+/* ---- KPI micro-gauge ---------------------------------------------------- */
+.k-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+.k-kpi { display: flex; flex-direction: column; gap: var(--space-1); }
+.k-kpi-value { font-size: var(--text-xl); font-weight: 600; }
+.k-kpi-label { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-gauge { position: relative; height: 3px; border-radius: var(--radius-pill); background: var(--color-border); margin-top: var(--space-2); }
+.k-gauge-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: var(--radius-pill); background: var(--color-accent); }
+.k-gauge-tick { position: absolute; top: -2px; width: 2px; height: 7px; border-radius: 0; background: var(--color-accent-active); }
+
+/* ---- dialog + scrim ------------------------------------------------------ */
+.k-modal-root { position: fixed; inset: 0; z-index: 50; }
+.k-scrim { position: absolute; inset: 0; background: var(--color-scrim); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
+.k-dialog { width: 300px; padding: var(--space-4); }
+.k-dialog-title { font-size: var(--text-md); font-weight: 600; margin-bottom: var(--space-2); }
+.k-dialog-body { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.k-dialog-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+
+/* ---- toast ---------------------------------------------------------------- */
+.k-toast { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+.k-toast-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--color-success); flex: none; }
+
+/* ---- table: hairline rows, right-aligned tabular numeric columns ---------- */
+table { border-collapse: collapse; }
+.k-table { width: 100%; font-size: var(--text-sm); }
+.k-table th { text-align: left; font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+.k-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
+.k-table tr:last-child td { border-bottom: 0; }
+td.k-num { text-align: right; font-variant-numeric: tabular-nums; }
+/* hairline rule only between adjoining numeric columns, not every column */
+.k-table th.k-num + th.k-num, .k-table td.k-num + td.k-num { border-left: 1px solid var(--color-border); }
+
+/* ---- text tone utilities --------------------------------------------------- */
+.k-text-danger { color: var(--color-danger); }
+.k-text-success { color: var(--color-success); }
+
+/* ---- app shell -------------------------------------------------------------- */
+.k-shell { display: flex; min-height: 100vh; }
+
+/* ---- left rail (app-specific, not in the gallery) --------------------------- */
+.k-rail {
+  width: calc(var(--space-8) * 7);
+  flex: none;
+  background: var(--color-well);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-2);
+}
+.k-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  font-weight: 600;
+}
+.k-rail-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.k-rail-item:hover { background: var(--color-surface-hover); }
+.k-rail-item.is-active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-soft-foreground);
+  font-weight: 500;
+}
+
+/* ---- import drop zone (app-specific) ----------------------------------------- */
+.k-dropzone {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-well);
+  padding: var(--space-6);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: center;
+}
