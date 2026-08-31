@@ -124,7 +124,7 @@ export function ImportResultCard({
   report: ImportReport
   onPassword: (password: string, remember: boolean) => void
   onAddAccount: (iban: string, kind: AccountKind) => void
-  onContinue?: () => void
+  onContinue?: (statementId?: number) => void
 }) {
   const canContinue = onContinue && SUCCESS_STATUSES.has(report.status)
   return (
@@ -133,7 +133,7 @@ export function ImportResultCard({
       badge={importStatusLabel(report.status)}
       footer={
         canContinue ? (
-          <Button variant="primary" onClick={onContinue}>
+          <Button variant="primary" onClick={() => onContinue?.()}>
             Pokračovať na Transakcie
           </Button>
         ) : undefined
@@ -163,7 +163,13 @@ interface AddAccountTarget {
   kind: AccountKind
 }
 
-function RecentImportsRow({ statement }: { statement: RecentStatement }) {
+function RecentImportsRow({
+  statement,
+  onNavigate,
+}: {
+  statement: RecentStatement
+  onNavigate: (statementId: number) => void
+}) {
   const danger = statement.checksum.status === 'off_by'
   return (
     <div className="k-round-row">
@@ -172,11 +178,20 @@ function RecentImportsRow({ statement }: { statement: RecentStatement }) {
       <span className="k-num">č. {statement.number}</span>
       <span className="k-num">{statement.transaction_count} transakcií</span>
       <span className={danger ? 'k-card-badge k-text-danger' : 'k-card-badge'}>{checksumLabel(statement.checksum)}</span>
+      <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
+        Zobraziť transakcie
+      </Button>
     </div>
   )
 }
 
-function RecentImports({ statements }: { statements: RecentStatement[] }) {
+function RecentImports({
+  statements,
+  onNavigate,
+}: {
+  statements: RecentStatement[]
+  onNavigate: (statementId: number) => void
+}) {
   return (
     <Card title="Posledné importy">
       {statements.length === 0 ? (
@@ -184,7 +199,7 @@ function RecentImports({ statements }: { statements: RecentStatement[] }) {
       ) : (
         <div className="k-round-list">
           {statements.map((s) => (
-            <RecentImportsRow key={s.statement_id} statement={s} />
+            <RecentImportsRow key={s.statement_id} statement={s} onNavigate={onNavigate} />
           ))}
         </div>
       )}
@@ -192,7 +207,7 @@ function RecentImports({ statements }: { statements: RecentStatement[] }) {
   )
 }
 
-export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?: () => void }) {
+export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?: (statementId?: number) => void }) {
   const [reports, setReports] = useState<ImportReport[]>([])
   const [recent, setRecent] = useState<RecentStatement[]>([])
   const [addAccount, setAddAccount] = useState<AddAccountTarget | null>(null)
@@ -294,7 +309,7 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
           onContinue={onNavigateToTransactions}
         />
       ))}
-      <RecentImports statements={recent} />
+      <RecentImports statements={recent} onNavigate={(id) => onNavigateToTransactions?.(id)} />
       <Dialog
         open={addAccount !== null}
         title="Pridať účet"
