@@ -10,6 +10,16 @@ serde.workspace = true
 regex.workspace = true
 thiserror.workspace = true
 unicode-normalization = "0.1"
+# default-features off: `pdfium_latest` binds function pointers up to the newest Pdfium release,
+# and GetProcAddress fails at bind time for any symbol our older pinned DLL (chromium/7469,
+# scripts/fetch-pdfium.ps1) does not export. `pdfium_7350` is the closest bundled binding set at
+# or below 7469; `thread_safe` lets one bound Pdfium instance be shared (OnceLock) across test
+# threads, since Pdfium's own binding slot can only be initialized once per process.
+pdfium-render = { version = "0.9", default-features = false, features = ["thread_safe", "pdfium_7350"] }
+
+[dev-dependencies]
+lopdf = "0.44"
+tempfile = "3"
 
 [lints]
 workspace = true
