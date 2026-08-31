@@ -44,7 +44,7 @@ export function MonthlyStacked({ rows }: { rows: Summary['by_month_category'] })
           <Legend />
           {categories.map((cat, i) =>
             cat.category_id === OSTATNE_ID ? (
-              <Bar key={cat.category_id} dataKey={String(cat.category_id)} name={cat.name} stackId="a" fill="var(--color-border)" fillOpacity="var(--color-chart-band-alpha)" />
+              <Bar key={cat.category_id} dataKey={String(cat.category_id)} name={cat.name} stackId="a" fill="var(--color-border)" className="k-chart-ostatne" />
             ) : (
               <Bar key={cat.category_id} dataKey={String(cat.category_id)} name={cat.name} stackId="a" fill={CHART_COLORS[i]} />
             ),

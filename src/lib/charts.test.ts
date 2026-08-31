@@ -36,4 +36,33 @@ describe('topCategories', () => {
     const few = [{ category_id: 1, name: 'Jedlo', cents: 100 }]
     expect(topCategories(few, 6)).toEqual(few)
   })
+
+  it('rolls up a multi-month input to the same per-category totals the stacked chart draws', () => {
+    // Shape of Summary.by_month_category: one row per (month, category).
+    // MonthlyStacked draws one stacked bar per month, one segment per
+    // category; summing a category's segments across every bar gives its
+    // total height across the whole chart. CategoryDonut feeds the same
+    // rows through topCategories, which sums by category_id regardless of
+    // month, so the two must land on identical per-category totals.
+    const monthly = [
+      { month: '2026-01', category_id: 1, name: 'Jedlo', cents: 300 },
+      { month: '2026-02', category_id: 1, name: 'Jedlo', cents: 500 },
+      { month: '2026-01', category_id: 2, name: 'Doprava', cents: 200 },
+      { month: '2026-03', category_id: 2, name: 'Doprava', cents: 100 },
+    ]
+    const stackedTotalsByCategory = new Map<number, number>()
+    for (const row of monthly) {
+      stackedTotalsByCategory.set(row.category_id, (stackedTotalsByCategory.get(row.category_id) ?? 0) + row.cents)
+    }
+
+    const donut = topCategories(monthly, 6)
+
+    expect(donut.map((c) => c.cents)).toEqual(donut.map((c) => stackedTotalsByCategory.get(c.category_id)))
+    expect(new Map(donut.map((c) => [c.category_id, c.cents]))).toEqual(
+      new Map([
+        [1, 800],
+        [2, 300],
+      ]),
+    )
+  })
 })

@@ -18,7 +18,7 @@ function sliceColor(categoryId: number, index: number): string {
   return categoryId === OSTATNE_ID ? 'var(--color-border)' : CHART_COLORS[index]
 }
 
-export function CategoryDonut({ rows }: { rows: Summary['by_category'] }) {
+export function CategoryDonut({ rows }: { rows: Summary['by_month_category'] }) {
   const categories = topCategories(rows, 6)
   return (
     <div className="k-well" style={{ padding: 'var(--space-3)' }}>
@@ -29,7 +29,7 @@ export function CategoryDonut({ rows }: { rows: Summary['by_category'] }) {
               <Cell
                 key={cat.category_id}
                 fill={sliceColor(cat.category_id, i)}
-                fillOpacity={cat.category_id === OSTATNE_ID ? 'var(--color-chart-band-alpha)' : undefined}
+                className={cat.category_id === OSTATNE_ID ? 'k-chart-ostatne' : undefined}
               />
             ))}
           </Pie>

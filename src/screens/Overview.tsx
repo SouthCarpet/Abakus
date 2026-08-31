@@ -106,7 +106,7 @@ function SummaryBody({
       <div className="k-kpi-row">
         <Kpi label="Príjem" cents={summary.income_cents} min={incomeSpan?.min} max={incomeSpan?.max} tone="success" />
         <Kpi label="Výdavky" cents={summary.expense_cents} min={expenseSpan?.min} max={expenseSpan?.max} tone="danger" />
-        <Kpi label="Čisté" cents={summary.net_cents} tone={summary.net_cents >= 0 ? 'success' : 'danger'} />
+        <Kpi label="Čisté" cents={summary.net_cents} tone={summary.net_cents >= 0 ? 'success' : 'danger'} baselineOnly />
         <Kpi label="Prevody vylúčené" cents={summary.transfer_cents} />
       </div>
       <UnassignedTile
@@ -127,7 +127,7 @@ function SummaryBody({
         </div>
       </div>
       <Card title="Podľa kategórií">
-        <CategoryDonut rows={summary.by_category} />
+        <CategoryDonut rows={summary.by_month_category} />
       </Card>
       <TopMerchantsTable rows={summary.top_merchants} />
     </>
