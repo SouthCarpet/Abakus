@@ -165,6 +165,37 @@ fn fixture_from(text: &str) -> parser::Statement { parse_text(text).unwrap() }
     assert!(after.transfer_cents > before.transfer_cents);
 }
 
+/// A1: `reclassify_after_account_change` must flip a row to `Transfer` and
+/// drop its category even when the row was already confirmed, not just
+/// suggested or unassigned. This pins the UPDATE having no `status IN (...)`
+/// narrowing.
+#[test] fn reclassify_after_account_change_flips_even_confirmed_rows() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    s.import_statement(&fixture("personal-2026-06.txt"), "h1").unwrap();
+    let tpp = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.counterparty_iban.as_deref() == Some("SK3711000000000098765432")).unwrap();
+    let cat = s.category_by_path("Nákupy/domácnosť").unwrap().unwrap();
+    s.assign(&[tpp.id], cat, false).unwrap();
+    let confirmed = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == tpp.id).unwrap();
+    assert_eq!(confirmed.status, Status::Confirmed);
+    s.upsert_account("SK3711000000000098765432", AccountKind::Business, "Firemný").unwrap();
+    s.reclassify_after_account_change().unwrap();
+    let row = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == tpp.id).unwrap();
+    assert_eq!(row.status, Status::Transfer);
+    assert_eq!(row.category_id, None);
+}
+
+/// A1: `confirm` only turns a `Suggested` row into a rule; it must never
+/// touch a `Transfer` row.
+#[test] fn confirm_never_touches_a_transfer_row() {
+    let mut s = loaded();
+    let transfer_row = s.list_transactions(&TxFilter { status: Some(Status::Transfer), ..Default::default() }).unwrap().into_iter().next().unwrap();
+    assert_eq!(s.confirm(&[transfer_row.id]).unwrap(), 0);
+    let after = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == transfer_row.id).unwrap();
+    assert_eq!(after.status, Status::Transfer);
+    assert_eq!(after.category_id, None);
+}
+
 /// A3: checksum banner data.
 #[test] fn statements_with_bad_checksum_reports_the_off_by_amount() {
     let mut st = fixture("business-2026-06.txt");
