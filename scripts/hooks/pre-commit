@@ -8,7 +8,9 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR)
 pdfs=$(printf '%s\n' "$staged" | grep -iE '\.pdf$' || true)
 if [ -n "$pdfs" ]; then echo "blocked: PDF files are never committed:"; echo "$pdfs"; exit 1; fi
 # The five synthetic IBANs of this repo (valid check digits, fake accounts) plus the public Wikipedia example.
-ALLOW="SK4411000000000012345678 SK3711000000000098765432 SK0281800000007000000001 SK0902000000005230000001 SK3112000000198742637541"
+# SK3212000000198742637541 is that same Wikipedia example with one checksum digit changed on purpose,
+# used only to test that iban::is_valid rejects a bad checksum.
+ALLOW="SK4411000000000012345678 SK3711000000000098765432 SK0281800000007000000001 SK0902000000005230000001 SK3112000000198742637541 SK3212000000198742637541"
 hits=$(git diff --cached -U0 | grep -E '^\+' | grep -oE 'SK[0-9]{2} ?[0-9]{4} ?[0-9]{4} ?[0-9]{4} ?[0-9]{4} ?[0-9]{4}' | tr -d ' ' | sort -u || true)
 bad=""
 for h in $hits; do
