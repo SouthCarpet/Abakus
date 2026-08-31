@@ -9,6 +9,9 @@ chrono.workspace = true
 serde.workspace = true
 regex.workspace = true
 thiserror.workspace = true
+strsim = "0.11"
+unicode-normalization = "0.1"
+parser = { path = "../parser" }
 
 [lints]
 workspace = true

@@ -2906,9 +2906,12 @@ name = "rules"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "parser",
  "regex",
  "serde",
+ "strsim",
  "thiserror 2.0.20",
+ "unicode-normalization",
 ]
 
 [[package]]
