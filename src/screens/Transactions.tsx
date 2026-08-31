@@ -3,8 +3,11 @@ import type { Account, Category, Status, TxFilter, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { CategoryPicker } from '../components/CategoryPicker'
+import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
+import { Toast } from '../components/Toast'
 import { statusLabel } from '../lib/categories'
 import { formatDate } from '../lib/format'
+import { periodRange } from '../lib/period'
 
 const TEXT_DEBOUNCE_MS = 300
 const STATUSES: Status[] = ['transfer', 'confirmed', 'suggested', 'unassigned']
@@ -22,14 +25,10 @@ function useDebouncedText(delay: number): [string, string, (v: string) => void] 
 function FilterBar({
   accounts,
   categories,
-  from,
-  to,
   accountId,
   categoryId,
   status,
   text,
-  onFrom,
-  onTo,
   onAccount,
   onCategory,
   onStatus,
@@ -37,14 +36,10 @@ function FilterBar({
 }: {
   accounts: Account[]
   categories: Category[]
-  from: string
-  to: string
   accountId: number | null
   categoryId: number | null
   status: Status | null
   text: string
-  onFrom: (v: string) => void
-  onTo: (v: string) => void
   onAccount: (v: number | null) => void
   onCategory: (v: number | null) => void
   onStatus: (v: Status | null) => void
@@ -52,8 +47,6 @@ function FilterBar({
 }) {
   return (
     <div className="k-row">
-      <input className="k-input k-well" type="date" value={from} onChange={(e) => onFrom(e.target.value)} />
-      <input className="k-input k-well" type="date" value={to} onChange={(e) => onTo(e.target.value)} />
       <select
         className="k-select k-well"
         value={accountId ?? ''}
@@ -137,7 +130,7 @@ export function TransactionRow({
     <>
       <tr>
         <td>
-          <input type="checkbox" checked={selected} onChange={(e) => onSelect(row.id, e.target.checked)} />
+          <input type="checkbox" checked={selected} disabled={isTransfer} onChange={(e) => onSelect(row.id, e.target.checked)} />
         </td>
         <td>{formatDate(row.tx_date)}</td>
         <td>
@@ -181,22 +174,30 @@ export function TransactionRow({
   )
 }
 
-export function Transactions({ statementId }: { statementId?: number | null }) {
+export function Transactions({
+  statementId,
+  initialStatus,
+}: {
+  statementId?: number | null
+  initialStatus?: Status | null
+}) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [rows, setRows] = useState<TxRow[]>([])
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+  const [period, setPeriod] = usePeriod()
   const [accountId, setAccountId] = useState<number | null>(null)
   const [categoryId, setCategoryId] = useState<number | null>(null)
-  const [status, setStatus] = useState<Status | null>(null)
+  const [status, setStatus] = useState<Status | null>(initialStatus ?? null)
   const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS)
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [toast, setToast] = useState<string | null>(null)
+
+  const { from, to } = useMemo(() => periodRange(period.kind, new Date(), period.custom), [period])
 
   const filter: TxFilter = useMemo(
     () => ({
-      from: from || null,
-      to: to || null,
+      from,
+      to,
       account_id: accountId,
       category_id: categoryId,
       status,
@@ -241,8 +242,9 @@ export function Transactions({ statementId }: { statementId?: number | null }) {
 
   async function bulkAssign(catId: number | null, applyToMatching: boolean) {
     if (catId === null) return
-    await api.assign([...selected], catId, applyToMatching)
+    const outcome = await api.assign([...selected], catId, applyToMatching)
     setSelected(new Set())
+    setToast(outcome.skipped_transfers > 0 ? `Prevody sa nepriraďujú, preskočené: ${outcome.skipped_transfers}` : null)
     reload()
   }
 
@@ -256,22 +258,20 @@ export function Transactions({ statementId }: { statementId?: number | null }) {
         <span className="k-card-badge">Nezaradené: {unassignedCount}</span>
         <span className="k-card-badge">Odhady: {suggestedCount}</span>
       </div>
+      <PeriodPicker value={period} onChange={setPeriod} />
       <FilterBar
         accounts={accounts}
         categories={categories}
-        from={from}
-        to={to}
         accountId={accountId}
         categoryId={categoryId}
         status={status}
         text={text}
-        onFrom={setFrom}
-        onTo={setTo}
         onAccount={setAccountId}
         onCategory={setCategoryId}
         onStatus={setStatus}
         onText={setText}
       />
+      {toast ? <Toast message={toast} /> : null}
       <BulkBar
         count={selected.size}
         categories={categories}

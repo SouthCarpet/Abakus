@@ -6,7 +6,9 @@ import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
+import { usePeriod } from '../components/PeriodPicker'
 import { fromSkParts, maskIban } from '../lib/iban'
+import { periodRange } from '../lib/period'
 
 // Large enough that every statement a single-user local install could hold
 // comes back in one page, so its length also serves as the total count
@@ -50,6 +52,7 @@ export function Settings() {
   const [label, setLabel] = useState('')
   const [kind, setKind] = useState<AccountKind>('personal')
   const [error, setError] = useState('')
+  const [period] = usePeriod()
 
   async function refresh() {
     setAccounts(await api.listAccounts())
@@ -82,7 +85,8 @@ export function Settings() {
   async function exportCsv() {
     const path = await save({ filters: [{ name: 'CSV', extensions: ['csv'] }] })
     if (!path) return
-    await api.exportCsv({}, path)
+    const { from, to } = periodRange(period.kind, new Date(), period.custom)
+    await api.exportCsv({ from, to }, path)
   }
 
   return (

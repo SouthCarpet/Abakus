@@ -1,11 +1,18 @@
 import { useState } from 'react'
+import type { Status } from './api'
 import { Card } from './components/Card'
 import { Rail } from './components/Rail'
 import { Import } from './screens/Import'
+import { Overview } from './screens/Overview'
 import { Settings } from './screens/Settings'
 import { Transactions } from './screens/Transactions'
 
 type Screen = 'overview' | 'transactions' | 'import' | 'categories' | 'settings'
+
+interface TransactionsEntry {
+  statementId?: number
+  status?: Status
+}
 
 const RAIL_ITEMS: { id: Screen; label: string }[] = [
   { id: 'overview', label: 'Prehľad' },
@@ -21,10 +28,10 @@ function Placeholder({ title }: { title: string }) {
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('overview')
-  const [transactionsStatementId, setTransactionsStatementId] = useState<number | null>(null)
+  const [transactionsEntry, setTransactionsEntry] = useState<TransactionsEntry>({})
 
-  function goToTransactions(statementId?: number) {
-    setTransactionsStatementId(statementId ?? null)
+  function goToTransactions(entry: TransactionsEntry = {}) {
+    setTransactionsEntry(entry)
     setScreen('transactions')
   }
 
@@ -37,9 +44,13 @@ export function App() {
     <div className="k-shell">
       <Rail items={RAIL_ITEMS} active={screen} onSelect={selectScreen} />
       <section className="k-page">
-        {screen === 'overview' ? <Placeholder title="Prehľad" /> : null}
-        {screen === 'transactions' ? <Transactions statementId={transactionsStatementId} /> : null}
-        {screen === 'import' ? <Import onNavigateToTransactions={goToTransactions} /> : null}
+        {screen === 'overview' ? (
+          <Overview onNavigateToImport={() => setScreen('import')} onNavigateToTransactions={goToTransactions} />
+        ) : null}
+        {screen === 'transactions' ? (
+          <Transactions statementId={transactionsEntry.statementId} initialStatus={transactionsEntry.status ?? null} />
+        ) : null}
+        {screen === 'import' ? <Import onNavigateToTransactions={(statementId) => goToTransactions({ statementId })} /> : null}
         {screen === 'categories' ? <Placeholder title="Kategórie" /> : null}
         {screen === 'settings' ? <Settings /> : null}
       </section>
