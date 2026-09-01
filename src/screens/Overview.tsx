@@ -142,13 +142,20 @@ export function Overview({
   onNavigateToTransactions,
 }: {
   onNavigateToImport: () => void
-  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number }) => void
+  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number; accountKind?: AccountKind }) => void
 }) {
   const [period, setPeriod] = usePeriod()
   const onMonthClick = (month: string) => setPeriod({ kind: 'custom', custom: monthRange(month) })
   const [accountKind, setAccountKind] = useState<'all' | AccountKind>('all')
   const [summary, setSummary] = useState<Summary | null>(null)
   const [badChecksums, setBadChecksums] = useState<BadChecksum[]>([])
+
+  // A17: a drill-down out of a kind-filtered Prehľad must land on the same
+  // filter in Transakcie, or it can show rows from an account the user just
+  // filtered out.
+  function navigateFiltered(entry: { statementId?: number; status?: Status; categoryId?: number }) {
+    onNavigateToTransactions(accountKind === 'all' ? entry : { ...entry, accountKind })
+  }
 
   useEffect(() => {
     void api.badChecksums().then(setBadChecksums)
@@ -191,7 +198,7 @@ export function Overview({
             summary={summary}
             incomeSpan={incomeSpan}
             expenseSpan={expenseSpan}
-            onNavigateToTransactions={onNavigateToTransactions}
+            onNavigateToTransactions={navigateFiltered}
             onMonthClick={onMonthClick}
           />
         )

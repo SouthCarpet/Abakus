@@ -87,11 +87,28 @@ impl Store {
     /// merchant is empty and no merchant rule exists). Without that pointer a
     /// statement delete could remove a rule that a surviving row still uses.
     /// Confirmed rows are never swept: only `suggested` and `unassigned`.
+    ///
+    /// A17/F1 gap closed: a swept row also gets a `rule_sources` row of its
+    /// own, recorded under ITS statement, not the row that taught the rule.
+    /// Without this, a rule the teaching statement's own delete correctly
+    /// kept (a surviving row still used it) could become undeletable later:
+    /// once the teacher is gone, the swept row's statement has no provenance
+    /// of its own to hand `delete_statement` when its turn comes.
     fn apply_merchant_rule(&mut self, merchant: &str, rule_id: Option<i64>, category_id: i64) -> Result<()> {
+        let swept: Vec<i64> = {
+            let mut st = self.conn.prepare("SELECT id FROM transactions WHERE merchant_norm = ?1 AND status IN ('suggested', 'unassigned')")?;
+            let rows = st.query_map([merchant], |r| r.get(0))?;
+            rows.collect::<std::result::Result<_, _>>()?
+        };
         self.conn.execute(
             "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = COALESCE(?3, rule_id), source = 'merchant_rule' WHERE merchant_norm = ?1 AND status IN ('suggested', 'unassigned')",
             rusqlite::params![merchant, category_id, rule_id],
         )?;
+        if let Some(rule) = rule_id {
+            for id in swept {
+                self.record_rule_source(rule, id)?;
+            }
+        }
         Ok(())
     }
 

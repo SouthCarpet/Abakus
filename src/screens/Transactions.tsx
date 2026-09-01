@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Account, Category, Status, TxFilter, TxRow } from '../api'
+import type { Account, AccountKind, Category, Status, TxFilter, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { CategoryPicker } from '../components/CategoryPicker'
@@ -178,10 +178,14 @@ export function Transactions({
   statementId,
   initialStatus,
   initialCategoryId,
+  initialAccountKind,
 }: {
   statementId?: number | null
   initialStatus?: Status | null
   initialCategoryId?: number | null
+  // A17: a drill-down from a kind-filtered Prehľad carries that filter here,
+  // so it never shows rows from an account the user already filtered out.
+  initialAccountKind?: AccountKind | null
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -201,12 +205,13 @@ export function Transactions({
       from,
       to,
       account_id: accountId,
+      account_kind: initialAccountKind ?? null,
       category_id: categoryId,
       status,
       text: debouncedText || null,
       statement_id: statementId ?? null,
     }),
-    [from, to, accountId, categoryId, status, debouncedText, statementId],
+    [from, to, accountId, initialAccountKind, categoryId, status, debouncedText, statementId],
   )
 
   const reload = useCallback(() => {

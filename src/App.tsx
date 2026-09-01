@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Status } from './api'
+import type { AccountKind, Status } from './api'
 import { Rail } from './components/Rail'
 import { Categories } from './screens/Categories'
 import { Import } from './screens/Import'
@@ -13,6 +13,7 @@ interface TransactionsEntry {
   statementId?: number
   status?: Status
   categoryId?: number
+  accountKind?: AccountKind
 }
 
 const RAIL_ITEMS: { id: Screen; label: string }[] = [
@@ -49,6 +50,7 @@ export function App() {
             statementId={transactionsEntry.statementId}
             initialStatus={transactionsEntry.status ?? null}
             initialCategoryId={transactionsEntry.categoryId ?? null}
+            initialAccountKind={transactionsEntry.accountKind ?? null}
           />
         ) : null}
         {screen === 'import' ? <Import onNavigateToTransactions={(statementId) => goToTransactions({ statementId })} /> : null}

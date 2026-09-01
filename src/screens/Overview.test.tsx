@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { BadChecksum } from '../api'
+import type { BadChecksum, Summary } from '../api'
 import { api } from '../api'
 import { ChecksumBanner, Overview } from './Overview'
 
@@ -55,5 +55,44 @@ describe('Overview account kind filter (A17/F3)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Osobný' }))
     await waitFor(() => expect(vi.mocked(api.summary).mock.calls.at(-1)?.slice(2)).toEqual([null, 'personal']))
+  })
+})
+
+const nonEmptySummary: Summary = {
+  income_cents: 0,
+  expense_cents: 0,
+  transfer_cents: 0,
+  net_cents: 0,
+  unassigned_count: 3,
+  suggested_count: 1,
+  by_category: [],
+  by_month: [{ month: '2026-06', income_cents: 0, expense_cents: 0 }],
+  by_month_category: [],
+  top_merchants: [],
+}
+
+// A17: the unassigned drill-down must carry the account kind the user
+// already filtered by, or it can show rows from an account they excluded.
+describe('Overview unassigned drill-down carries the account kind filter', () => {
+  it('adds the selected account kind to the navigation entry', async () => {
+    vi.mocked(api.summary).mockResolvedValue(nonEmptySummary)
+    const onNavigateToTransactions = vi.fn()
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={onNavigateToTransactions} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Osobný' }))
+    await waitFor(() => expect(vi.mocked(api.summary).mock.calls.at(-1)?.slice(2)).toEqual([null, 'personal']))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Nezaradené/ }))
+
+    expect(onNavigateToTransactions).toHaveBeenCalledWith({ status: 'unassigned', accountKind: 'personal' })
+  })
+
+  it('leaves the entry untouched while the filter is Všetko', async () => {
+    vi.mocked(api.summary).mockResolvedValue(nonEmptySummary)
+    const onNavigateToTransactions = vi.fn()
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={onNavigateToTransactions} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Nezaradené/ }))
+
+    expect(onNavigateToTransactions).toHaveBeenCalledWith({ status: 'unassigned' })
   })
 })

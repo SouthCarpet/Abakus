@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { save } from '@tauri-apps/plugin-dialog'
-import type { Account, AccountKind, NetLogRow, Release } from '../api'
+import type { Account, AccountKind, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
@@ -16,7 +16,38 @@ function formatLogTime(startedAt: string): string {
   return startedAt.replace('T', ' ').replace('Z', '').slice(0, 19)
 }
 
-function NetLogSection({ rows, onScanNow }: { rows: NetLogRow[]; onScanNow: () => void }) {
+// A17/F7: a write into net_log can itself fail (poisoned store, disk error).
+// The request still happened, so a silent loss would leave Nastavenia
+// looking complete while the audit trail has a gap. This shows exactly that.
+function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
+  if (failures.length === 0) return null
+  return (
+    <div className="k-section">
+      <p className="k-card-title k-text-danger">Nezapísané záznamy</p>
+      <table className="k-table">
+        <thead>
+          <tr>
+            <th>Čas</th>
+            <th>Adresa</th>
+            <th>Chyba</th>
+          </tr>
+        </thead>
+        <tbody>
+          {failures.map((f, i) => (
+            <tr key={`${f.at}-${i}`}>
+              <td>{formatLogTime(f.at)}</td>
+              <td>{f.url}</td>
+              <td>{f.error}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>Tento zoznam žije len počas behu aplikácie a po reštarte zmizne.</p>
+    </div>
+  )
+}
+
+function NetLogSection({ rows, failures, onScanNow }: { rows: NetLogRow[]; failures: AuditFailure[]; onScanNow: () => void }) {
   return (
     <div className="k-section">
       <p className="k-card-title">Sieťová aktivita</p>
@@ -43,6 +74,7 @@ function NetLogSection({ rows, onScanNow }: { rows: NetLogRow[]; onScanNow: () =
         </table>
       )}
       <p>Vzorkovanie nemusí zachytiť krátke pripojenia. Skutočnú záruku dávajú CSP politika a test závislostí.</p>
+      <AuditFailuresSection failures={failures} />
       <Button variant="secondary" onClick={onScanNow}>
         Skenovať teraz
       </Button>
@@ -107,6 +139,7 @@ export function Settings() {
   const [checkUpdates, setCheckUpdates] = useState(false)
   const [release, setRelease] = useState<Release | null>(null)
   const [netLog, setNetLog] = useState<NetLogRow[]>([])
+  const [auditFailures, setAuditFailures] = useState<AuditFailure[]>([])
   const [editTarget, setEditTarget] = useState<Account | null>(null)
   const [editLabel, setEditLabel] = useState('')
   const [editKind, setEditKind] = useState<AccountKind>('personal')
@@ -119,6 +152,7 @@ export function Settings() {
 
   async function refreshNetLog() {
     setNetLog(await api.netLog(NET_LOG_LIMIT))
+    setAuditFailures(await api.netAuditFailures())
   }
 
   useEffect(() => {
@@ -258,7 +292,7 @@ export function Settings() {
                 <p>{release.url}</p>
               </>
             ) : null}
-            <NetLogSection rows={netLog} onScanNow={() => void scanNow()} />
+            <NetLogSection rows={netLog} failures={auditFailures} onScanNow={() => void scanNow()} />
           </Card>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Account, NetLogRow, Release } from '../api'
+import type { Account, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
 import { Settings } from './Settings'
 
@@ -11,12 +11,14 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({ save: vi.fn() }))
 
 const release: Release = { tag: '0.2.0', url: 'https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0', notes: '' }
 const netLogRow: NetLogRow = { id: 1, started_at: '2026-08-31T10:00:00Z', url: 'https://api.github.com/repos/SouthCarpet/Abakus/releases/latest', status: '200', duration_ms: 120, bytes_in: 512 }
+const auditFailure: AuditFailure = { at: '2026-08-31T10:00:05Z', url: 'https://api.github.com/repos/SouthCarpet/Abakus/releases/latest', error: 'store lock poisoned' }
 
 function mockApi(overrides: Partial<typeof api> = {}) {
   vi.mocked(api.listAccounts).mockResolvedValue([])
   vi.mocked(api.dataDir).mockResolvedValue('C:/data')
   vi.mocked(api.recentStatements).mockResolvedValue([])
   vi.mocked(api.netLog).mockResolvedValue([])
+  vi.mocked(api.netAuditFailures).mockResolvedValue([])
   vi.mocked(api.getCheckUpdates).mockResolvedValue(false)
   vi.mocked(api.checkUpdateNow).mockResolvedValue(null)
   vi.mocked(api.setCheckUpdates).mockResolvedValue(undefined)
@@ -33,6 +35,7 @@ vi.mock('../api', async (importOriginal) => {
       dataDir: vi.fn(),
       recentStatements: vi.fn(),
       netLog: vi.fn(),
+      netAuditFailures: vi.fn(),
       getCheckUpdates: vi.fn(),
       checkUpdateNow: vi.fn(),
       setCheckUpdates: vi.fn(),
@@ -84,6 +87,22 @@ describe('Settings: network audit', () => {
     screen.getByRole('button', { name: 'Skenovať teraz' }).click()
     await waitFor(() => expect(api.runNetAudit).toHaveBeenCalled())
     await waitFor(() => expect(vi.mocked(api.netLog).mock.calls.length).toBeGreaterThan(1))
+  })
+
+  // A17/F7: a write into net_log can itself fail. The failure is process-local
+  // (lost on restart), but while the process runs, Nastavenia must show it.
+  it('shows a failed audit write and hides the section once none remain', async () => {
+    mockApi({ netAuditFailures: vi.fn().mockResolvedValue([auditFailure]) } as Partial<typeof api>)
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByText(auditFailure.error)).toBeInTheDocument())
+    expect(screen.getByText('Nezapísané záznamy')).toBeInTheDocument()
+  })
+
+  it('shows nothing extra when every audit write succeeded', async () => {
+    mockApi()
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByText('Žiadna sieťová aktivita')).toBeInTheDocument())
+    expect(screen.queryByText('Nezapísané záznamy')).not.toBeInTheDocument()
   })
 })
 

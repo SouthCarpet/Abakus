@@ -28,17 +28,35 @@ impl Store {
     /// unless the caller acknowledges the recast explicitly, and an
     /// acknowledged change runs the same reclassification an added account
     /// runs (spec D4).
+    ///
+    /// A kind change and its reclassification run in one transaction: a
+    /// failure partway through must never leave the account recast with
+    /// stale classifications. A plain label edit stays a single statement
+    /// (already atomic on its own), so it does not pay for a transaction it
+    /// does not need.
     pub fn update_account(&mut self, id: i64, label: &str, kind: AccountKind, acknowledge_kind_change: bool) -> Result<Account> {
         let current = self.account_by_id(id)?.ok_or(StoreError::UnknownAccountId { id })?;
         let kind_changed = current.kind != kind;
         if kind_changed {
             self.check_kind_change(&current, acknowledge_kind_change)?;
-        }
-        self.conn.execute("UPDATE accounts SET label = ?2, kind = ?3 WHERE id = ?1", rusqlite::params![id, label, kind_str(kind)])?;
-        if kind_changed {
-            self.reclassify_after_account_change()?;
+            self.conn.execute_batch("BEGIN IMMEDIATE")?;
+            match self.update_account_kind_tx(id, label, kind) {
+                Ok(()) => self.conn.execute_batch("COMMIT")?,
+                Err(e) => {
+                    let _ = self.conn.execute_batch("ROLLBACK");
+                    return Err(e);
+                }
+            }
+        } else {
+            self.conn.execute("UPDATE accounts SET label = ?2, kind = ?3 WHERE id = ?1", rusqlite::params![id, label, kind_str(kind)])?;
         }
         self.account_by_id(id)?.ok_or(StoreError::UnknownAccountId { id })
+    }
+
+    fn update_account_kind_tx(&mut self, id: i64, label: &str, kind: AccountKind) -> Result<()> {
+        self.conn.execute("UPDATE accounts SET label = ?2, kind = ?3 WHERE id = ?1", rusqlite::params![id, label, kind_str(kind)])?;
+        self.reclassify_after_account_change()?;
+        Ok(())
     }
 
     /// An account with no statement and no transaction has no history to
@@ -66,4 +84,40 @@ impl Store {
     pub fn account_by_iban(&self, iban: &str) -> Result<Option<Account>> { Ok(self.list_accounts()?.into_iter().find(|a| a.iban == parser::iban::normalize(iban))) }
     pub fn account_by_id(&self, id: i64) -> Result<Option<Account>> { Ok(self.list_accounts()?.into_iter().find(|a| a.id == id)) }
     pub fn set_has_password(&mut self, id: i64, has: bool) -> Result<()> { self.conn.execute("UPDATE accounts SET has_password = ?2 WHERE id = ?1", rusqlite::params![id, has])?; Ok(()) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rules::RuleKind;
+
+    /// A17/F2: the kind write and its reclassification are one transaction.
+    /// The failure here is engineered with raw SQL (a rule left pointing at a
+    /// category deleted out from under it, `PRAGMA foreign_keys` briefly off
+    /// to set that up) because the app itself can never reach this state; it
+    /// exists only to prove the transaction boundary really rolls back both
+    /// writes together, not just the second one.
+    #[test]
+    fn a_failed_reclassification_rolls_back_the_kind_write_too() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let cat = s.category_by_path("Nákupy/domácnosť").unwrap().unwrap();
+        s.insert_rule(RuleKind::Merchant, "acme", None, cat).unwrap();
+        s.conn.execute_batch(
+            "INSERT INTO statements (id, account_id, number, period_start, period_end, checksum_status, file_hash) VALUES (1, 1, 1, '2026-06-01', '2026-06-30', 'ok', 'h1'); \
+             INSERT INTO transactions (id, statement_id, account_id, fingerprint, posted_date, tx_date, kind, amount_cents, merchant_raw, merchant_norm, raw_block, status, source) \
+               VALUES (1, 1, 1, 'fp-1', '2026-06-01', '2026-06-01', 'card', -500, 'ACME', 'acme', 'raw', 'unassigned', 'none');",
+        ).unwrap();
+        s.conn.execute_batch("PRAGMA foreign_keys = OFF").unwrap();
+        s.conn.execute("DELETE FROM categories WHERE id = ?1", [cat]).unwrap();
+        s.conn.execute_batch("PRAGMA foreign_keys = ON").unwrap();
+        let before = s.account_by_id(id).unwrap().unwrap();
+
+        let e = s.update_account(id, "Osobný", AccountKind::Business, true).unwrap_err();
+
+        assert!(matches!(e, StoreError::Db(_)), "got {e:?}");
+        let after = s.account_by_id(id).unwrap().unwrap();
+        assert_eq!(after.kind, before.kind, "the kind write must not survive a failed reclassification");
+        assert_eq!(after.label, before.label);
+    }
 }

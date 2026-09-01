@@ -281,3 +281,46 @@ fn deleting_one_statement_leaves_another_statements_rows_untouched() {
     assert_eq!(after, before, "another statement's rows keep their status, category and identity");
     assert_eq!(s.statement_count().unwrap(), 1);
 }
+
+/// A17/F1 gap closed: `apply_to_matching` sweeps a merchant rule across a row
+/// of ANOTHER statement, and that swept row now records its own provenance.
+/// Without it, deleting the teaching statement first correctly kept the rule
+/// (a surviving row still used it), but the swept statement's own delete
+/// later had no provenance to find: the rule outlived every statement with
+/// any claim on it.
+#[test]
+fn a_swept_row_teaches_its_own_statement_the_rule_so_it_dies_with_the_last_one() {
+    let (mut s, july, august) = two_bauhaus_statements();
+    let cat = s.category_by_path("Nákupy/domácnosť").unwrap().unwrap();
+    s.assign(&[row_of(&s, july).id], cat, true).unwrap();
+    assert!(rule_exists(&s, RuleKind::Merchant, "bauhaus", None));
+
+    let first = s.delete_statement(july).unwrap();
+    assert_eq!(first.rules_deleted, 1, "only july's own exact rule; the merchant rule is still used by august");
+    assert!(rule_exists(&s, RuleKind::Merchant, "bauhaus", None), "the surviving row still needs it");
+
+    let second = s.delete_statement(august).unwrap();
+
+    assert_eq!(second.rules_deleted, 1, "the merchant rule dies with the last statement that has any claim on it");
+    assert!(!rule_exists(&s, RuleKind::Merchant, "bauhaus", None), "no statement is left to teach or use it");
+}
+
+/// A17/F1 seed guard: `match_kind <> 'seed'` in the doomed-rules query is the
+/// only thing standing between a seed rule and deletion once it has a
+/// `rule_sources` row. Seeds never get one through normal use (this test
+/// gives one directly through the public API), so this is the only test that
+/// exercises the filter itself rather than the fact seeds are normally
+/// provenance-free.
+#[test]
+fn a_seed_rule_with_a_provenance_row_still_survives_a_delete() {
+    let mut s = loaded();
+    let personal = s.recent_statements(10).unwrap().into_iter().find(|r| r.account_label == "Osobný").unwrap().statement_id;
+    let seed = s.list_rules().unwrap().into_iter().find(|r| r.kind == RuleKind::Seed).unwrap();
+    let some_row = row_of(&s, personal);
+    s.record_rule_source(seed.id, some_row.id).unwrap();
+
+    let outcome = s.delete_statement(personal).unwrap();
+
+    assert_eq!(outcome.rules_deleted, 0, "the seed filter must protect it even with a rule_sources row");
+    assert!(rule_exists(&s, RuleKind::Seed, &seed.key, seed.place.as_deref()));
+}
