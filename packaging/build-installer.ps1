@@ -99,6 +99,27 @@ if (-not (Test-Path -LiteralPath $exePath)) {
     throw "Expected release binary not found at $exePath"
 }
 
+# A binary built by a bare `cargo build` keeps the dev URL and embeds no
+# frontend, so the installed app opens WebView2 on localhost and fails. Only
+# tauri-cli sets the custom-protocol feature that flips that decision. The
+# packaged exe must therefore carry the vite bundle name from dist\assets;
+# this guard catches the case where -SkipBuild reuses such a stale binary.
+$assetsDir = Join-Path $repoRoot 'dist\assets'
+$bundleName = $null
+if (Test-Path -LiteralPath $assetsDir) {
+    $bundle = Get-ChildItem -LiteralPath $assetsDir -Filter '*.js' | Select-Object -First 1
+    if ($bundle) { $bundleName = [IO.Path]::GetFileNameWithoutExtension($bundle.Name) }
+}
+if ($bundleName) {
+    $exeText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($exePath))
+    if (-not $exeText.Contains($bundleName)) {
+        throw "The binary at $exePath does not embed the frontend bundle '$bundleName'. It was built by a bare cargo build, not by tauri-cli, so the installed app would open http://localhost:1420. Rebuild without -SkipBuild."
+    }
+    Write-Host "Frontend bundle '$bundleName' found in the release binary."
+} else {
+    Write-Warning "dist\assets holds no .js bundle, so the embedded-frontend check was skipped."
+}
+
 $pdfiumPath = Join-Path $repoRoot 'src-tauri\resources\pdfium\pdfium.dll'
 if (-not (Test-Path -LiteralPath $pdfiumPath)) {
     throw "Expected pdfium.dll not found at $pdfiumPath. Run scripts\fetch-pdfium.ps1 first."

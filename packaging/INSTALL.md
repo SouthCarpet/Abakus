@@ -71,7 +71,7 @@ z `src-tauri\tauri.conf.json`.
 
 ## Čo odinštalovanie robí
 
-Po odstránení programových súborov sa zobrazia dve samostatné otázky.
+Počas odinštalovania, nad oknom s priebehom, sa zobrazia dve samostatné otázky.
 Obe majú predvolenú odpoveď **Nie**, takže bez potvrdenia sa nič nezmaže.
 
 1. **Vymazať používateľské nastavenia?** Áno vymaže iba heslá k výpisom
