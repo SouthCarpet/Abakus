@@ -39,7 +39,7 @@ Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Abakus"; Filename: "{app}\abakus.exe"; Tasks: startmenuicon
-Name: "{group}\Uninstall Abakus"; Filename: "{uninstallexe}"; Tasks: startmenuicon
+Name: "{group}\Odinštalovať Abakus"; Filename: "{uninstallexe}"; Tasks: startmenuicon
 Name: "{autodesktop}\Abakus"; Filename: "{app}\abakus.exe"; Tasks: desktopicon
 
 [Run]

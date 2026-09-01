@@ -60,17 +60,20 @@ fn absorb(st: &mut Statement, block: &Block) {
         if first_line(block).is_none() {
             let line = &block.lines[idx];
             st.closing_cents = trailing_amount(line).or_else(|| block.lines.get(idx + 1).and_then(|l| trailing_amount(l)));
-            if st.closing_cents.is_none() { st.warnings.push(format!("closing line not parsed: {}", line.trim())); }
+            // A17/F8: the warning text is Slovak because this parser has one consumer
+            // (this app's UI); the interpolated line/description text only the parser
+            // holds at this point, so it stays here rather than a code the UI re-translates.
+            if st.closing_cents.is_none() { st.warnings.push(format!("koncový riadok sa nedá prečítať: {}", line.trim())); }
             return;
         }
     }
     match first_line(block) {
         Some(fl) => {
             let t = dispatch(&fl, block);
-            if t.kind == TxKind::Other { st.warnings.push(format!("unknown kind: {}", fl.description)); }
+            if t.kind == TxKind::Other { st.warnings.push(format!("neznámy druh záznamu: {}", fl.description)); }
             st.transactions.push(t);
         }
-        None => st.warnings.push(format!("unparsed block: {}", first.trim())),
+        None => st.warnings.push(format!("nespracovaný blok: {}", first.trim())),
     }
 }
 
@@ -78,4 +81,42 @@ fn dispatch(fl: &crate::fields::FirstLine, block: &Block) -> Transaction {
     if is_card(&fl.description) { parse_card(fl, block) }
     else if is_transfer(&fl.description) { parse_transfer(fl, block) }
     else { let mut t = Transaction::blank(fl.posted, fl.amount, TxKind::Other, block.lines.join("\n")); t.merchant_raw = fl.description.clone(); t }
+}
+
+/// A17/F8: all three warning shapes read in Slovak, not English.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::AccountKind;
+
+    fn blank_statement() -> Statement {
+        let d = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+        Statement { iban: "SK00".into(), account_kind: AccountKind::Personal, number: 1, period_start: d, period_end: d, opening_cents: None, closing_cents: None, transactions: Vec::new(), warnings: Vec::new() }
+    }
+
+    fn b(lines: &[&str]) -> Block { Block { lines: lines.iter().map(|s| s.to_string()).collect() } }
+
+    #[test]
+    fn unparsed_block_warning_is_slovak() {
+        let mut st = blank_statement();
+        absorb(&mut st, &b(&["totally unrecognized garbage line"]));
+        assert_eq!(st.warnings.len(), 1, "{:?}", st.warnings);
+        assert!(st.warnings[0].starts_with("nespracovaný blok"), "{:?}", st.warnings);
+    }
+
+    #[test]
+    fn closing_line_not_parsed_warning_is_slovak() {
+        let mut st = blank_statement();
+        absorb(&mut st, &b(&["Konecny zostatok bez sumy"]));
+        assert_eq!(st.warnings.len(), 1, "{:?}", st.warnings);
+        assert!(st.warnings[0].starts_with("koncový riadok sa nedá prečítať"), "{:?}", st.warnings);
+    }
+
+    #[test]
+    fn unknown_kind_warning_is_slovak() {
+        let mut st = blank_statement();
+        absorb(&mut st, &b(&["01.06.2026    Nejaky neznamy poplatok                       1.99-"]));
+        assert_eq!(st.warnings.len(), 1, "{:?}", st.warnings);
+        assert!(st.warnings[0].starts_with("neznámy druh záznamu: Nejaky neznamy poplatok"), "{:?}", st.warnings);
+    }
 }

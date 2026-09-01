@@ -28,11 +28,15 @@ pub struct ImportReport {
     pub checksum: Option<Checksum>,
     pub warnings: Vec<String>,
     pub message: Option<String>,
+    /// A17/F5: the id a successful import wrote to, so the UI can navigate
+    /// straight to the rows that were just imported. `None` for every status
+    /// that never reaches a stored statement (locked, unknown_account, error).
+    pub statement_id: Option<i64>,
 }
 
 impl ImportReport {
     fn bare(path: &str, status: ImportStatus) -> Self {
-        Self { path: path.into(), status, account_label: None, account_kind: None, iban_masked: None, iban: None, statement_number: None, period_start: None, period_end: None, inserted: 0, duplicates: 0, checksum: None, warnings: Vec::new(), message: None }
+        Self { path: path.into(), status, account_label: None, account_kind: None, iban_masked: None, iban: None, statement_number: None, period_start: None, period_end: None, inserted: 0, duplicates: 0, checksum: None, warnings: Vec::new(), message: None, statement_id: None }
     }
 }
 
@@ -49,7 +53,7 @@ pub fn import_parsed(store: &mut Store, path: &str, parsed: Result<Statement, Pa
     };
     let mut r = ImportReport { account_kind: Some(st.account_kind), iban_masked: Some(mask(&st.iban)), iban: Some(st.iban.clone()), statement_number: Some(st.number), period_start: Some(st.period_start), period_end: Some(st.period_end), warnings: st.warnings.clone(), checksum: Some(st.checksum()), ..ImportReport::bare(path, ImportStatus::Imported) };
     match store.import_statement(&st, file_hash) {
-        Ok(o) => { r.status = if o.already_imported { ImportStatus::AlreadyImported } else { ImportStatus::Imported }; r.inserted = o.inserted; r.duplicates = o.duplicates; r.account_label = store.account_by_iban(&st.iban).ok().flatten().map(|a| a.label); }
+        Ok(o) => { r.status = if o.already_imported { ImportStatus::AlreadyImported } else { ImportStatus::Imported }; r.inserted = o.inserted; r.duplicates = o.duplicates; r.statement_id = Some(o.statement_id); r.account_label = store.account_by_iban(&st.iban).ok().flatten().map(|a| a.label); }
         Err(StoreError::UnknownAccount { .. }) => r.status = ImportStatus::UnknownAccount,
         Err(e) => { r.status = ImportStatus::Error; r.message = Some(e.to_string()); }
     }

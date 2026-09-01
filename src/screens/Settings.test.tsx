@@ -1,6 +1,6 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NetLogRow, Release } from '../api'
+import type { Account, NetLogRow, Release } from '../api'
 import { api } from '../api'
 import { Settings } from './Settings'
 
@@ -37,6 +37,7 @@ vi.mock('../api', async (importOriginal) => {
       checkUpdateNow: vi.fn(),
       setCheckUpdates: vi.fn(),
       runNetAudit: vi.fn(),
+      updateAccount: vi.fn(),
     },
   }
 })
@@ -83,5 +84,43 @@ describe('Settings: network audit', () => {
     screen.getByRole('button', { name: 'Skenovať teraz' }).click()
     await waitFor(() => expect(api.runNetAudit).toHaveBeenCalled())
     await waitFor(() => expect(vi.mocked(api.netLog).mock.calls.length).toBeGreaterThan(1))
+  })
+})
+
+// A17/F2: label is a free edit, IBAN stays read-only, and a kind change on an
+// account with imports needs the user's deliberate confirmation.
+describe('Settings: edit account', () => {
+  const account: Account = { id: 1, iban: 'SK4411000000000012345678', kind: 'personal', label: 'Osobný', has_password: false }
+
+  it('edits the label and keeps the IBAN read-only', async () => {
+    const updateAccount = vi.fn().mockResolvedValue({ ...account, label: 'Nový názov' })
+    mockApi({ listAccounts: vi.fn().mockResolvedValue([account]), updateAccount } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
+    const ibanField = screen.getByLabelText('IBAN') as HTMLInputElement
+    expect(ibanField).toBeDisabled()
+    expect(ibanField.value).toBe('SK44...5678')
+
+    fireEvent.change(screen.getByLabelText('Názov účtu'), { target: { value: 'Nový názov' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
+    await waitFor(() => expect(updateAccount).toHaveBeenCalledWith(1, 'Nový názov', 'personal', false))
+  })
+
+  it('shows the backend refusal and lets the user confirm the kind change deliberately', async () => {
+    const refusal = 'Účet už má importované výpisy: 3, transakcie: 12. Zmena typu účtu prepíše ich zaradenie v prehľadoch aj v exporte. Zmenu treba potvrdiť.'
+    const updateAccount = vi.fn().mockRejectedValueOnce(refusal).mockResolvedValueOnce({ ...account, kind: 'business' })
+    mockApi({ listAccounts: vi.fn().mockResolvedValue([account]), updateAccount } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
+    fireEvent.change(screen.getByLabelText('Druh účtu'), { target: { value: 'business' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
+    await screen.findByText(refusal)
+    expect(updateAccount).toHaveBeenNthCalledWith(1, 1, 'Osobný', 'business', false)
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Rozumiem/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
+    await waitFor(() => expect(updateAccount).toHaveBeenNthCalledWith(2, 1, 'Osobný', 'business', true))
   })
 })

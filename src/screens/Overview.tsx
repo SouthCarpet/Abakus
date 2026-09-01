@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { Account, AccountKind, BadChecksum, Status, Summary } from '../api'
+import { useEffect, useState } from 'react'
+import type { AccountKind, BadChecksum, Status, Summary } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
@@ -147,24 +147,21 @@ export function Overview({
   const [period, setPeriod] = usePeriod()
   const onMonthClick = (month: string) => setPeriod({ kind: 'custom', custom: monthRange(month) })
   const [accountKind, setAccountKind] = useState<'all' | AccountKind>('all')
-  const [accounts, setAccounts] = useState<Account[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [badChecksums, setBadChecksums] = useState<BadChecksum[]>([])
 
   useEffect(() => {
-    void api.listAccounts().then(setAccounts)
     void api.badChecksums().then(setBadChecksums)
   }, [])
 
-  const accountId = useMemo(() => {
-    if (accountKind === 'all') return null
-    return accounts.find((a) => a.kind === accountKind)?.id ?? null
-  }, [accountKind, accounts])
-
   useEffect(() => {
     const { from, to } = periodRange(period.kind, new Date(), period.custom)
-    void api.summary(from, to, accountId).then(setSummary)
-  }, [period, accountId])
+    // A17/F3: filters by the whole KIND, so a second personal or business
+    // account is never dropped out of the totals (it used to send the id of
+    // just one account of that kind).
+    const kind = accountKind === 'all' ? null : accountKind
+    void api.summary(from, to, null, kind).then(setSummary)
+  }, [period, accountKind])
 
   const incomeSpan = summary ? monthlySpan(summary.by_month, (m) => m.income_cents) : undefined
   const expenseSpan = summary ? monthlySpan(summary.by_month, (m) => m.expense_cents) : undefined

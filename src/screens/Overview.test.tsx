@@ -1,6 +1,7 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BadChecksum } from '../api'
+import { api } from '../api'
 import { ChecksumBanner, Overview } from './Overview'
 
 afterEach(() => cleanup())
@@ -10,7 +11,6 @@ vi.mock('../api', async (importOriginal) => {
   return {
     ...actual,
     api: {
-      listAccounts: vi.fn().mockResolvedValue([]),
       badChecksums: vi.fn().mockResolvedValue([{ statement_id: 9, number: 4, account_label: 'Osobný', off_by_cents: -150 }]),
       summary: vi.fn().mockResolvedValue({
         income_cents: 0,
@@ -44,5 +44,16 @@ describe('Overview', () => {
     render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
     const banner = await screen.findByText('Výpis č. 4 (účet Osobný) nesedí o 1,50 €')
     expect(banner).toHaveClass('k-text-danger')
+  })
+})
+
+describe('Overview account kind filter (A17/F3)', () => {
+  it('sends the whole account kind, not one account id, so a second account of that kind is never dropped', async () => {
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+    await waitFor(() => expect(api.summary).toHaveBeenCalled())
+    expect(vi.mocked(api.summary).mock.calls[0].slice(2)).toEqual([null, null])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Osobný' }))
+    await waitFor(() => expect(vi.mocked(api.summary).mock.calls.at(-1)?.slice(2)).toEqual([null, 'personal']))
   })
 })

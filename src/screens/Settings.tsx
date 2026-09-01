@@ -65,7 +65,15 @@ function resolveIban(input: string): string {
   return fromSkParts(bank, prefix, number)
 }
 
-function AccountRow({ account, onForgetPassword }: { account: Account; onForgetPassword: (id: number) => void }) {
+function AccountRow({
+  account,
+  onForgetPassword,
+  onEdit,
+}: {
+  account: Account
+  onForgetPassword: (id: number) => void
+  onEdit: (account: Account) => void
+}) {
   return (
     <tr>
       <td>{account.label}</td>
@@ -73,6 +81,9 @@ function AccountRow({ account, onForgetPassword }: { account: Account; onForgetP
       <td>{maskIban(account.iban)}</td>
       <td>{account.has_password ? 'heslo uložené' : 'bez hesla'}</td>
       <td>
+        <Button variant="ghost" onClick={() => onEdit(account)}>
+          Upraviť
+        </Button>
         {account.has_password ? (
           <Button variant="ghost" onClick={() => onForgetPassword(account.id)}>
             Zabudnúť heslo
@@ -96,6 +107,11 @@ export function Settings() {
   const [checkUpdates, setCheckUpdates] = useState(false)
   const [release, setRelease] = useState<Release | null>(null)
   const [netLog, setNetLog] = useState<NetLogRow[]>([])
+  const [editTarget, setEditTarget] = useState<Account | null>(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [editKind, setEditKind] = useState<AccountKind>('personal')
+  const [editAcknowledge, setEditAcknowledge] = useState(false)
+  const [editError, setEditError] = useState('')
 
   async function refresh() {
     setAccounts(await api.listAccounts())
@@ -149,6 +165,36 @@ export function Settings() {
     await refresh()
   }
 
+  function openEdit(account: Account) {
+    setEditTarget(account)
+    setEditLabel(account.label)
+    setEditKind(account.kind)
+    setEditAcknowledge(false)
+    setEditError('')
+  }
+
+  function changeEditKind(next: AccountKind) {
+    setEditKind(next)
+    setEditAcknowledge(false)
+    setEditError('')
+  }
+
+  // A17/F2: the IBAN never travels here, so an edit can only touch the label
+  // and the kind of the account it was opened for. The backend refuses a kind
+  // change on an account with imports unless acknowledged; the checkbox below
+  // only appears once that refusal names what would be recast.
+  async function saveEdit() {
+    if (!editTarget) return
+    setEditError('')
+    try {
+      await api.updateAccount(editTarget.id, editLabel, editKind, editAcknowledge)
+      setEditTarget(null)
+      await refresh()
+    } catch (e) {
+      setEditError(String(e))
+    }
+  }
+
   async function exportCsv() {
     const path = await save({ filters: [{ name: 'CSV', extensions: ['csv'] }] })
     if (!path) return
@@ -180,7 +226,7 @@ export function Settings() {
               </thead>
               <tbody>
                 {accounts.map((account) => (
-                  <AccountRow key={account.id} account={account} onForgetPassword={(id) => void forgetPassword(id)} />
+                  <AccountRow key={account.id} account={account} onForgetPassword={(id) => void forgetPassword(id)} onEdit={openEdit} />
                 ))}
               </tbody>
             </table>
@@ -244,6 +290,41 @@ export function Settings() {
           </select>
         </Field>
         {error ? <p className="k-text-danger">{error}</p> : null}
+      </Dialog>
+      <Dialog
+        open={editTarget !== null}
+        title="Upraviť účet"
+        onClose={() => setEditTarget(null)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setEditTarget(null)}>
+              Zrušiť
+            </Button>
+            <Button variant="primary" onClick={() => void saveEdit()}>
+              Uložiť
+            </Button>
+          </>
+        }
+      >
+        <Field label="Názov účtu">
+          <input className="k-input k-well" value={editLabel} onChange={(e) => setEditLabel(e.target.value)} />
+        </Field>
+        <Field label="IBAN">
+          <input className="k-input k-well" value={editTarget ? maskIban(editTarget.iban) : ''} disabled readOnly />
+        </Field>
+        <Field label="Druh účtu">
+          <select className="k-select k-well" value={editKind} onChange={(e) => changeEditKind(e.target.value as AccountKind)}>
+            <option value="personal">Osobný</option>
+            <option value="business">Firemný</option>
+          </select>
+        </Field>
+        {editError ? <p className="k-text-danger">{editError}</p> : null}
+        {editError && editTarget && editKind !== editTarget.kind ? (
+          <label className="k-checkbox">
+            <input type="checkbox" checked={editAcknowledge} onChange={(e) => setEditAcknowledge(e.target.checked)} />
+            Rozumiem, chcem zmenu typu účtu potvrdiť.
+          </label>
+        ) : null}
       </Dialog>
     </div>
   )

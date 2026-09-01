@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { open } from '@tauri-apps/plugin-dialog'
-import type { AccountKind, Checksum, ImportReport, RecentStatement } from '../api'
+import type { AccountKind, Checksum, ImportReport, RecentStatement, StatementDeletePreview } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
@@ -40,6 +40,12 @@ function WarningsList({ warnings }: { warnings: string[] }) {
       ))}
     </ul>
   )
+}
+
+// A17/F4: shows the backend's own failure text instead of the generic "Chyba" badge alone.
+function ImportErrorMessage({ report }: { report: ImportReport }) {
+  if (!report.message) return null
+  return <p className="k-text-danger">{report.message}</p>
 }
 
 function LockedAction({
@@ -133,7 +139,7 @@ export function ImportResultCard({
       badge={importStatusLabel(report.status)}
       footer={
         canContinue ? (
-          <Button variant="primary" onClick={() => onContinue?.()}>
+          <Button variant="primary" onClick={() => onContinue?.(report.statementId ?? undefined)}>
             Pokračovať na Transakcie
           </Button>
         ) : undefined
@@ -150,6 +156,7 @@ export function ImportResultCard({
         </span>
         <ChecksumRow checksum={report.checksum} />
       </div>
+      <ImportErrorMessage report={report} />
       <WarningsList warnings={report.warnings} />
       <LockedAction report={report} onPassword={onPassword} />
       <UnknownAccountAction report={report} onAddAccount={onAddAccount} />
@@ -166,9 +173,11 @@ interface AddAccountTarget {
 function RecentImportsRow({
   statement,
   onNavigate,
+  onDelete,
 }: {
   statement: RecentStatement
   onNavigate: (statementId: number) => void
+  onDelete: (statement: RecentStatement) => void
 }) {
   const danger = statement.checksum.status === 'off_by'
   return (
@@ -181,6 +190,9 @@ function RecentImportsRow({
       <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
         Zobraziť transakcie
       </Button>
+      <Button variant="danger" onClick={() => onDelete(statement)}>
+        Zmazať
+      </Button>
     </div>
   )
 }
@@ -188,9 +200,11 @@ function RecentImportsRow({
 function RecentImports({
   statements,
   onNavigate,
+  onDelete,
 }: {
   statements: RecentStatement[]
   onNavigate: (statementId: number) => void
+  onDelete: (statement: RecentStatement) => void
 }) {
   return (
     <Card title="Posledné importy">
@@ -199,11 +213,23 @@ function RecentImports({
       ) : (
         <div className="k-round-list">
           {statements.map((s) => (
-            <RecentImportsRow key={s.statement_id} statement={s} onNavigate={onNavigate} />
+            <RecentImportsRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} />
           ))}
         </div>
       )}
     </Card>
+  )
+}
+
+// A17/F1: what the confirm dialog reads before the user decides. Names the
+// backend's own counts, never a guess, so the person deleting a statement
+// knows exactly what disappears with it.
+function DeleteStatementBody({ preview }: { preview: StatementDeletePreview | null }) {
+  if (!preview) return <p>Načítava sa...</p>
+  return (
+    <p>
+      {`Výpis č. ${preview.number} (${preview.account_label}): zmaže ${preview.transaction_count} transakcií, z toho ${preview.confirmed_count} potvrdených ručne, a ${preview.rules_deleted} naučených pravidiel bez iného zdroja. Ostatné výpisy a nastavenia sa nezmenia.`}
+    </p>
   )
 }
 
@@ -212,6 +238,9 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
   const [recent, setRecent] = useState<RecentStatement[]>([])
   const [addAccount, setAddAccount] = useState<AddAccountTarget | null>(null)
   const [accountLabel, setAccountLabel] = useState('')
+  const [addAccountError, setAddAccountError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<RecentStatement | null>(null)
+  const [deletePreview, setDeletePreview] = useState<StatementDeletePreview | null>(null)
   const passwordsRef = useRef<Record<string, { password: string; remember: boolean }>>({})
 
   const loadRecent = useCallback(() => {
@@ -274,6 +303,7 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
 
   function handleAddAccount(path: string, iban: string, kind: AccountKind) {
     setAccountLabel('')
+    setAddAccountError('')
     setAddAccount({ path, iban, kind })
   }
 
@@ -287,9 +317,32 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
 
   async function saveAccountAndRetry() {
     if (!addAccount) return
-    await api.saveAccount(addAccount.iban, addAccount.kind, accountLabel)
-    await retryImport(addAccount.path)
-    setAddAccount(null)
+    setAddAccountError('')
+    try {
+      await api.saveAccount(addAccount.iban, addAccount.kind, accountLabel)
+      await retryImport(addAccount.path)
+      setAddAccount(null)
+    } catch (e) {
+      setAddAccountError(String(e))
+    }
+  }
+
+  // A17/F1: the preview is loaded before the dialog opens, so the confirmation
+  // always names the backend's own counts, never a placeholder.
+  async function requestDelete(statement: RecentStatement) {
+    setDeletePreview(null)
+    setDeleteTarget(statement)
+    setDeletePreview(await api.statementDeletePreview(statement.statement_id))
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    const id = deleteTarget.statement_id
+    await api.deleteStatement(id)
+    setDeleteTarget(null)
+    setDeletePreview(null)
+    setReports((prev) => prev.filter((r) => r.statementId !== id))
+    loadRecent()
   }
 
   return (
@@ -309,7 +362,7 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
           onContinue={onNavigateToTransactions}
         />
       ))}
-      <RecentImports statements={recent} onNavigate={(id) => onNavigateToTransactions?.(id)} />
+      <RecentImports statements={recent} onNavigate={(id) => onNavigateToTransactions?.(id)} onDelete={(s) => void requestDelete(s)} />
       <Dialog
         open={addAccount !== null}
         title="Pridať účet"
@@ -340,6 +393,24 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
             <option value="business">Firemný</option>
           </select>
         </Field>
+        {addAccountError ? <p className="k-text-danger">{addAccountError}</p> : null}
+      </Dialog>
+      <Dialog
+        open={deleteTarget !== null}
+        title="Zmazať výpis"
+        onClose={() => setDeleteTarget(null)}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+              Zrušiť
+            </Button>
+            <Button variant="danger" disabled={!deletePreview} onClick={() => void confirmDelete()}>
+              Zmazať
+            </Button>
+          </>
+        }
+      >
+        <DeleteStatementBody preview={deletePreview} />
       </Dialog>
     </div>
   )

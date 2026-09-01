@@ -25,6 +25,21 @@ fn imported_report_has_counts_and_checksum() {
     assert_eq!(r.account_label.as_deref(), Some("Osobný"));
 }
 
+/// A17/F5: the report carries the statement id a successful import wrote,
+/// for both a fresh import and a re-import of the same file.
+#[test]
+fn imported_report_carries_the_statement_id_for_fresh_and_repeat_imports() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    let first = import_parsed(&mut s, "x.pdf", Ok(fixture("personal-2026-06.txt")), "h1");
+    assert_eq!(first.status, ImportStatus::Imported);
+    let id = first.statement_id.expect("a successful import must carry a statement id");
+
+    let repeat = import_parsed(&mut s, "x.pdf", Ok(fixture("personal-2026-06.txt")), "h1");
+    assert_eq!(repeat.status, ImportStatus::AlreadyImported);
+    assert_eq!(repeat.statement_id, Some(id), "the repeat import points at the same statement");
+}
+
 #[test]
 fn encrypted_becomes_locked_and_other_errors_become_error() {
     let mut s = Store::open_in_memory().unwrap();

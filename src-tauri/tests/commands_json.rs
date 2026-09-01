@@ -141,12 +141,14 @@ fn import_report_serializes_camel_case() {
         checksum: Some(Checksum::Ok),
         warnings: Vec::new(),
         message: None,
+        statement_id: Some(9),
     };
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["accountLabel"], json!("Osobný"));
     assert_eq!(v["accountKind"], json!("personal"));
     assert_eq!(v["ibanMasked"], json!("SK44...5678"));
     assert_eq!(v["statementNumber"], json!(6));
+    assert_eq!(v["statementId"], json!(9));
     assert!(v.get("account_label").is_none(), "must not fall back to snake_case");
 }
 
