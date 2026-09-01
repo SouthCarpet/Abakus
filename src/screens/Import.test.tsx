@@ -125,3 +125,34 @@ describe('Recent imports: delete a statement', () => {
     expect(api.deleteStatement).not.toHaveBeenCalled()
   })
 })
+
+// A17: the row cells (date, account, number, count, checksum) had no names.
+describe('Recent imports: column headers', () => {
+  it('names every cell the rows already render', async () => {
+    vi.mocked(api.recentStatements).mockResolvedValueOnce([
+      { statement_id: 5, number: 6, period_end: '2026-06-30', account_label: 'Osobný', transaction_count: 8, checksum: { status: 'ok' } },
+    ])
+    render(<Import />)
+    await waitFor(() => expect(screen.getByText('č. 6')).toBeInTheDocument())
+
+    for (const label of ['Dátum', 'Účet', 'Číslo', 'Transakcie', 'Kontrolný súčet', 'Akcie']) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+  })
+})
+
+// A17: Zmazať used to outweigh Zobraziť transakcie on every row (filled
+// danger next to a plain text control). It stays findable through the
+// danger text tone, but no longer the loudest thing on the row.
+describe('Recent imports: row-level Zmazať weight', () => {
+  it('is a ghost button with the danger text tone, not the filled danger button', async () => {
+    vi.mocked(api.recentStatements).mockResolvedValueOnce([
+      { statement_id: 5, number: 6, period_end: '2026-06-30', account_label: 'Osobný', transaction_count: 8, checksum: { status: 'ok' } },
+    ])
+    render(<Import />)
+    const button = await screen.findByRole('button', { name: 'Zmazať' })
+    expect(button).toHaveClass('k-btn-ghost')
+    expect(button).toHaveClass('k-text-danger')
+    expect(button).not.toHaveClass('k-btn-danger')
+  })
+})

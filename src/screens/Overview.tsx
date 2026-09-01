@@ -75,7 +75,12 @@ function monthlySpan(rows: Summary['by_month'], pick: (m: Summary['by_month'][nu
   return { min: Math.min(0, ...values), max: Math.max(...values) }
 }
 
-function EmptyOverview({ onNavigateToImport }: { onNavigateToImport: () => void }) {
+// A17: "Importuj prvý výpis" is wrong advice once imports already exist; the
+// real cause is then the period filter, so the two cases get two sentences.
+function EmptyOverview({ onNavigateToImport, hasAnyImports }: { onNavigateToImport: () => void; hasAnyImports: boolean }) {
+  if (hasAnyImports) {
+    return <Card title="Prehľad">Za vybrané obdobie nič nie je. Skús iné obdobie hore, napríklad Všetko.</Card>
+  }
   return (
     <Card
       title="Prehľad"
@@ -149,6 +154,9 @@ export function Overview({
   const [accountKind, setAccountKind] = useState<'all' | AccountKind>('all')
   const [summary, setSummary] = useState<Summary | null>(null)
   const [badChecksums, setBadChecksums] = useState<BadChecksum[]>([])
+  // A17: whether ANY statement was ever imported, independent of the period
+  // filter, so the empty state can tell "no imports" from "wrong period".
+  const [hasAnyImports, setHasAnyImports] = useState<boolean | null>(null)
 
   // A17: a drill-down out of a kind-filtered Prehľad must land on the same
   // filter in Transakcie, or it can show rows from an account the user just
@@ -159,6 +167,10 @@ export function Overview({
 
   useEffect(() => {
     void api.badChecksums().then(setBadChecksums)
+  }, [])
+
+  useEffect(() => {
+    void api.recentStatements(1).then((rows) => setHasAnyImports(rows.length > 0))
   }, [])
 
   useEffect(() => {
@@ -190,9 +202,9 @@ export function Overview({
         <ChecksumBanner key={row.statement_id} row={row} onNavigate={(statementId) => onNavigateToTransactions({ statementId })} />
       ))}
 
-      {summary !== null ? (
+      {summary !== null && hasAnyImports !== null ? (
         summary.by_month.length === 0 ? (
-          <EmptyOverview onNavigateToImport={onNavigateToImport} />
+          <EmptyOverview onNavigateToImport={onNavigateToImport} hasAnyImports={hasAnyImports} />
         ) : (
           <SummaryBody
             summary={summary}

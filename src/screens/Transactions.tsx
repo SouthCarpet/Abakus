@@ -197,6 +197,9 @@ export function Transactions({
   const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState<string | null>(null)
+  // A17: distinguishes "no rows loaded yet" from "the filter really matches
+  // nothing", so the empty sentence only shows once a real load finished.
+  const [loaded, setLoaded] = useState(false)
 
   const { from, to } = useMemo(() => periodRange(period.kind, new Date(), period.custom), [period])
 
@@ -215,7 +218,10 @@ export function Transactions({
   )
 
   const reload = useCallback(() => {
-    void api.listTransactions(filter).then(setRows)
+    void api.listTransactions(filter).then((data) => {
+      setRows(data)
+      setLoaded(true)
+    })
   }, [filter])
 
   useEffect(() => {
@@ -298,6 +304,11 @@ export function Transactions({
           </tr>
         </thead>
         <tbody>
+          {loaded && rows.length === 0 ? (
+            <tr>
+              <td colSpan={8}>Za toto obdobie nič nie je. Skús iné obdobie hore.</td>
+            </tr>
+          ) : null}
           {rows.map((row) => (
             <TransactionRow
               key={row.id}

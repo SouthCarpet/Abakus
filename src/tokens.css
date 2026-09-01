@@ -59,6 +59,7 @@
   --motion-live: 1200ms;
   --ease-standard: cubic-bezier(.2,0,0,1);
   --control-h: 32px;
+  color-scheme: light;
 }
 [data-theme="dark"] {
   --color-background: oklch(0.14 0.012 260);
@@ -97,4 +98,5 @@
   --color-chart-band-alpha: 0.12;
   --color-chart-grid: oklch(0.32 0.012 260 / 0.4);
   --shadow-raise: 0 1px 4px oklch(0.02 0.012 260 / 0.24);
+  color-scheme: dark;
 }

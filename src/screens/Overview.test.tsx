@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BadChecksum, Summary } from '../api'
 import { api } from '../api'
 import { ChecksumBanner, Overview } from './Overview'
@@ -24,6 +24,7 @@ vi.mock('../api', async (importOriginal) => {
         by_month_category: [],
         top_merchants: [],
       }),
+      recentStatements: vi.fn().mockResolvedValue([]),
     },
   }
 })
@@ -94,5 +95,35 @@ describe('Overview unassigned drill-down carries the account kind filter', () =>
     fireEvent.click(await screen.findByRole('button', { name: /Nezaradené/ }))
 
     expect(onNavigateToTransactions).toHaveBeenCalledWith({ status: 'unassigned' })
+  })
+})
+
+const emptySummary: Summary = { ...nonEmptySummary, unassigned_count: 0, suggested_count: 0, by_month: [] }
+
+// A17: "Importuj prvý výpis" told a user with two imports on Import to
+// import a first statement, because the empty card never checked whether
+// any import existed at all, only the current period.
+describe('Overview empty state names the real cause', () => {
+  // An earlier describe block leaves api.summary resolving nonEmptySummary
+  // (mockResolvedValue with no "Once" persists); pin it back to the empty
+  // shape these tests need, since mocks are not reset between test files.
+  beforeEach(() => {
+    vi.mocked(api.summary).mockResolvedValue(emptySummary)
+  })
+
+  it('tells the user to import a first statement when no import exists yet', async () => {
+    vi.mocked(api.recentStatements).mockResolvedValueOnce([])
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+    expect(await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Importovať' })).toBeInTheDocument()
+  })
+
+  it('points at the period chips when imports exist but the period is empty', async () => {
+    vi.mocked(api.recentStatements).mockResolvedValueOnce([
+      { statement_id: 5, number: 6, period_end: '2026-06-30', account_label: 'Osobný', transaction_count: 8, checksum: { status: 'ok' } },
+    ])
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+    expect(await screen.findByText(/Za vybrané obdobie nič nie je/)).toBeInTheDocument()
+    expect(screen.queryByText('Zatiaľ nič. Importuj prvý výpis.')).not.toBeInTheDocument()
   })
 })

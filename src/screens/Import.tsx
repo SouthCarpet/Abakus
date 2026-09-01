@@ -190,9 +190,25 @@ function RecentImportsRow({
       <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
         Zobraziť transakcie
       </Button>
-      <Button variant="danger" onClick={() => onDelete(statement)}>
+      {/* Secondary, not the loudest control on the row: composes the
+          existing ghost variant with the existing danger text tone, so
+          Zmazať stays findable without outweighing Zobraziť transakcie. */}
+      <Button variant="ghost" className="k-text-danger" onClick={() => onDelete(statement)}>
         Zmazať
       </Button>
+    </div>
+  )
+}
+
+function RecentImportsHead() {
+  return (
+    <div className="k-round-row-head">
+      <span>Dátum</span>
+      <span>Účet</span>
+      <span>Číslo</span>
+      <span>Transakcie</span>
+      <span>Kontrolný súčet</span>
+      <span>Akcie</span>
     </div>
   )
 }
@@ -212,6 +228,7 @@ function RecentImports({
         <p>Zatiaľ žiadne importy.</p>
       ) : (
         <div className="k-round-list">
+          <RecentImportsHead />
           {statements.map((s) => (
             <RecentImportsRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} />
           ))}

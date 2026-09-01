@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AccountKind, Status } from './api'
 import { Rail } from './components/Rail'
+import { watchSystemTheme } from './lib/theme'
 import { Categories } from './screens/Categories'
 import { Import } from './screens/Import'
 import { Overview } from './screens/Overview'
@@ -27,6 +28,8 @@ const RAIL_ITEMS: { id: Screen; label: string }[] = [
 export function App() {
   const [screen, setScreen] = useState<Screen>('overview')
   const [transactionsEntry, setTransactionsEntry] = useState<TransactionsEntry>({})
+
+  useEffect(() => watchSystemTheme(), [])
 
   function goToTransactions(entry: TransactionsEntry = {}) {
     setTransactionsEntry(entry)

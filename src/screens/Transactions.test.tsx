@@ -101,6 +101,15 @@ describe('TransactionRow', () => {
   })
 })
 
+// A17: an empty filter used to show only the table headers with no next-action.
+describe('Transactions empty state', () => {
+  it('names the period as the likely reason once loading finishes with no rows', async () => {
+    vi.mocked(api.listTransactions).mockResolvedValueOnce([])
+    render(<Transactions />)
+    expect(await screen.findByText('Za toto obdobie nič nie je. Skús iné obdobie hore.')).toBeInTheDocument()
+  })
+})
+
 describe('Transactions bulk assign toast', () => {
   it('shows a toast when bulkAssign skips transfers', async () => {
     render(<Transactions />)
