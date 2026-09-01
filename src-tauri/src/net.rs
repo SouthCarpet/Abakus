@@ -52,10 +52,53 @@ where
         Ok((status, body)) => (status.to_string(), body.len() as i64),
         Err(e) => (format!("error: {e}"), 0),
     };
-    if let Ok(mut s) = store.lock() {
-        let _ = s.append_net_log(started_at, url, &status, duration_ms, bytes_in);
-    }
+    log_or_record_failure(store, started_at, url, &status, duration_ms, bytes_in);
     result
+}
+
+/// A17/F7: the audit row is written, or the failure to write it is kept. The
+/// request result itself is untouched either way, so the caller still learns
+/// honestly what the network did; what must never happen is a request that
+/// leaves no trace at all and says nothing about it.
+fn log_or_record_failure(store: &Mutex<Store>, started_at: chrono::DateTime<chrono::Utc>, url: &str, status: &str, duration_ms: i64, bytes_in: i64) {
+    match store.lock() {
+        Ok(mut s) => {
+            if let Err(e) = s.append_net_log(started_at, url, status, duration_ms, bytes_in) {
+                record_audit_failure(url, e.to_string());
+            }
+        }
+        Err(_) => record_audit_failure(url, "store lock poisoned".to_string()),
+    }
+}
+
+/// An audit-log write that failed. It cannot be recorded in the table that
+/// just refused it, so it lands here and the `net_audit_failures` command
+/// reads it out for Nastavenia.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct AuditFailure {
+    pub at: chrono::DateTime<chrono::Utc>,
+    pub url: String,
+    pub error: String,
+}
+
+/// Process-local and bounded. A poisoned sink is recovered rather than
+/// panicked on: losing the report of a lost audit row would be the same bug
+/// twice.
+static AUDIT_FAILURES: Mutex<Vec<AuditFailure>> = Mutex::new(Vec::new());
+const MAX_AUDIT_FAILURES: usize = 50;
+
+pub(crate) fn record_audit_failure(url: &str, error: String) {
+    let mut list = AUDIT_FAILURES.lock().unwrap_or_else(|e| e.into_inner());
+    if list.len() >= MAX_AUDIT_FAILURES {
+        list.remove(0);
+    }
+    list.push(AuditFailure { at: chrono::Utc::now(), url: url.to_string(), error });
+}
+
+/// Newest last, as recorded. Empty means every audit row this process wrote
+/// reached the database.
+pub fn audit_failures() -> Vec<AuditFailure> {
+    AUDIT_FAILURES.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 pub(crate) async fn send_request(url: String) -> Result<(u16, Vec<u8>), String> {
@@ -165,6 +208,37 @@ mod tests {
     fn is_localhost_classifies_ipv4_mapped_loopback_too() {
         assert!(is_localhost("::ffff:127.0.0.1".parse().unwrap()));
         assert!(!is_localhost("::ffff:8.8.8.8".parse().unwrap()));
+    }
+
+    /// A17/F7: the audit-log write used to be `let _ = ...`, so a store that
+    /// could not take the row left no trace anywhere. A poisoned store lock is
+    /// the deterministic version of that failure. This test fails again if
+    /// anyone drops the failure on the floor: the request result must still be
+    /// honest AND the lost audit row must be reported.
+    #[tokio::test]
+    async fn a_failed_audit_write_is_recorded_and_the_request_result_is_still_returned() {
+        let url = "https://api.github.com/f7-poisoned";
+        let store = Mutex::new(Store::open_in_memory().unwrap());
+        let _ = std::thread::scope(|s| s.spawn(|| { let _guard = store.lock().unwrap(); panic!("poison the store lock on purpose"); }).join());
+        assert!(store.lock().is_err(), "the store lock must be poisoned for this test to mean anything");
+
+        let result = fetch_and_log(&store, url, |_| async { Ok((200, b"{}".to_vec())) }).await;
+        assert_eq!(result, Ok((200, b"{}".to_vec())), "the request result stays honest");
+
+        let failure = audit_failures().into_iter().find(|f| f.url == url).expect("the failed audit write must be recorded");
+        assert_eq!(failure.error, "store lock poisoned");
+    }
+
+    /// The other half: a write that succeeds records nothing, so the failure
+    /// list stays meaningful instead of filling up with noise.
+    #[tokio::test]
+    async fn a_successful_audit_write_records_no_failure() {
+        let url = "https://api.github.com/f7-healthy";
+        let store = Mutex::new(Store::open_in_memory().unwrap());
+        let _ = fetch_and_log(&store, url, |_| async { Ok((200, b"{}".to_vec())) }).await;
+
+        assert_eq!(store.lock().unwrap().net_log(10).unwrap().len(), 1);
+        assert!(!audit_failures().iter().any(|f| f.url == url));
     }
 
     #[tokio::test]

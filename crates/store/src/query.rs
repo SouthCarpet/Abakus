@@ -11,6 +11,10 @@ pub struct TxFilter {
     pub from: Option<NaiveDate>,
     pub to: Option<NaiveDate>,
     pub account_id: Option<i64>,
+    /// A17/F3: every account of that kind, not one of them. Absent in older UI
+    /// payloads, hence `serde(default)`.
+    #[serde(default)]
+    pub account_kind: Option<AccountKind>,
     pub category_id: Option<i64>,
     pub status: Option<Status>,
     pub text: Option<String>,
@@ -80,6 +84,12 @@ pub(crate) fn where_clause(f: &TxFilter) -> (String, Vec<Box<dyn rusqlite::ToSql
     if let Some(s) = f.statement_id {
         let k = push_param(&mut params, Box::new(s));
         conds.push(format!("t.statement_id = ?{k}"));
+    }
+    if let Some(kind) = f.account_kind {
+        // A subquery, not `a.kind`: this fragment is shared with the summary
+        // aggregates, whose FROM clause does not join `accounts`.
+        let k = push_param(&mut params, Box::new(crate::accounts::kind_str(kind).to_string()));
+        conds.push(format!("t.account_id IN (SELECT id FROM accounts WHERE kind = ?{k})"));
     }
     if let Some(c) = f.category_id {
         let k = push_param(&mut params, Box::new(c));

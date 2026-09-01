@@ -2,6 +2,7 @@
 //! argument shape and result struct, round-trip the exact JSON the UI sends
 //! (literals copied from `src/api.ts` call sites) against the real Rust types.
 use abakus_lib::import_flow::{ImportReport, ImportStatus};
+use abakus_lib::net::AuditFailure;
 use abakus_lib::update::Release;
 use chrono::{NaiveDate, TimeZone, Utc};
 use parser::{AccountKind, Checksum};
@@ -9,7 +10,7 @@ use rules::{RuleKind, Status};
 use serde_json::json;
 use store::{
     Account, AssignOutcome, BadChecksum, Category, CategoryKind, NetLogRow, RecentStatement,
-    RuleView, Summary, TxFilter, TxRow,
+    RuleView, StatementDeleteOutcome, StatementDeletePreview, Summary, TxFilter, TxRow,
 };
 
 /// Tauri deserializes each command argument from its own JSON field (there is
@@ -52,6 +53,22 @@ struct SummaryArgs {
     from: Option<String>,
     to: Option<String>,
     #[serde(rename = "accountId")] account_id: Option<i64>,
+    /// A17/F3. Tauri lets a command omit an `Option` argument, so the field
+    /// defaults here the same way.
+    #[serde(default, rename = "accountKind")] account_kind: Option<AccountKind>,
+}
+
+#[derive(serde::Deserialize)]
+struct StatementIdArgs {
+    #[serde(rename = "statementId")] statement_id: i64,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateAccountArgs {
+    id: i64,
+    label: String,
+    kind: AccountKind,
+    #[serde(rename = "acknowledgeKindChange")] acknowledge_kind_change: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -326,6 +343,67 @@ fn category_serializes_snake_case() {
     let c = Category { id: 4, parent_id: Some(1), name: "potraviny".into(), kind: CategoryKind::Expense, sort: 0, system: false, archived: false };
     let v = serde_json::to_value(&c).unwrap();
     assert_eq!(v, json!({"id": 4, "parent_id": 1, "name": "potraviny", "kind": "expense", "sort": 0, "system": false, "archived": false}));
+}
+
+/// A17/F3: the Prehľad sends a KIND, not the id of one account of that kind.
+#[test]
+fn summary_args_carry_the_account_kind() {
+    let args: SummaryArgs = serde_json::from_value(json!({"from": null, "to": null, "accountId": null, "accountKind": "business"})).unwrap();
+    assert_eq!(args.account_kind, Some(AccountKind::Business));
+    assert_eq!(args.account_id, None);
+}
+
+/// A17/F1: both delete commands take the statement id under the same name.
+#[test]
+fn statement_delete_args_match_the_ui_call() {
+    let args: StatementIdArgs = serde_json::from_value(json!({"statementId": 5})).unwrap();
+    assert_eq!(args.statement_id, 5);
+}
+
+/// A17/F2: no `iban` field, on purpose. The IBAN is the identity and an edit
+/// cannot carry one.
+#[test]
+fn update_account_args_match_the_ui_call() {
+    let args: UpdateAccountArgs = serde_json::from_value(json!({"id": 1, "label": "Firma s.r.o.", "kind": "business", "acknowledgeKindChange": true})).unwrap();
+    assert_eq!((args.id, args.label.as_str(), args.kind, args.acknowledge_kind_change), (1, "Firma s.r.o.", AccountKind::Business, true));
+}
+
+#[test]
+fn statement_delete_preview_serializes_snake_case() {
+    let p = StatementDeletePreview {
+        statement_id: 5, number: 6, account_label: "Osobný".into(),
+        period_start: NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(), period_end: NaiveDate::from_ymd_opt(2026, 6, 30).unwrap(),
+        transaction_count: 8, confirmed_count: 2, rules_deleted: 1,
+    };
+    let v = serde_json::to_value(&p).unwrap();
+    assert_eq!(v, json!({"statement_id": 5, "number": 6, "account_label": "Osobný", "period_start": "2026-06-01", "period_end": "2026-06-30", "transaction_count": 8, "confirmed_count": 2, "rules_deleted": 1}));
+}
+
+#[test]
+fn statement_delete_outcome_serializes_snake_case() {
+    let o = StatementDeleteOutcome { statement_id: 5, number: 6, transactions_deleted: 8, rules_deleted: 1, open_rows_reclassified: 3 };
+    let v = serde_json::to_value(&o).unwrap();
+    assert_eq!(v, json!({"statement_id": 5, "number": 6, "transactions_deleted": 8, "rules_deleted": 1, "open_rows_reclassified": 3}));
+}
+
+/// A17/F7: the shape Nastavenia reads when an audit row could not be written.
+#[test]
+fn audit_failure_serializes_with_the_fields_the_ui_reads() {
+    let f = AuditFailure { at: Utc.with_ymd_and_hms(2026, 9, 1, 10, 0, 0).unwrap(), url: "https://api.github.com/x".into(), error: "store lock poisoned".into() };
+    let v = serde_json::to_value(&f).unwrap();
+    assert_eq!(v["url"], json!("https://api.github.com/x"));
+    assert_eq!(v["error"], json!("store lock poisoned"));
+    assert!(v.get("at").is_some(), "the UI shows when the audit row was lost");
+}
+
+/// The A17/F3 filter field must be optional on the wire: an older payload
+/// without it still deserializes.
+#[test]
+fn tx_filter_account_kind_is_optional_and_round_trips() {
+    let without: TxFilter = serde_json::from_value(json!({"from": null, "to": null, "account_id": null, "category_id": null, "status": null, "text": null, "statement_id": null})).unwrap();
+    assert_eq!(without.account_kind, None);
+    let with: TxFilter = serde_json::from_value(json!({"from": null, "to": null, "account_id": null, "account_kind": "personal", "category_id": null, "status": null, "text": null, "statement_id": null})).unwrap();
+    assert_eq!(with.account_kind, Some(AccountKind::Personal));
 }
 
 #[test]

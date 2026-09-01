@@ -25,6 +25,19 @@ impl Store {
         self.conn.execute("INSERT INTO rules (match_kind, key, place, category_id) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(match_kind, key, place) DO UPDATE SET category_id = excluded.category_id", rusqlite::params![kind_str(kind), key, place, category_id])?;
         Ok(self.conn.query_row("SELECT id FROM rules WHERE match_kind = ?1 AND key = ?2 AND place = ?3", rusqlite::params![kind_str(kind), key, place], |r| r.get(0))?)
     }
+    /// A17/F1: records that `transaction_id` produced `rule_id`. The statement
+    /// is read from the transaction itself, so provenance can never point at a
+    /// statement the row does not belong to. Re-assigning the same row to the
+    /// same rule is a no-op (`OR IGNORE` on the primary key), not a duplicate.
+    pub fn record_rule_source(&mut self, rule_id: i64, transaction_id: i64) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO rule_sources (rule_id, transaction_id, statement_id) \
+             SELECT ?1, t.id, t.statement_id FROM transactions t WHERE t.id = ?2",
+            rusqlite::params![rule_id, transaction_id],
+        )?;
+        Ok(())
+    }
+
     pub fn list_rules(&self) -> Result<Vec<Rule>> {
         let mut st = self.conn.prepare("SELECT id, match_kind, key, place, category_id FROM rules ORDER BY id")?;
         let rows = st.query_map([], |r| {

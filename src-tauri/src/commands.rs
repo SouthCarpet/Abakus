@@ -39,9 +39,29 @@ pub fn list_accounts(state: State<AppState>) -> Result<Vec<store::Account>, Stri
 pub fn save_account(state: State<AppState>, iban: String, kind: parser::AccountKind, label: String) -> Result<store::Account, String> {
     if !parser::iban::is_valid(&iban) { return Err("IBAN nie je platný".into()); }
     let mut s = lock(&state)?;
-    let id = s.upsert_account(&iban, kind, &label).map_err(|e| e.to_string())?;
+    let id = s.upsert_account(&iban, kind, &label).map_err(account_error)?;
     s.reclassify_after_account_change().map_err(|e| e.to_string())?;
     s.list_accounts().map_err(|e| e.to_string())?.into_iter().find(|a| a.id == id).ok_or_else(|| "account vanished".into())
+}
+
+/// A17/F2: edits an existing account. The IBAN is not a parameter, so an edit
+/// can never move an account's history onto another IBAN. The label is free.
+/// The kind is refused while the account has imports until the UI sends
+/// `acknowledgeKindChange`, and an acknowledged change reclassifies (spec D4).
+#[tauri::command]
+pub fn update_account(state: State<AppState>, id: i64, label: String, kind: parser::AccountKind, acknowledge_kind_change: bool) -> Result<store::Account, String> {
+    lock(&state)?.update_account(id, &label, kind, acknowledge_kind_change).map_err(account_error)
+}
+
+/// The refusal names what would be recast, so the UI can show a truthful
+/// warning instead of a generic failure.
+fn account_error(e: store::StoreError) -> String {
+    match e {
+        store::StoreError::AccountKindLocked { statements, transactions, .. } => format!(
+            "Účet už má importované výpisy: {statements}, transakcie: {transactions}. Zmena typu účtu prepíše ich zaradenie v prehľadoch aj v exporte. Zmenu treba potvrdiť."
+        ),
+        other => other.to_string(),
+    }
 }
 
 #[tauri::command]
@@ -92,9 +112,12 @@ pub fn confirm(state: State<AppState>, ids: Vec<i64>) -> Result<usize, String> {
     lock(&state)?.confirm(&ids).map_err(|e| e.to_string())
 }
 
+/// A17/F3: `accountKind` covers EVERY account of that kind. The screen used to
+/// pass the id of the first account of a kind, which silently dropped a second
+/// personal or business account out of the totals.
 #[tauri::command]
-pub fn summary(state: State<AppState>, from: Option<chrono::NaiveDate>, to: Option<chrono::NaiveDate>, account_id: Option<i64>) -> Result<store::Summary, String> {
-    lock(&state)?.summary(from, to, account_id).map_err(|e| e.to_string())
+pub fn summary(state: State<AppState>, from: Option<chrono::NaiveDate>, to: Option<chrono::NaiveDate>, account_id: Option<i64>, account_kind: Option<parser::AccountKind>) -> Result<store::Summary, String> {
+    lock(&state)?.summary_filtered(from, to, account_id, account_kind).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -117,6 +140,21 @@ pub fn data_dir(state: State<AppState>) -> String {
 #[tauri::command]
 pub fn recent_statements(state: State<AppState>, limit: usize) -> Result<Vec<store::RecentStatement>, String> {
     lock(&state)?.recent_statements(limit).map_err(|e| e.to_string())
+}
+
+/// A17/F1: what a delete of this statement would remove, for the confirmation
+/// text. It runs the same rule query the delete runs, so the numbers the user
+/// confirms are the numbers the delete produces.
+#[tauri::command]
+pub fn statement_delete_preview(state: State<AppState>, statement_id: i64) -> Result<store::StatementDeletePreview, String> {
+    lock(&state)?.statement_delete_preview(statement_id).map_err(|e| e.to_string())
+}
+
+/// A17/F1: deletes one imported statement with its transactions and the rules
+/// only it produced. All or nothing; returns what was removed.
+#[tauri::command]
+pub fn delete_statement(state: State<AppState>, statement_id: i64) -> Result<store::StatementDeleteOutcome, String> {
+    lock(&state)?.delete_statement(statement_id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -161,6 +199,13 @@ where
 #[tauri::command]
 pub fn net_log(state: State<AppState>, limit: usize) -> Result<Vec<store::NetLogRow>, String> {
     lock(&state)?.net_log(limit).map_err(|e| e.to_string())
+}
+
+/// A17/F7: audit rows that could not be written. Empty is the normal answer;
+/// anything else means the network log is incomplete and says so.
+#[tauri::command]
+pub fn net_audit_failures() -> Vec<net::AuditFailure> {
+    net::audit_failures()
 }
 
 #[tauri::command]

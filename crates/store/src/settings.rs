@@ -15,9 +15,17 @@ impl Store {
     }
 
     pub fn set_check_updates(&mut self, on: bool) -> Result<()> {
+        self.set_setting(CHECK_UPDATES_KEY, if on { "1" } else { "0" })
+    }
+
+    pub(crate) fn setting(&self, key: &str) -> Result<Option<String>> {
+        Ok(self.conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| r.get(0)).ok())
+    }
+
+    pub(crate) fn set_setting(&mut self, key: &str, value: &str) -> Result<()> {
         self.conn.execute(
             "INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            rusqlite::params![CHECK_UPDATES_KEY, if on { "1" } else { "0" }],
+            rusqlite::params![key, value],
         )?;
         Ok(())
     }

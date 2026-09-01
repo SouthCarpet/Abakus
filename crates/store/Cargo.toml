@@ -17,5 +17,10 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 parser = { path = "../parser" }
 rules = { path = "../rules" }
 
+# The migration test writes a database with the OLD schema before opening it
+# through `Store`, which needs raw SQLite access from an integration test.
+[dev-dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
+
 [lints]
 workspace = true

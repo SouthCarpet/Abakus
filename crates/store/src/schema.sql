@@ -10,5 +10,18 @@ CREATE INDEX IF NOT EXISTS tx_status_idx ON transactions(status);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- Same NULL-distinct trap for top-level categories: UNIQUE (parent_id, name) does not fire when parent_id IS NULL.
 CREATE UNIQUE INDEX IF NOT EXISTS categories_top_uniq ON categories(name) WHERE parent_id IS NULL;
+-- A17/F1: provenance for LEARNED rules. One row per (rule, transaction that produced it);
+-- statement_id is denormalized so "which rules did this statement produce" is answerable
+-- before its transactions are deleted. Seed rules never get rows here, so they can never be
+-- selected for deletion. ON DELETE CASCADE keeps the table clean if a caller ever deletes
+-- transactions without going through delete_statement.
+CREATE TABLE IF NOT EXISTS rule_sources (
+  rule_id INTEGER NOT NULL REFERENCES rules(id) ON DELETE CASCADE,
+  transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+  statement_id INTEGER NOT NULL REFERENCES statements(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (rule_id, transaction_id)
+);
+CREATE INDEX IF NOT EXISTS rule_sources_stmt_idx ON rule_sources(statement_id);
 -- Spec A14b: every outbound request net::audited_get makes, plus net::sample_connections observations.
 CREATE TABLE IF NOT EXISTS net_log (id INTEGER PRIMARY KEY, started_at TEXT NOT NULL, url TEXT NOT NULL, status TEXT NOT NULL, duration_ms INTEGER NOT NULL, bytes_in INTEGER NOT NULL);

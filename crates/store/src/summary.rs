@@ -43,7 +43,16 @@ const FROM: &str = "FROM transactions t LEFT JOIN categories c ON c.id = t.categ
 
 impl Store {
     pub fn summary(&self, from: Option<NaiveDate>, to: Option<NaiveDate>, account_id: Option<i64>) -> Result<Summary> {
-        let f = TxFilter { from, to, account_id, ..Default::default() };
+        self.summary_filtered(from, to, account_id, None)
+    }
+
+    /// A17/F3: the Prehľad filters by account KIND, which covers every account
+    /// of that kind. Picking one account per kind (what the screen used to do,
+    /// because the store offered nothing else) dropped a second personal or
+    /// business account out of the totals. `account_id` still narrows to a
+    /// single account when a caller wants exactly that.
+    pub fn summary_filtered(&self, from: Option<NaiveDate>, to: Option<NaiveDate>, account_id: Option<i64>, account_kind: Option<parser::AccountKind>) -> Result<Summary> {
+        let f = TxFilter { from, to, account_id, account_kind, ..Default::default() };
         let (w, params) = where_clause(&f);
         let refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let totals = self.summary_totals(&w, &refs)?;

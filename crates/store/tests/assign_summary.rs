@@ -110,7 +110,8 @@ fn fixture_from(text: &str) -> parser::Statement { parse_text(text).unwrap() }
 }
 
 /// A4: one call exercises every numbered parameter, including the reused
-/// ones (`category_id` twice, `text` three times).
+/// ones (`category_id` twice, `text` three times) and the A17/F3
+/// `account_kind` subquery.
 #[test] fn combined_filter_matches_the_exact_surviving_row() {
     let mut s = Store::open_in_memory().unwrap();
     s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
@@ -124,6 +125,7 @@ fn fixture_from(text: &str) -> parser::Statement { parse_text(text).unwrap() }
         from: chrono::NaiveDate::from_ymd_opt(2026, 5, 1),
         to: chrono::NaiveDate::from_ymd_opt(2026, 6, 30),
         account_id: Some(personal),
+        account_kind: Some(AccountKind::Personal),
         category_id: Some(cat),
         status: Some(Status::Suggested),
         text: Some("ALDI".into()),
