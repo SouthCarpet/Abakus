@@ -4,14 +4,19 @@
 
 .DESCRIPTION
     Reads the app version from src-tauri\tauri.conf.json, builds the
-    frontend (tsc, then vite) and the release binary (cargo, jobs=4) unless
-    -SkipBuild, then runs ISCC against packaging\abakus.iss with
-    /DAppVersion=<version>. The frontend build calls node directly on the
-    tsc/vite scripts instead of `npm run build`, because the .cmd shims for
+    frontend (tsc, then vite) and the release binary (tauri-cli, via node,
+    jobs=4) unless -SkipBuild, then runs ISCC against packaging\abakus.iss
+    with /DAppVersion=<version>. Both the frontend build and the tauri-cli
+    build call node directly on the installed package scripts instead of
+    `npm run build` / `npm run tauri build`, because the .cmd shims for
     those tools return "Access is denied" on this machine (an AV lock, not a
-    real build failure). ESET real-time protection also sometimes locks a
-    freshly written setup exe, so the ISCC step retries up to 6 times with a
-    15 s pause between attempts.
+    real build failure). The tauri-cli build merges in
+    packaging\tauri.build-override.json to blank out
+    tauri.conf.json's beforeBuildCommand, so tauri-cli does not try to run
+    `npm run build` itself and hit the same shim lock; the frontend is
+    already built by the step above. ESET real-time protection also
+    sometimes locks a freshly written setup exe, so the ISCC step retries up
+    to 6 times with a 15 s pause between attempts.
 
 .PARAMETER SkipBuild
     Skip the Tauri release build. Use this when the release binary is
@@ -38,11 +43,13 @@ $version = $tauriConf.version
 Write-Host "Abakus version: $version"
 
 if (-not $SkipBuild) {
-    # `npm run tauri build` shells out to the tsc/vite .cmd shims, which return
-    # "Access is denied" on this machine (AV lock on the shim, not a real build
-    # failure -- see the project's known machine trap). Build the frontend by
-    # invoking the node scripts directly, then build the Rust side with cargo,
-    # skipping tauri-cli's own bundling step entirely (bundle.active is false).
+    # `npm run tauri build` and `npm run build` shell out to the tsc/vite/
+    # tauri .cmd shims, which return "Access is denied" on this machine (AV
+    # lock on the shim, not a real build failure -- see the project's known
+    # machine trap). Build the frontend by invoking the node scripts
+    # directly, then build the Rust side through tauri-cli, also via node.
+    # tauri-cli's own bundling step is skipped (bundle.active is false; Inno
+    # does the packaging below).
     Write-Host "Building frontend (tsc + vite via node, bypassing .cmd shims)..."
     Push-Location $repoRoot
     try {
@@ -58,16 +65,26 @@ if (-not $SkipBuild) {
             throw "Expected dist\index.html not found after the frontend build"
         }
 
-        Write-Host "Building release binary (cargo jobs=4)..."
+        Write-Host "Building release binary (tauri-cli via node, jobs=4)..."
         $env:CARGO_BUILD_JOBS = '4'
-        # --features custom-protocol is what makes this a PRODUCTION binary.
-        # tauri-codegen sets `dev: cfg!(not(feature = "custom-protocol"))`, so
-        # without it cargo produces a dev-mode exe that loads build.devUrl
-        # (http://localhost:1420) and embeds no frontend. tauri-cli passes this
-        # feature itself; a bare `cargo build` must pass it by hand.
-        cargo build --release --features custom-protocol --jobs 4 --manifest-path src-tauri\Cargo.toml
+        # A bare `cargo build` (even with --features custom-protocol added by
+        # hand) never runs the real tauri-cli build path, so it is fragile:
+        # any future tauri-cli-only step would be silently skipped. Call
+        # tauri-cli itself instead, through node, to avoid the tsc/vite .cmd
+        # shim lock. `--no-bundle` skips tauri-cli's own bundling (Inno does
+        # that below); `--config` merges in
+        # packaging\tauri.build-override.json, which sets
+        # build.beforeBuildCommand to "" -- without that, tauri-cli would run
+        # `npm run build` itself (tauri.conf.json's configured
+        # beforeBuildCommand), which hits the same shim lock this script
+        # already avoided above by calling tsc/vite directly. tauri-cli sets
+        # the `custom-protocol` cargo feature itself, so the release binary
+        # embeds the frontend and does not load build.devUrl
+        # (http://localhost:1420) at runtime.
+        $tauriOverride = Join-Path $repoRoot 'packaging\tauri.build-override.json'
+        node node_modules/@tauri-apps/cli/tauri.js build --no-bundle --config $tauriOverride
         if ($LASTEXITCODE -ne 0) {
-            throw "cargo build failed with exit code $LASTEXITCODE"
+            throw "tauri-cli build failed with exit code $LASTEXITCODE"
         }
     } finally {
         Pop-Location

@@ -12,8 +12,32 @@ Potrebujete Rust toolchain, Node.js, npm a Inno Setup 6
 Skript spraví toto:
 
 1. Zostaví frontend (`tsc -b`, potom `vite build` do `dist\`).
-2. Zostaví appku v režime release (`cargo build --release --jobs 4`).
+2. Zostaví appku v režime release cez tauri-cli (`tauri build --no-bundle`,
+   jobs 4).
 3. Skompiluje `packaging\abakus.iss` cez ISCC.
+
+Frontend aj tauri-cli sa spúšťajú priamo cez `node`, nie cez `npm run
+build` alebo `npm run tauri build`. Príkazové `.cmd` obaly týchto nástrojov
+(`tsc.cmd`, `vite.cmd`, `tauri.cmd`) na tomto počítači hlásia "Access is
+denied". Je to zámok antivírusu ESET na súbore obalu, nie skutočná chyba
+zostavenia. `node node_modules\@tauri-apps\cli\tauri.js` obalu nepoužíva.
+
+Krok 2 volá `tauri build`, nie priamy `cargo build`. Dôvod: Tauri rozlišuje
+vývojovú a produkčnú verziu podľa cargo príznaku (feature) `custom-protocol`
+zapnutého v čase kompilácie. Bez neho appka pri spustení otvorí vývojový
+server (`http://localhost:1420`) namiesto zabudovaného frontendu. `tauri
+build` zapne tento príznak sám. `cargo build` by ho musel niekto pridať
+ručne, a taká zostava by sa pri budúcej zmene ľahko rozišla so skutočným
+tauri-cli krokom.
+
+`tauri build` normálne pred kompiláciou sám spustí `build.beforeBuildCommand`
+z `tauri.conf.json`, čo je tu nastavené na `npm run build`. To by narazilo na
+rovnaký zámok `.cmd` obalu. Skript preto do `tauri build` pridáva
+`--config packaging\tauri.build-override.json`, čo tento príkaz nahradí
+prázdnym reťazcom. Frontend v `dist\` je v tom momente už hotový z kroku 1,
+takže sa nič nestratí. `--no-bundle` iba vypína vlastné balenie tauri-cli
+(o balenie sa stará Inno Setup v kroku 3); `bundle.active` v
+`tauri.conf.json` je aj tak `false`.
 
 Ak už máte hotový release build, pridajte `-SkipBuild` a skript spustí iba
 krok 3:
