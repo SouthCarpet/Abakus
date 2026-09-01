@@ -95,14 +95,14 @@ describe('Settings: network audit', () => {
     mockApi({ netAuditFailures: vi.fn().mockResolvedValue([auditFailure]) } as Partial<typeof api>)
     render(<Settings />)
     await waitFor(() => expect(screen.getByText(auditFailure.error)).toBeInTheDocument())
-    expect(screen.getByText('Nezapísané záznamy')).toBeInTheDocument()
+    expect(screen.getByText('Neúspešné zápisy auditu')).toBeInTheDocument()
   })
 
   it('shows nothing extra when every audit write succeeded', async () => {
     mockApi()
     render(<Settings />)
     await waitFor(() => expect(screen.getByText('Žiadna sieťová aktivita')).toBeInTheDocument())
-    expect(screen.queryByText('Nezapísané záznamy')).not.toBeInTheDocument()
+    expect(screen.queryByText('Neúspešné zápisy auditu')).not.toBeInTheDocument()
   })
 })
 
@@ -117,7 +117,7 @@ describe('Settings: edit account', () => {
     render(<Settings />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
-    const ibanField = screen.getByLabelText('IBAN') as HTMLInputElement
+    const ibanField = screen.getByLabelText('IBAN (nedá sa zmeniť)') as HTMLInputElement
     expect(ibanField).toBeDisabled()
     expect(ibanField.value).toBe('SK44...5678')
 
@@ -127,18 +127,18 @@ describe('Settings: edit account', () => {
   })
 
   it('shows the backend refusal and lets the user confirm the kind change deliberately', async () => {
-    const refusal = 'Účet už má importované výpisy: 3, transakcie: 12. Zmena typu účtu prepíše ich zaradenie v prehľadoch aj v exporte. Zmenu treba potvrdiť.'
+    const refusal = 'Počet výpisov: 3. Počet transakcií: 12. Zmena typu účtu zmení ich zaradenie v Prehľade aj v exporte. Ak chcete pokračovať, potvrďte zmenu.'
     const updateAccount = vi.fn().mockRejectedValueOnce(refusal).mockResolvedValueOnce({ ...account, kind: 'business' })
     mockApi({ listAccounts: vi.fn().mockResolvedValue([account]), updateAccount } as Partial<typeof api>)
     render(<Settings />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
-    fireEvent.change(screen.getByLabelText('Druh účtu'), { target: { value: 'business' } })
+    fireEvent.change(screen.getByLabelText('Typ účtu'), { target: { value: 'business' } })
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
     await screen.findByText(refusal)
     expect(updateAccount).toHaveBeenNthCalledWith(1, 1, 'Osobný', 'business', false)
 
-    fireEvent.click(screen.getByRole('checkbox', { name: /Rozumiem/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Potvrdzujem zmenu typu účtu/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
     await waitFor(() => expect(updateAccount).toHaveBeenNthCalledWith(2, 1, 'Osobný', 'business', true))
   })

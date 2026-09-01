@@ -63,17 +63,17 @@ fn absorb(st: &mut Statement, block: &Block) {
             // A17/F8: the warning text is Slovak because this parser has one consumer
             // (this app's UI); the interpolated line/description text only the parser
             // holds at this point, so it stays here rather than a code the UI re-translates.
-            if st.closing_cents.is_none() { st.warnings.push(format!("koncový riadok sa nedá prečítať: {}", line.trim())); }
+            if st.closing_cents.is_none() { st.warnings.push(format!("Konečný zostatok sa nedá prečítať: {}", line.trim())); }
             return;
         }
     }
     match first_line(block) {
         Some(fl) => {
             let t = dispatch(&fl, block);
-            if t.kind == TxKind::Other { st.warnings.push(format!("neznámy druh záznamu: {}", fl.description)); }
+            if t.kind == TxKind::Other { st.warnings.push(format!("Neznámy typ transakcie: {}", fl.description)); }
             st.transactions.push(t);
         }
-        None => st.warnings.push(format!("nespracovaný blok: {}", first.trim())),
+        None => st.warnings.push(format!("Blok sa nepodarilo spracovať: {}", first.trim())),
     }
 }
 
@@ -101,7 +101,7 @@ mod tests {
         let mut st = blank_statement();
         absorb(&mut st, &b(&["totally unrecognized garbage line"]));
         assert_eq!(st.warnings.len(), 1, "{:?}", st.warnings);
-        assert!(st.warnings[0].starts_with("nespracovaný blok"), "{:?}", st.warnings);
+        assert!(st.warnings[0].starts_with("Blok sa nepodarilo spracovať"), "{:?}", st.warnings);
     }
 
     #[test]
@@ -109,7 +109,7 @@ mod tests {
         let mut st = blank_statement();
         absorb(&mut st, &b(&["Konecny zostatok bez sumy"]));
         assert_eq!(st.warnings.len(), 1, "{:?}", st.warnings);
-        assert!(st.warnings[0].starts_with("koncový riadok sa nedá prečítať"), "{:?}", st.warnings);
+        assert!(st.warnings[0].starts_with("Konečný zostatok sa nedá prečítať"), "{:?}", st.warnings);
     }
 
     #[test]
@@ -117,6 +117,6 @@ mod tests {
         let mut st = blank_statement();
         absorb(&mut st, &b(&["01.06.2026    Nejaky neznamy poplatok                       1.99-"]));
         assert_eq!(st.warnings.len(), 1, "{:?}", st.warnings);
-        assert!(st.warnings[0].starts_with("neznámy druh záznamu: Nejaky neznamy poplatok"), "{:?}", st.warnings);
+        assert!(st.warnings[0].starts_with("Neznámy typ transakcie: Nejaky neznamy poplatok"), "{:?}", st.warnings);
     }
 }

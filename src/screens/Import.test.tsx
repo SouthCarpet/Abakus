@@ -103,9 +103,9 @@ describe('Recent imports: delete a statement', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
     await waitFor(() => expect(api.statementDeletePreview).toHaveBeenCalledWith(5))
-    await screen.findByText(/zmaže 8 transakcií, z toho 2 potvrdených ručne, a 1 naučených pravidiel/)
+    await screen.findByText(/Odstráni sa 8 transakcií, z nich 2 ručne potvrdených. Pravidlá, ktoré nepoužíva iný výpis: 1/)
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Zmazať' })[1])
+    fireEvent.click(screen.getByRole('button', { name: 'Natrvalo zmazať' }))
     await waitFor(() => expect(api.deleteStatement).toHaveBeenCalledWith(5))
     await waitFor(() => expect(vi.mocked(api.recentStatements).mock.calls.length).toBeGreaterThan(1))
     await waitFor(() => expect(screen.queryByText('č. 6')).not.toBeInTheDocument())
@@ -119,8 +119,8 @@ describe('Recent imports: delete a statement', () => {
     await waitFor(() => expect(screen.getByText('č. 6')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
-    await screen.findByText(/zmaže 8 transakcií/)
-    fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
+    await screen.findByText(/Odstráni sa 8 transakcií/)
+    fireEvent.click(screen.getByRole('button', { name: 'Späť' }))
 
     expect(api.deleteStatement).not.toHaveBeenCalled()
   })

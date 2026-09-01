@@ -39,7 +39,7 @@ pub enum StoreError {
     /// account reads (personal or business), so changing it after an import
     /// needs an explicit acknowledgement. The counts travel with the error so
     /// the command layer can say what exactly would be recast.
-    #[error("account {iban} already has {statements} statements and {transactions} transactions; changing its kind needs an explicit acknowledgement")]
+    #[error("Účet {iban} už obsahuje výpisy: {statements}. Transakcie: {transactions}. Zmena typu účtu vyžaduje potvrdenie.")]
     AccountKindLocked { iban: String, statements: i64, transactions: i64 },
     #[error("{0}")]
     Parse(String),

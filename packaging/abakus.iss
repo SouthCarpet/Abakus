@@ -29,8 +29,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "slovak"; MessagesFile: "compiler:Languages\Slovak.isl"
 
 [Tasks]
-Name: "startmenuicon"; Description: "Vytvoriť odkaz v ponuke Štart"; GroupDescription: "Odkazy:"; Flags: checkedonce
-Name: "desktopicon"; Description: "Vytvoriť odkaz na ploche"; GroupDescription: "Odkazy:"; Flags: checkedonce
+Name: "startmenuicon"; Description: "Pridať odkaz do ponuky Štart"; GroupDescription: "Odkazy:"; Flags: checkedonce
+Name: "desktopicon"; Description: "Pridať odkaz na plochu"; GroupDescription: "Odkazy:"; Flags: checkedonce
 
 [Files]
 Source: "..\target\release\abakus.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -93,18 +93,16 @@ begin
     begin
       DeleteSettings := MsgBox(
         'Vymazať používateľské nastavenia?' + #13#10 + #13#10 +
-        'Vymaže iba heslá k výpisom uložené v Správcovi poverení systému Windows ' +
-        '(položky Abakusu). Ostatné nastavenia appky sú v dátovom súbore, takže bez ' +
-        'druhej otázky zostanú zachované.',
+        'Odstránia sa len heslá k výpisom uložené v Správcovi poverení systému Windows ' +
+        '(položky Abakusu). Ostatné nastavenia zostanú zachované.',
         mbConfirmation, MB_YESNO or MB_DEFBUTTON2);
       if DeleteSettings = IDYES then
         DeleteAbakusCredentials();
 
       DeleteData := MsgBox(
         'Vymazať používateľské údaje?' + #13#10 + #13#10 +
-        'Vymaže priečinok ' + ExpandConstant('{localappdata}') + '\Abakus s databázou. ' +
-        'Databáza obsahuje aj nastavenia uložené v appke a sieťový denník, takže táto ' +
-        'voľba ich vymaže tiež.',
+        'Odstráni sa priečinok ' + ExpandConstant('{localappdata}') + '\Abakus s databázou, ' +
+        'nastaveniami a sieťovým denníkom. Túto operáciu nemožno vrátiť späť.',
         mbConfirmation, MB_YESNO or MB_DEFBUTTON2);
       if DeleteData = IDYES then
         DelTree(ExpandConstant('{localappdata}\Abakus'), True, True, True);

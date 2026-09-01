@@ -58,7 +58,7 @@ pub fn update_account(state: State<AppState>, id: i64, label: String, kind: pars
 fn account_error(e: store::StoreError) -> String {
     match e {
         store::StoreError::AccountKindLocked { statements, transactions, .. } => format!(
-            "Účet už má importované výpisy: {statements}, transakcie: {transactions}. Zmena typu účtu prepíše ich zaradenie v prehľadoch aj v exporte. Zmenu treba potvrdiť."
+            "Počet výpisov: {statements}. Počet transakcií: {transactions}. Zmena typu účtu zmení ich zaradenie v Prehľade aj v exporte. Ak chcete pokračovať, potvrďte zmenu."
         ),
         other => other.to_string(),
     }
@@ -213,4 +213,3 @@ pub fn run_net_audit(state: State<AppState>) -> Result<usize, String> {
     let mut s = lock(&state)?;
     net::sample_connections(&mut s)
 }
-

@@ -23,7 +23,7 @@ function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
   if (failures.length === 0) return null
   return (
     <div className="k-section">
-      <p className="k-card-title k-text-danger">Nezapísané záznamy</p>
+      <p className="k-card-title k-text-danger">Neúspešné zápisy auditu</p>
       <table className="k-table">
         <thead>
           <tr>
@@ -42,7 +42,7 @@ function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
           ))}
         </tbody>
       </table>
-      <p>Tento zoznam žije len počas behu aplikácie a po reštarte zmizne.</p>
+      <p>Tieto zlyhania sú dostupné len počas behu aplikácie. Po reštarte sa odstránia.</p>
     </div>
   )
 }
@@ -343,10 +343,10 @@ export function Settings() {
         <Field label="Názov účtu">
           <input className="k-input k-well" value={editLabel} onChange={(e) => setEditLabel(e.target.value)} />
         </Field>
-        <Field label="IBAN">
+        <Field label="IBAN (nedá sa zmeniť)">
           <input className="k-input k-well" value={editTarget ? maskIban(editTarget.iban) : ''} disabled readOnly />
         </Field>
-        <Field label="Druh účtu">
+        <Field label="Typ účtu">
           <select className="k-select k-well" value={editKind} onChange={(e) => changeEditKind(e.target.value as AccountKind)}>
             <option value="personal">Osobný</option>
             <option value="business">Firemný</option>
@@ -356,7 +356,7 @@ export function Settings() {
         {editError && editTarget && editKind !== editTarget.kind ? (
           <label className="k-checkbox">
             <input type="checkbox" checked={editAcknowledge} onChange={(e) => setEditAcknowledge(e.target.checked)} />
-            Rozumiem, chcem zmenu typu účtu potvrdiť.
+            Potvrdzujem zmenu typu účtu a nové zaradenie transakcií.
           </label>
         ) : null}
       </Dialog>

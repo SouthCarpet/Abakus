@@ -47,32 +47,12 @@
   `unassigned`. A row already `confirmed` keeps the category the user chose for it.
   This is intentional, not a gap: a confirmed choice is a decision Abakus never
   silently overwrites (spec-adjudicated 2026-08-31).
-- **"Použiť aj na podobné" now also writes `rule_id` on the rows it sweeps.**
-  Before A17 a swept row's `rule_id` was left as it was; now it is set to the
-  merchant rule that reclassified it (`COALESCE` still keeps the old value on
-  the rare row with no merchant rule). A rule the rules screen shows as used
-  by one statement may in fact be used by rows of several, through a sweep
-  rather than a direct assignment.
-- **`hit_count` changes meaning the first time a statement is deleted.** Before
-  any delete, a rule's `hit_count` counts every classification pass
-  (`Store::touch_rule`, `crates/store/src/rules_repo.rs`), so a row that was
-  reclassified several times can inflate it above the number of rows that
-  actually use the rule today. The first statement delete recomputes the
-  whole `rules` table from the rows that really point at each rule
-  (`crates/store/src/delete_statement.rs`), and every delete after that keeps
-  it accurate. The number on the rules screen can therefore drop, sometimes
-  sharply, the first time you delete any statement, without anything having
-  gone wrong.
-- **Editing an account's kind can now fail where it used to silently succeed.**
-  `save_account`/`upsert_account` on an IBAN that already has an account
-  refuses a kind change once that account has imports, unless the caller
-  acknowledges the recast (`AccountKindLocked`, see
-  `crates/store/src/accounts.rs`). Re-saving an existing account with a
-  different kind is no longer a plain update: it can return an error the
-  caller has to show and let the user confirm.
-- **A failed network-audit write is visible only while Abakus is running.**
-  A write into `net_log` that itself fails (poisoned store, disk error) is
-  recorded in a process-local, 50-entry list (`src-tauri/src/net.rs`) that
-  Nastavenia's "Nezapísané záznamy" section reads. The request it happened
-  during still ran and is not undone; only the record of it having failed is
-  lost the moment the app closes, not the failed write's effect.
+- **`apply_to_matching` now writes `rule_id` on matching rows.** A rule can
+  therefore be used by transactions from several statements.
+- **`hit_count` changes meaning after the first statement deletion.** It is
+  then recomputed from rows whose `rule_id` points to each rule. The displayed
+  count can drop.
+- **`save_account` fails when an existing account's kind changes and it has
+  imports.** The caller must use `update_account` and acknowledge the change.
+- **Audit-write failures exist only in the current process.** Nastavenia shows
+  them until the application closes.

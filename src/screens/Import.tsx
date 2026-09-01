@@ -228,7 +228,7 @@ function DeleteStatementBody({ preview }: { preview: StatementDeletePreview | nu
   if (!preview) return <p>Načítava sa...</p>
   return (
     <p>
-      {`Výpis č. ${preview.number} (${preview.account_label}): zmaže ${preview.transaction_count} transakcií, z toho ${preview.confirmed_count} potvrdených ručne, a ${preview.rules_deleted} naučených pravidiel bez iného zdroja. Ostatné výpisy a nastavenia sa nezmenia.`}
+      {`Natrvalo sa zmaže výpis č. ${preview.number} z účtu ${preview.account_label}. Odstráni sa ${preview.transaction_count} transakcií, z nich ${preview.confirmed_count} ručne potvrdených. Pravidlá, ktoré nepoužíva iný výpis: ${preview.rules_deleted}. Ostatné výpisy a nastavenia zostanú bez zmeny.`}
     </p>
   )
 }
@@ -397,15 +397,15 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
       </Dialog>
       <Dialog
         open={deleteTarget !== null}
-        title="Zmazať výpis"
+        title="Natrvalo zmazať výpis?"
         onClose={() => setDeleteTarget(null)}
         actions={
           <>
             <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
-              Zrušiť
+              Späť
             </Button>
             <Button variant="danger" disabled={!deletePreview} onClick={() => void confirmDelete()}>
-              Zmazať
+              Natrvalo zmazať
             </Button>
           </>
         }
