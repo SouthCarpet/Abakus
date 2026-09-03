@@ -56,3 +56,5 @@
   imports.** The caller must use `update_account` and acknowledge the change.
 - **Audit-write failures exist only in the current process.** Nastavenia shows
   them until the application closes.
+- **Two chips share the label "Všetko".** On Prehľad the period cluster and the account-type cluster each end with a chip named "Všetko" (`src/screens/Overview.tsx`). Position tells them apart, wording does not. Reported by the closing visual verification (2026-09-01) as a SHOULD, left as a residual rather than reopening the round.
+
