@@ -291,3 +291,31 @@ same primitives as `assets/icon.svg` (rounded background, stroked rounded square
 bars, three dots, same colours and coordinates) with `PIL.ImageDraw` at 4x supersample
 and downsamples to a real multi-size `.ico` (16, 32, 48, 64, 128, 256 px), replacing the
 placeholder. New size: 21,350 bytes.
+
+## Closure round A17 (2026-09-01)
+
+Findings from the codex release verification were folded into the plan as amendment
+A17 on the user's decision, so the plan closed only after they landed.
+
+- Deleting an import is one transaction: it releases the statement file hash and the
+  transaction fingerprints (so the same PDF imports again), drops the statement from
+  the recent and bad-checksum views, deletes only learned rules whose supporting
+  transactions are all gone, reclassifies surviving open rows and recomputes hit
+  counts. A new rule_sources table carries provenance, with a once-guarded migration
+  proved against a database built from the pre-A17 schema.
+- The account IBAN is read-only. A kind change is refused while imports exist unless
+  the caller acknowledges it, and then the kind write and the transfer reclassification
+  share one transaction.
+- Prehľad totals every account of a kind instead of the first one.
+- A failed network-log write is surfaced and listed in Nastavenia instead of swallowed.
+- The dark theme renders: the app follows the system colour scheme live, and a guard
+  test asserts every colour and shadow token has a dark counterpart.
+
+Verification: grok-4.6 adversarial round (PARTIAL, no blocker, five should-fix, all
+closed), then grok-4.6 visual rounds 3 and 4 on the release binary (round 3 PARTIAL
+with the dark-theme MUST, round 4 PASS on all three axes with no MUST). An earlier
+visual round on gemini-3.7-flash-high was discarded: it returned PASS while quoting UI
+strings that do not exist in the source, checked by grep.
+
+Gates at closure: 206 Rust tests, 69 vitest, clippy, tsc and eslint clean, and the
+Rust suite also passes with ABAKUS_PDFIUM_DIR unset.
