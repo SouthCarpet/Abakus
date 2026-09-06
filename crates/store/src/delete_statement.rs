@@ -69,13 +69,21 @@ impl Store {
         })
     }
 
+    /// A failure of the `COMMIT` statement itself (not just the delete body)
+    /// must roll back too, same reasoning and regression pattern as
+    /// `delete_account`: see
+    /// `a_failed_commit_rolls_back_too_and_leaves_the_connection_usable`
+    /// below.
     pub fn delete_statement(&mut self, id: i64) -> Result<StatementDeleteOutcome> {
         self.conn.execute_batch("BEGIN IMMEDIATE")?;
         match self.delete_statement_tx(id) {
-            Ok(outcome) => {
-                self.conn.execute_batch("COMMIT")?;
-                Ok(outcome)
-            }
+            Ok(outcome) => match self.conn.execute_batch("COMMIT") {
+                Ok(()) => Ok(outcome),
+                Err(e) => {
+                    let _ = self.conn.execute_batch("ROLLBACK");
+                    Err(e.into())
+                }
+            },
             Err(e) => {
                 let _ = self.conn.execute_batch("ROLLBACK");
                 Err(e)
@@ -123,8 +131,9 @@ impl Store {
 
     /// `touch_rule` counts classification passes, so a reclassification round
     /// inflates it. After a delete the count is set to what it really is: the
-    /// number of transactions currently classified by that rule.
-    fn recompute_hit_counts(&mut self) -> Result<()> {
+    /// number of transactions currently classified by that rule. Shared with
+    /// `delete_account`, which reclassifies for the same reason.
+    pub(crate) fn recompute_hit_counts(&mut self) -> Result<()> {
         self.conn.execute("UPDATE rules SET hit_count = (SELECT COUNT(*) FROM transactions t WHERE t.rule_id = rules.id)", [])?;
         Ok(())
     }
@@ -145,4 +154,55 @@ impl Store {
 
 fn parse_date(s: &str) -> Result<NaiveDate> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| StoreError::Parse(format!("statement date {s}: {e}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parser::AccountKind;
+    use rules::RuleKind;
+
+    /// PARENT-NOTE 078 correction: same regression as `delete_account`'s
+    /// `a_failed_commit_rolls_back_too_and_leaves_the_connection_usable`,
+    /// adapted to `delete_statement`. Lives here (not `tests/delete_statement.rs`)
+    /// because it needs raw SQL against the private connection, same reason
+    /// `delete_account`'s own commit-failure test does.
+    #[test]
+    fn a_failed_commit_rolls_back_too_and_leaves_the_connection_usable() {
+        let mut s = Store::open_in_memory().unwrap();
+        let doomed_account = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let retained_account = s.upsert_account("SK3711000000000098765432", AccountKind::Business, "Firemný").unwrap();
+        let cat = s.category_by_path("Nákupy/domácnosť").unwrap().unwrap();
+
+        s.insert_rule(RuleKind::Merchant, "widget", None, cat).unwrap();
+        s.conn.execute_batch(&format!(
+            "INSERT INTO statements (id, account_id, number, period_start, period_end, checksum_status, file_hash) VALUES (1, {doomed_account}, 1, '2026-06-01', '2026-06-30', 'ok', 'h1'); \
+             INSERT INTO transactions (id, statement_id, account_id, fingerprint, posted_date, tx_date, kind, amount_cents, merchant_raw, merchant_norm, raw_block, status, source, rule_id, category_id) \
+               VALUES (1, 1, {doomed_account}, 'fp-widget', '2026-06-01', '2026-06-01', 'card', -500, 'WIDGET', 'widget', 'raw', 'confirmed', 'merchant_rule', (SELECT id FROM rules WHERE key = 'widget'), {cat}); \
+             INSERT INTO rule_sources (rule_id, transaction_id, statement_id) SELECT id, 1, 1 FROM rules WHERE key = 'widget';"
+        )).unwrap();
+
+        s.insert_rule(RuleKind::Merchant, "acme", None, cat).unwrap();
+        s.conn.execute_batch(&format!(
+            "INSERT INTO statements (id, account_id, number, period_start, period_end, checksum_status, file_hash) VALUES (2, {retained_account}, 1, '2026-06-01', '2026-06-30', 'ok', 'h2'); \
+             INSERT INTO transactions (id, statement_id, account_id, fingerprint, posted_date, tx_date, kind, amount_cents, merchant_raw, merchant_norm, raw_block, status, source) \
+               VALUES (2, 2, {retained_account}, 'fp-acme', '2026-06-01', '2026-06-01', 'card', -700, 'ACME', 'acme', 'raw', 'unassigned', 'none');"
+        )).unwrap();
+
+        s.conn.execute_batch("PRAGMA foreign_keys = OFF").unwrap();
+        s.conn.execute("DELETE FROM categories WHERE id = ?1", [cat]).unwrap();
+        s.conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA defer_foreign_keys = ON").unwrap();
+
+        let statement_before = s.recent_statements(10).unwrap();
+
+        let e = s.delete_statement(1).unwrap_err();
+
+        assert!(matches!(e, StoreError::Db(_)), "got {e:?}");
+        assert_eq!(s.recent_statements(10).unwrap(), statement_before, "a rolled-back COMMIT must leave both statements exactly as they were");
+        // Connection usability: `BEGIN IMMEDIATE` would itself fail with
+        // "cannot start a transaction within a transaction" if the earlier
+        // ROLLBACK had not actually closed the open one.
+        let new_account = s.upsert_account("SK8911000000000055555555", AccountKind::Personal, "Nový").unwrap();
+        assert!(s.account_by_id(new_account).unwrap().is_some(), "the connection must accept a fresh write after a rolled-back COMMIT");
+    }
 }

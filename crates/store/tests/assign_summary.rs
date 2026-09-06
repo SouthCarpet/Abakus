@@ -109,6 +109,43 @@ fn fixture_from(text: &str) -> parser::Statement { parse_text(text).unwrap() }
     assert!(csv.starts_with("datum;ucet;obchodnik;miesto;suma_eur;kategoria;podkategoria;stav\n")); assert_eq!(csv.lines().count(), 13);
 }
 
+/// 078 audit: `merchant_raw` and `place` come from parsed PDF text, not from
+/// this app, so a crafted statement line could start a field with `=`/`+`/
+/// `-`/`@`, which Excel/LibreOffice/Sheets read as a formula the moment the
+/// exported CSV is opened. A leading `'` must defuse it without changing the
+/// actual text the user sees.
+#[test] fn csv_export_defuses_a_leading_formula_character_in_merchant_and_place() {
+    let text = "Osobný účet     SK44 1100 0000 0000 1234 5678          Mena  EUR                          BIC (SWIFT)   TATRSKBX
+IBAN SK44 1100 0000 0000 1234 5678
+Číslo klienta:  1234567
+Majiteľ účtu:   JANA VZOROVÁ
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+Dialog  0800 00 1100              ID:   00                                    Výpis číslo:        1
+Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 30.06.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  30.06.2026                                                       500.00
+01.06.2026    EUR AP nákup POS                                                                  5.00-
+              Miesto platby:    +PLUS                 =SUM(A1)
+              Dátum:  30.05.26  Čas:  12:00:00        Suma:          5.00- EUR
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                       495.00
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        1        Strana:        1
+";
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    s.import_statement(&parse_text(text).unwrap(), "h1").unwrap();
+
+    let csv = s.export_csv(&TxFilter::default()).unwrap();
+
+    let row = csv.lines().nth(1).unwrap();
+    assert!(row.contains("\"'=SUM(A1)\""), "the merchant field must be defused: {row}");
+    assert!(row.contains("\"'+PLUS\""), "the place field must be defused: {row}");
+    assert!(!row.contains("\"=SUM"), "an un-defused formula must never reach the file: {row}");
+}
+
 /// A4: one call exercises every numbered parameter, including the reused
 /// ones (`category_id` twice, `text` three times) and the A17/F3
 /// `account_kind` subquery.

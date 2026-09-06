@@ -68,8 +68,67 @@ fn account_error(e: store::StoreError) -> String {
 pub fn clear_password(state: State<AppState>, account_id: i64) -> Result<(), String> {
     let mut s = lock(&state)?;
     let acc = s.list_accounts().map_err(|e| e.to_string())?.into_iter().find(|a| a.id == account_id).ok_or("no such account")?;
-    secrets::clear(&acc.iban);
+    secrets::clear(&acc.iban)?;
     s.set_has_password(account_id, false).map_err(|e| e.to_string())
+}
+
+/// 078: what a delete of this account would remove, for the confirmation
+/// text. Runs the same rule query the delete runs (mirrors
+/// `statement_delete_preview`), so the numbers the user confirms are the
+/// numbers the delete produces. Read-only: never touches the database.
+#[tauri::command]
+pub fn account_delete_preview(state: State<AppState>, account_id: i64) -> Result<store::AccountDeletePreview, String> {
+    lock(&state)?.account_delete_preview(account_id).map_err(account_delete_error)
+}
+
+/// 078: deletes one account with its statements, transactions, and the
+/// learned rules only it produced. A keyring and SQLite have no shared
+/// commit, so this orders the two steps to protect the user's data: the
+/// credential removal runs FIRST, while the account still exists, and the
+/// database delete only runs once that has actually succeeded. A keyring
+/// failure (locked vault, backend error) then leaves the account and all its
+/// data exactly as they were, so the user has a working retry, not a gone
+/// account and an orphaned credential.
+///
+/// Residual boundary, undocumented no further: the two systems still cannot
+/// share one atomic commit, so if the keyring clear succeeds but the
+/// database delete then fails (rolled back internally, see
+/// `crates/store/src/delete_account.rs`'s own commit-failure handling), the
+/// account survives with `has_password` still true while the credential is
+/// already gone. This is not silently lost: `secrets::clear` is idempotent
+/// (a missing credential is `Ok`, see its doc comment), so the user's retry
+/// calls the keyring again, finds nothing there, and proceeds straight to a
+/// successful database delete. No account is ever left with a stale
+/// `has_password` flag AND a live credential removed out from under it.
+#[tauri::command]
+pub fn delete_account(state: State<AppState>, account_id: i64) -> Result<store::AccountDeleteOutcome, String> {
+    let mut s = lock(&state)?;
+    delete_account_inner(&mut s, account_id, &secrets::clear)
+}
+
+/// The testable body of `delete_account`: `clear_secret` stands in for the
+/// real keyring removal (same seam shape as `import_flow::remember_password`'s
+/// `set_secret`), so a test can inject a failing fake and prove the
+/// credential-cleanup failure boundary without ever touching a real
+/// credential. An account with no stored password never touches the keyring
+/// at all.
+fn delete_account_inner(s: &mut store::Store, account_id: i64, clear_secret: &dyn Fn(&str) -> Result<(), String>) -> Result<store::AccountDeleteOutcome, String> {
+    let account = s
+        .account_by_id(account_id)
+        .map_err(|e| e.to_string())?
+        .ok_or(store::StoreError::UnknownAccountId { id: account_id })
+        .map_err(account_delete_error)?;
+    if account.has_password {
+        clear_secret(&account.iban).map_err(|e| format!("Odstránenie hesla zlyhalo, účet nebol vymazaný: {e}"))?;
+    }
+    s.delete_account(account_id).map_err(account_delete_error)
+}
+
+fn account_delete_error(e: store::StoreError) -> String {
+    match e {
+        store::StoreError::UnknownAccountId { id } => format!("Účet s id {id} neexistuje."),
+        other => other.to_string(),
+    }
 }
 
 #[tauri::command]
@@ -122,9 +181,22 @@ pub fn summary(state: State<AppState>, from: Option<chrono::NaiveDate>, to: Opti
 
 #[tauri::command]
 pub fn export_csv(state: State<AppState>, filter: store::TxFilter, path: String) -> Result<usize, String> {
-    let csv = lock(&state)?.export_csv(&filter).map_err(|e| e.to_string())?;
-    std::fs::write(&path, &csv).map_err(|e| e.to_string())?;
-    Ok(csv.lines().count().saturating_sub(1))
+    let s = lock(&state)?;
+    export_csv_inner(&s, &filter, &path)
+}
+
+/// The testable body of `export_csv`, same seam shape as
+/// `delete_account_inner`. The exported row count comes from the same
+/// filtered query `export_csv` itself runs, not from counting `\n` in the
+/// finished text: a field can legitimately contain an embedded newline (it
+/// is CSV-quoted, per `csv_quote`), and `.lines().count()` then reports more
+/// rows than were actually exported. Regression:
+/// `export_csv_counts_records_not_lines_when_a_field_has_an_embedded_newline`.
+fn export_csv_inner(s: &store::Store, filter: &store::TxFilter, path: &str) -> Result<usize, String> {
+    let record_count = s.list_transactions(filter).map_err(|e| e.to_string())?.len();
+    let csv = s.export_csv(filter).map_err(|e| e.to_string())?;
+    std::fs::write(path, &csv).map_err(|e| e.to_string())?;
+    Ok(record_count)
 }
 
 #[tauri::command]
@@ -212,4 +284,120 @@ pub fn net_audit_failures() -> Vec<net::AuditFailure> {
 pub fn run_net_audit(state: State<AppState>) -> Result<usize, String> {
     let mut s = lock(&state)?;
     net::sample_connections(&mut s)
+}
+
+/// 078: `delete_account_inner`'s credential-cleanup failure boundary, tested
+/// with a fake `clear_secret` (never the real keyring, per the audit's
+/// constraint). `account_delete_error`'s Slovak wording is tested here too:
+/// it is a pure function, so no `State`/fixture is needed for it.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parser::AccountKind;
+    use std::cell::RefCell;
+    use store::Store;
+
+    fn fixture(name: &str) -> parser::Statement {
+        parser::parse_text(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/synthetic/").to_string() + name).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn account_delete_error_states_the_unknown_id_in_slovak() {
+        let msg = account_delete_error(store::StoreError::UnknownAccountId { id: 42 });
+        assert_eq!(msg, "Účet s id 42 neexistuje.");
+    }
+
+    #[test]
+    fn account_delete_error_passes_other_errors_through() {
+        let msg = account_delete_error(store::StoreError::Parse("čokoľvek".into()));
+        assert_eq!(msg, "čokoľvek");
+    }
+
+    #[test]
+    fn deleting_an_unknown_account_is_a_clear_slovak_error() {
+        let mut s = Store::open_in_memory().unwrap();
+        let never = |_: &str| -> Result<(), String> { panic!("must not be called: no account was found") };
+
+        let e = delete_account_inner(&mut s, 9_999, &never).unwrap_err();
+
+        assert_eq!(e, "Účet s id 9999 neexistuje.");
+    }
+
+    #[test]
+    fn deleting_an_account_without_a_password_never_touches_the_keyring() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let calls: RefCell<Vec<String>> = RefCell::new(Vec::new());
+        let record = |iban: &str| -> Result<(), String> { calls.borrow_mut().push(iban.into()); Ok(()) };
+
+        let outcome = delete_account_inner(&mut s, id, &record).unwrap();
+
+        assert_eq!(outcome.account_id, id);
+        assert!(calls.borrow().is_empty(), "an account with no stored password must never call the keyring");
+        assert!(s.account_by_id(id).unwrap().is_none());
+    }
+
+    /// The exact boundary the 078 review correction asked for named and
+    /// tested: a keyring failure now runs BEFORE the database delete, so the
+    /// account and every one of its rows survive it, giving the user a
+    /// working retry instead of a gone account and an orphaned credential.
+    #[test]
+    fn a_credential_cleanup_failure_leaves_the_account_and_its_data_intact_for_a_retry() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        s.set_has_password(id, true).unwrap();
+        s.import_statement(&fixture("personal-2026-06.txt"), "h1").unwrap();
+        let failing = |_: &str| -> Result<(), String> { Err("keyring locked".into()) };
+
+        let e = delete_account_inner(&mut s, id, &failing).unwrap_err();
+
+        assert!(e.contains("keyring locked"), "the real cause must reach the caller: {e}");
+        assert!(!e.to_lowercase().contains("success"), "a credential failure must never read as a success: {e}");
+        assert!(s.account_by_id(id).unwrap().is_some(), "a keyring failure must not delete the account: the user needs a handle to retry");
+        assert_eq!(s.list_transactions(&store::TxFilter { account_id: Some(id), ..Default::default() }).unwrap().len(), 8, "no data may be lost when only the credential step failed");
+    }
+
+    /// The keyring step runs and succeeds; only then does the database
+    /// delete run and actually remove the data.
+    /// 078 correction: a category name is only trimmed at the ends
+    /// (`save_category`), so an embedded newline in the middle survives all
+    /// the way to `csv_quote` through the real public API, no raw SQL
+    /// needed. The old `csv.lines().count() - 1` would have reported one
+    /// row too many for this exact case.
+    #[test]
+    fn export_csv_counts_records_not_lines_when_a_field_has_an_embedded_newline() {
+        let mut s = Store::open_in_memory().unwrap();
+        s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        s.import_statement(&fixture("personal-2026-06.txt"), "h1").unwrap();
+        let multiline_cat = s.save_category(None, None, "Multi\nline", store::CategoryKind::Expense).unwrap().id;
+        let ids: Vec<i64> = s.list_transactions(&store::TxFilter::default()).unwrap().into_iter().map(|r| r.id).collect();
+        let expected = ids.len();
+        s.assign(&ids, multiline_cat, false).unwrap();
+        let path = std::env::temp_dir().join(format!("abakus-test-export-{}.csv", std::process::id()));
+        let path = path.to_str().unwrap();
+
+        let count = export_csv_inner(&s, &store::TxFilter::default(), path).unwrap();
+
+        let written = std::fs::read_to_string(path).unwrap();
+        std::fs::remove_file(path).ok();
+        assert!(written.contains("Multi\nline"), "the embedded newline must reach the file, quoted, not stripped");
+        assert_eq!(count, expected, "the count must be the number of exported records, not the number of text lines");
+        assert_ne!(count, written.lines().count().saturating_sub(1), "this fixture must actually exercise the bug: line-counting must disagree with the real record count");
+    }
+
+    #[test]
+    fn a_successful_credential_cleanup_runs_before_the_database_delete_and_clears_the_right_iban() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        s.set_has_password(id, true).unwrap();
+        s.import_statement(&fixture("personal-2026-06.txt"), "h1").unwrap();
+        let calls: RefCell<Vec<String>> = RefCell::new(Vec::new());
+        let record = |iban: &str| -> Result<(), String> { calls.borrow_mut().push(iban.into()); Ok(()) };
+
+        let outcome = delete_account_inner(&mut s, id, &record).unwrap();
+
+        assert_eq!((outcome.statements_deleted, outcome.transactions_deleted), (1, 8));
+        assert_eq!(calls.borrow().as_slice(), &["SK4411000000000012345678".to_string()]);
+        assert!(s.account_by_id(id).unwrap().is_none(), "the database delete runs once the credential step has actually succeeded");
+    }
 }

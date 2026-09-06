@@ -148,34 +148,80 @@ impl Store {
     }
 }
 
-fn row_to_tx(r: &rusqlite::Row) -> rusqlite::Result<TxRow> {
-    // A defaulted 1970 date would hide a corrupt row behind a plausible-looking date
-    // (adjudicated review finding); surface the parse failure as a real SQLite error instead.
-    let date = |i: usize| -> rusqlite::Result<NaiveDate> {
-        let s: String = r.get(i)?;
-        NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(|e| rusqlite::Error::FromSqlConversionFailure(i, rusqlite::types::Type::Text, Box::new(e)))
-    };
+// A defaulted 1970 date would hide a corrupt row behind a plausible-looking
+// date (adjudicated review finding); surface the parse failure as a real
+// SQLite error instead.
+fn parse_row_date(r: &rusqlite::Row, i: usize) -> rusqlite::Result<NaiveDate> {
+    let s: String = r.get(i)?;
+    NaiveDate::parse_from_str(&s, "%Y-%m-%d").map_err(|e| rusqlite::Error::FromSqlConversionFailure(i, rusqlite::types::Type::Text, Box::new(e)))
+}
+
+/// `(id, account_id, account_kind, statement_number, posted_date, tx_date, kind, amount_cents, orig_amount_cents, orig_currency)`,
+/// columns 0-9 of `BASE_SELECT`.
+type TxIdentity = (i64, i64, AccountKind, i64, NaiveDate, NaiveDate, String, i64, Option<i64>, Option<String>);
+
+fn row_identity(r: &rusqlite::Row) -> rusqlite::Result<TxIdentity> {
     let kind_s: String = r.get(2)?;
+    Ok((
+        r.get(0)?,
+        r.get(1)?,
+        if kind_s == "business" { AccountKind::Business } else { AccountKind::Personal },
+        r.get(3)?,
+        parse_row_date(r, 4)?,
+        parse_row_date(r, 5)?,
+        r.get(6)?,
+        r.get(7)?,
+        r.get(8)?,
+        r.get(9)?,
+    ))
+}
+
+/// `(merchant_raw, place, counterparty_name, counterparty_iban, category_id, category_name, parent_name, status, source, raw_block)`,
+/// columns 10-19 of `BASE_SELECT`.
+type TxDetail = (String, Option<String>, Option<String>, Option<String>, Option<i64>, Option<String>, Option<String>, Status, String, String);
+
+fn row_detail(r: &rusqlite::Row) -> rusqlite::Result<TxDetail> {
+    Ok((
+        r.get(10)?,
+        r.get(11)?,
+        r.get(12)?,
+        r.get(13)?,
+        r.get(14)?,
+        r.get(15)?,
+        r.get(16)?,
+        status_parse(&r.get::<_, String>(17)?),
+        r.get(18)?,
+        r.get(19)?,
+    ))
+}
+
+/// Split into `row_identity`/`row_detail` (and `parse_row_date`) purely to
+/// keep each function's cyclomatic complexity under the project's Lizard
+/// budget: every `?` here is a branch under that analyzer, and one flat
+/// function over all 20 `BASE_SELECT` columns measured 23.
+fn row_to_tx(r: &rusqlite::Row) -> rusqlite::Result<TxRow> {
+    let (id, account_id, account_kind, statement_number, posted_date, tx_date, kind, amount_cents, orig_amount_cents, orig_currency) = row_identity(r)?;
+    let (merchant_raw, place, counterparty_name, counterparty_iban, category_id, category_name, parent_name, status, source, raw_block) = row_detail(r)?;
     Ok(TxRow {
-        id: r.get(0)?,
-        account_id: r.get(1)?,
-        account_kind: if kind_s == "business" { AccountKind::Business } else { AccountKind::Personal },
-        statement_number: r.get(3)?,
-        posted_date: date(4)?,
-        tx_date: date(5)?,
-        kind: r.get(6)?,
-        amount_cents: r.get(7)?,
-        orig_amount_cents: r.get(8)?,
-        orig_currency: r.get(9)?,
-        merchant_raw: r.get(10)?,
-        place: r.get(11)?,
-        counterparty_name: r.get(12)?,
-        counterparty_iban: r.get(13)?,
-        category_id: r.get(14)?,
-        category_name: r.get(15)?,
-        parent_name: r.get(16)?,
-        status: status_parse(&r.get::<_, String>(17)?),
-        source: r.get(18)?,
-        raw_block: r.get(19)?,
+        id,
+        account_id,
+        account_kind,
+        statement_number,
+        posted_date,
+        tx_date,
+        kind,
+        amount_cents,
+        orig_amount_cents,
+        orig_currency,
+        merchant_raw,
+        place,
+        counterparty_name,
+        counterparty_iban,
+        category_id,
+        category_name,
+        parent_name,
+        status,
+        source,
+        raw_block,
     })
 }
