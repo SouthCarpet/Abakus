@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
-import { save } from '@tauri-apps/plugin-dialog'
+import { useEffect, useRef, useState } from 'react'
+import { files } from '../lib/files'
+import { useAction } from '../lib/useAction'
+import { DeleteAccountDialog } from '../components/DeleteAccountDialog'
 import type { Account, AccountKind, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
@@ -8,7 +10,7 @@ import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { usePeriod } from '../components/PeriodPicker'
 import { fromSkParts, maskIban } from '../lib/iban'
-import { periodRange } from '../lib/period'
+import { periodRange, validPeriod } from '../lib/period'
 
 const NET_LOG_LIMIT = 20
 
@@ -101,10 +103,12 @@ function AccountRow({
   account,
   onForgetPassword,
   onEdit,
+  onDelete,
 }: {
   account: Account
   onForgetPassword: (id: number) => void
   onEdit: (account: Account) => void
+  onDelete: (account: Account) => void
 }) {
   return (
     <tr>
@@ -116,6 +120,7 @@ function AccountRow({
         <Button variant="ghost" onClick={() => onEdit(account)}>
           Upraviť
         </Button>
+        <Button variant="ghost" onClick={() => onDelete(account)}>Zmazať účet</Button>
         {account.has_password ? (
           <Button variant="ghost" onClick={() => onForgetPassword(account.id)}>
             Zabudnúť heslo
@@ -127,6 +132,12 @@ function AccountRow({
 }
 
 export function Settings() {
+  const action = useAction()
+  const accountRequest = useRef(0)
+  const netRequest = useRef(0)
+  const updateRequest = useRef(0)
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
+  const [exportMessage, setExportMessage] = useState('')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [dataDir, setDataDir] = useState('')
   const [statementCount, setStatementCount] = useState(0)
@@ -147,33 +158,49 @@ export function Settings() {
   const [editError, setEditError] = useState('')
 
   async function refresh() {
-    setAccounts(await api.listAccounts())
+    const request = ++accountRequest.current
+    const [nextAccounts, statements] = await Promise.all([api.listAccounts(), api.recentStatements(ALL_STATEMENTS_LIMIT)])
+    if (request !== accountRequest.current) return
+    setAccounts(nextAccounts)
+    setStatementCount(statements.length)
   }
 
   async function refreshNetLog() {
-    setNetLog(await api.netLog(NET_LOG_LIMIT))
-    setAuditFailures(await api.netAuditFailures())
+    const request = ++netRequest.current
+    const [rows, failures] = await Promise.all([api.netLog(NET_LOG_LIMIT), api.netAuditFailures()])
+    if (request !== netRequest.current) return
+    setNetLog(rows)
+    setAuditFailures(failures)
   }
 
   useEffect(() => {
-    void refresh()
-    void api.dataDir().then(setDataDir)
-    void api.recentStatements(ALL_STATEMENTS_LIMIT).then((list) => setStatementCount(list.length))
-    void refreshNetLog()
-    // Boot gating (spec A14): the check runs only when the persisted flag is
-    // on, at the moment Nastavenia is opened. Nastavenia is the one place
-    // its result is ever shown.
-    void api.getCheckUpdates().then((on) => {
-      setCheckUpdates(on)
-      if (on) void api.checkUpdateNow().then(setRelease)
-    })
+    void refresh().catch((e) => action.setError(String(e)))
+    void api.dataDir().then(setDataDir).catch((e) => action.setError(String(e)))
+    void refreshNetLog().catch((e) => action.setError(String(e)))
+    const request = ++updateRequest.current
+    void loadUpdatePreference(request).catch((e) => action.setError(String(e)))
+    return () => { accountRequest.current++; netRequest.current++; updateRequest.current++ }
   }, [])
 
+  async function loadUpdatePreference(request: number) {
+    const on = await api.getCheckUpdates()
+    if (request !== updateRequest.current) return
+    setCheckUpdates(on)
+    if (!on) return
+    const nextRelease = await api.checkUpdateNow()
+    if (request === updateRequest.current) setRelease(nextRelease)
+    await refreshNetLog()
+  }
+
   async function toggleCheckUpdates(next: boolean) {
+    const request = ++updateRequest.current
     await api.setCheckUpdates(next)
     setCheckUpdates(next)
-    setRelease(next ? await api.checkUpdateNow() : null)
-    await refreshNetLog()
+    setRelease(null)
+    try {
+      const nextRelease = next ? await api.checkUpdateNow() : null
+      if (request === updateRequest.current) setRelease(nextRelease)
+    } finally { await refreshNetLog() }
   }
 
   async function scanNow() {
@@ -188,7 +215,7 @@ export function Settings() {
       setAddOpen(false)
       setIbanInput('')
       setLabel('')
-      await refresh()
+      await refresh().catch((e) => action.setError(String(e)))
     } catch (e) {
       setError(String(e))
     }
@@ -230,82 +257,91 @@ export function Settings() {
   }
 
   async function exportCsv() {
-    const path = await save({ filters: [{ name: 'CSV', extensions: ['csv'] }] })
-    if (!path) return
+    if (!validPeriod(period)) throw new Error('Vyberte platné obdobie v Transakciách.')
+    setExportMessage('')
+    const path = await files.saveCsv()
+    if (!path) { setExportMessage('Export zrušený.'); return }
     const { from, to } = periodRange(period.kind, new Date(), period.custom)
-    await api.exportCsv({ from, to }, path)
+    const count = await api.exportCsv({ from, to }, path)
+    setExportMessage(`Exportovaných transakcií: ${count}.`)
   }
 
   return (
     <div className="k-section">
-      <div className="k-row" style={{ alignItems: 'stretch' }}>
-        <div className="k-section" style={{ flex: 1, minWidth: 320 }}>
-          <Card
-            title="Účty"
-            footer={
-              <Button variant="primary" onClick={() => setAddOpen(true)}>
-                Pridať účet
+      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.busy ? <p role="status">Prebieha operácia...</p> : null}
+      {exportMessage ? <p role="status">{exportMessage}</p> : null}
+      <fieldset disabled={action.busy} className="k-section">
+        <div className="k-row" style={{ alignItems: 'stretch' }}>
+          <div className="k-section" style={{ flex: 1, minWidth: 320 }}>
+            <Card
+              title="Účty"
+              footer={
+                <Button variant="primary" onClick={() => setAddOpen(true)}>
+                  Pridať účet
+                </Button>
+              }
+            >
+              <table className="k-table">
+                <thead>
+                  <tr>
+                    <th>Názov</th>
+                    <th>Druh</th>
+                    <th>IBAN</th>
+                    <th>Heslo</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.map((account) => (
+                    <AccountRow key={account.id} account={account} onForgetPassword={(id) => void action.run(() => forgetPassword(id))} onEdit={openEdit} onDelete={setDeleteTarget} />
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+            <Card title="Údaje">
+              <p>Priečinok s dátami: {dataDir}</p>
+              <Button variant="secondary" onClick={() => void action.run(() => exportCsv())}>
+                Exportovať CSV
               </Button>
-            }
-          >
-            <table className="k-table">
-              <thead>
-                <tr>
-                  <th>Názov</th>
-                  <th>Druh</th>
-                  <th>IBAN</th>
-                  <th>Heslo</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {accounts.map((account) => (
-                  <AccountRow key={account.id} account={account} onForgetPassword={(id) => void forgetPassword(id)} onEdit={openEdit} />
-                ))}
-              </tbody>
-            </table>
-          </Card>
-          <Card title="Údaje">
-            <p>Priečinok s dátami: {dataDir}</p>
-            <Button variant="secondary" onClick={() => void exportCsv()}>
-              Exportovať CSV
-            </Button>
-          </Card>
+            </Card>
+          </div>
+          <div style={{ flex: 1, minWidth: 320 }}>
+            <Card title="Stav">
+              <p>Priečinok s dátami: {dataDir}</p>
+              <p>
+                Účty: <span className="k-num">{accounts.length}</span>
+              </p>
+              <p>
+                Výpisy: <span className="k-num">{statementCount}</span>
+              </p>
+              <label className="k-checkbox">
+                <input type="checkbox" checked={checkUpdates} onChange={(e) => void action.run(() => toggleCheckUpdates(e.target.checked))} />
+                Kontrolovať aktualizácie (GitHub)
+              </label>
+              <p>Toto je jediné sieťové volanie aplikácie. V predvolenom stave je vypnuté.</p>
+              {release ? (
+                <>
+                  <p>Dostupná aktualizácia {release.tag}</p>
+                  <p>{release.url}</p>
+                </>
+              ) : null}
+              <NetLogSection rows={netLog} failures={auditFailures} onScanNow={() => void action.run(() => scanNow())} />
+            </Card>
+          </div>
         </div>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <Card title="Stav">
-            <p>Priečinok s dátami: {dataDir}</p>
-            <p>
-              Účty: <span className="k-num">{accounts.length}</span>
-            </p>
-            <p>
-              Výpisy: <span className="k-num">{statementCount}</span>
-            </p>
-            <label className="k-checkbox">
-              <input type="checkbox" checked={checkUpdates} onChange={(e) => void toggleCheckUpdates(e.target.checked)} />
-              Kontrolovať aktualizácie (GitHub)
-            </label>
-            <p>Toto je jediné sieťové volanie aplikácie. V predvolenom stave je vypnuté.</p>
-            {release ? (
-              <>
-                <p>Dostupná aktualizácia {release.tag}</p>
-                <p>{release.url}</p>
-              </>
-            ) : null}
-            <NetLogSection rows={netLog} failures={auditFailures} onScanNow={() => void scanNow()} />
-          </Card>
-        </div>
-      </div>
+      </fieldset>
+      {deleteTarget ? <DeleteAccountDialog account={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={refresh} /> : null}
       <Dialog
         open={addOpen}
         title="Pridať účet"
-        onClose={() => setAddOpen(false)}
+        onClose={() => { if (!action.busy) setAddOpen(false) }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setAddOpen(false)}>
+            <Button variant="secondary" disabled={action.busy} onClick={() => setAddOpen(false)}>
               Zrušiť
             </Button>
-            <Button variant="primary" onClick={() => void saveAccount()}>
+            <Button variant="primary" disabled={action.busy} onClick={() => void action.run(() => saveAccount())}>
               Uložiť
             </Button>
           </>
@@ -323,18 +359,18 @@ export function Settings() {
             <option value="business">Firemný</option>
           </select>
         </Field>
-        {error ? <p className="k-text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="k-text-danger">{error}</p> : null}
       </Dialog>
       <Dialog
         open={editTarget !== null}
         title="Upraviť účet"
-        onClose={() => setEditTarget(null)}
+        onClose={() => { if (!action.busy) setEditTarget(null) }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setEditTarget(null)}>
+            <Button variant="secondary" disabled={action.busy} onClick={() => setEditTarget(null)}>
               Zrušiť
             </Button>
-            <Button variant="primary" onClick={() => void saveEdit()}>
+            <Button variant="primary" disabled={action.busy} onClick={() => void action.run(() => saveEdit())}>
               Uložiť
             </Button>
           </>
@@ -352,7 +388,7 @@ export function Settings() {
             <option value="business">Firemný</option>
           </select>
         </Field>
-        {editError ? <p className="k-text-danger">{editError}</p> : null}
+        {editError ? <p role="alert" className="k-text-danger">{editError}</p> : null}
         {editError && editTarget && editKind !== editTarget.kind ? (
           <label className="k-checkbox">
             <input type="checkbox" checked={editAcknowledge} onChange={(e) => setEditAcknowledge(e.target.checked)} />

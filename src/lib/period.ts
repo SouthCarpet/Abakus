@@ -3,6 +3,18 @@ export const PERIOD_LABELS: Record<PeriodKind, string> = { this_month: 'Tento me
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const firstOfMonth = (y: number, m: number) => new Date(y, m, 1)
 const lastOfMonth = (y: number, m: number) => new Date(y, m + 1, 0)
+
+function validDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
+export function validPeriod(value: { kind: PeriodKind; custom?: { from: string; to: string } }): boolean {
+  if (value.kind !== 'custom') return Object.prototype.hasOwnProperty.call(PERIOD_LABELS, value.kind)
+  const range = value.custom
+  return !!range && validDate(range.from) && validDate(range.to) && range.from <= range.to
+}
 // Month bar drilldown (IncomeExpense): "2026-02" -> the first and last day of
 // that month, in the same {from, to} shape periodRange returns for a custom
 // range, so it can go straight into usePeriod's setter.

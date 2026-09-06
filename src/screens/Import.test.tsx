@@ -103,7 +103,7 @@ describe('Recent imports: delete a statement', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
     await waitFor(() => expect(api.statementDeletePreview).toHaveBeenCalledWith(5))
-    await screen.findByText(/Odstráni sa 8 transakcií, z nich 2 ručne potvrdených. Pravidlá, ktoré nepoužíva iný výpis: 1/)
+    await screen.findByText(/Odstráni sa 8 transakcií, z nich 2 potvrdených. Pravidlá, ktoré nepoužíva iný výpis: 1/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Natrvalo zmazať' }))
     await waitFor(() => expect(api.deleteStatement).toHaveBeenCalledWith(5))
@@ -154,5 +154,44 @@ describe('Recent imports: row-level Zmazať weight', () => {
     expect(button).toHaveClass('k-btn-ghost')
     expect(button).toHaveClass('k-text-danger')
     expect(button).not.toHaveClass('k-btn-danger')
+  })
+})
+
+// Oracle: audit brief requires visible import/preview/delete failure and no duplicate pending deletion.
+describe('Import audit failure boundaries', () => {
+  it('shows a rejected file import instead of leaving an unhandled promise', async () => {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    vi.mocked(api.recentStatements).mockResolvedValue([])
+    vi.mocked(open).mockResolvedValue('C:/synthetic/failure.pdf')
+    vi.mocked(api.importStatements).mockRejectedValueOnce(new Error('PDF sa nedá načítať'))
+    render(<Import />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('PDF sa nedá načítať')
+    expect(screen.getByRole('button', { name: 'Vybrať PDF' })).toBeEnabled()
+  })
+
+  it('shows statement preview failure without enabling destructive confirmation', async () => {
+    vi.mocked(api.recentStatements).mockResolvedValue([{ statement_id: 91, number: 3, account_label: 'Test', period_end: '2026-09-01', transaction_count: 2, checksum: { status: 'ok' } }])
+    vi.mocked(api.statementDeletePreview).mockRejectedValueOnce(new Error('Náhľad výpisu zlyhal'))
+    render(<Import />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zmazať' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Náhľad výpisu zlyhal')
+    expect(screen.getByRole('button', { name: 'Natrvalo zmazať' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Späť' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps statement delete failure in its dialog with a retryable confirmation', async () => {
+    vi.mocked(api.recentStatements).mockResolvedValue([{ statement_id: 91, number: 3, account_label: 'Test', period_end: '2026-09-01', transaction_count: 2, checksum: { status: 'ok' } }])
+    vi.mocked(api.statementDeletePreview).mockResolvedValue({ statement_id: 91, number: 3, account_label: 'Test', period_start: '2026-08-01', period_end: '2026-09-01', transaction_count: 2, confirmed_count: 1, rules_deleted: 0 })
+    vi.mocked(api.deleteStatement).mockRejectedValueOnce(new Error('Odstránenie výpisu zlyhalo'))
+    render(<Import />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zmazať' }))
+    const remove = screen.getByRole('button', { name: 'Natrvalo zmazať' })
+    await waitFor(() => expect(remove).toBeEnabled())
+    fireEvent.click(remove)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Odstránenie výpisu zlyhalo')
+    expect(screen.getByRole('dialog')).toBeVisible()
+    expect(remove).toBeEnabled()
   })
 })

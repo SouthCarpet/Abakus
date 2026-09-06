@@ -8,7 +8,7 @@ import { IncomeExpense } from '../components/charts/IncomeExpense'
 import { MonthlyStacked } from '../components/charts/MonthlyStacked'
 import { Kpi } from '../components/Kpi'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
-import { monthRange, periodRange } from '../lib/period'
+import { monthRange, periodRange, validPeriod } from '../lib/period'
 
 const ACCOUNT_KINDS: { id: 'all' | AccountKind; label: string }[] = [
   { id: 'all', label: 'Všetko' },
@@ -150,6 +150,8 @@ export function Overview({
   onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number; accountKind?: AccountKind }) => void
 }) {
   const [period, setPeriod] = usePeriod()
+  const [error, setError] = useState('')
+  const [summaryError, setSummaryError] = useState('')
   const onMonthClick = (month: string) => setPeriod({ kind: 'custom', custom: monthRange(month) })
   const [accountKind, setAccountKind] = useState<'all' | AccountKind>('all')
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -166,20 +168,24 @@ export function Overview({
   }
 
   useEffect(() => {
-    void api.badChecksums().then(setBadChecksums)
+    void api.badChecksums().then(setBadChecksums).catch((e) => setError(String(e)))
   }, [])
 
   useEffect(() => {
-    void api.recentStatements(1).then((rows) => setHasAnyImports(rows.length > 0))
+    void api.recentStatements(1).then((rows) => setHasAnyImports(rows.length > 0)).catch((e) => setError(String(e)))
   }, [])
 
   useEffect(() => {
+    let active = true
+    setSummary(null); setSummaryError('')
+    if (!validPeriod(period)) return
     const { from, to } = periodRange(period.kind, new Date(), period.custom)
     // A17/F3: filters by the whole KIND, so a second personal or business
     // account is never dropped out of the totals (it used to send the id of
     // just one account of that kind).
     const kind = accountKind === 'all' ? null : accountKind
-    void api.summary(from, to, null, kind).then(setSummary)
+    void api.summary(from, to, null, kind).then((value) => { if (active) setSummary(value) }).catch((e) => { if (active) setSummaryError(String(e)) })
+    return () => { active = false }
   }, [period, accountKind])
 
   const incomeSpan = summary ? monthlySpan(summary.by_month, (m) => m.income_cents) : undefined
@@ -191,13 +197,15 @@ export function Overview({
         <PeriodPicker value={period} onChange={setPeriod} />
         <div className="k-row" role="group" aria-label="Účet">
           {ACCOUNT_KINDS.map((option) => (
-            <Button key={option.id} variant={accountKind === option.id ? 'primary' : 'secondary'} onClick={() => setAccountKind(option.id)}>
+            <Button aria-pressed={accountKind === option.id} key={option.id} variant={accountKind === option.id ? 'primary' : 'secondary'} onClick={() => setAccountKind(option.id)}>
               {option.label}
             </Button>
           ))}
         </div>
       </div>
 
+      {error ? <p role="alert">{error}</p> : null}
+      {summaryError ? <p role="alert">{summaryError}</p> : null}
       {badChecksums.map((row) => (
         <ChecksumBanner key={row.statement_id} row={row} onNavigate={(statementId) => onNavigateToTransactions({ statementId })} />
       ))}

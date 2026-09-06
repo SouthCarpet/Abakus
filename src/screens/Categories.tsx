@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Category, CategoryKind, RuleView } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
-import { Toast } from '../components/Toast'
+import { useAction } from '../lib/useAction'
 import { groupCategories } from '../lib/categories'
 
 const RULE_KIND_LABELS: Record<RuleView['kind'], string> = {
@@ -80,6 +80,7 @@ function CategoryRow({
     <div className="k-row" style={indent ? { marginLeft: 'var(--space-6)' } : undefined}>
       <input
         className="k-input k-well"
+        aria-label={`Názov kategórie ${category.id}`}
         value={name}
         disabled={category.system}
         onChange={(e) => setName(e.target.value)}
@@ -131,7 +132,8 @@ function CategoryTree({
 export function Categories() {
   const [categories, setCategories] = useState<Category[]>([])
   const [rules, setRules] = useState<RuleView[]>([])
-  const [toast, setToast] = useState<string | null>(null)
+  const action = useAction()
+  const refreshRequest = useRef(0)
   const [addOpen, setAddOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [newKind, setNewKind] = useState<CategoryKind>('expense')
@@ -140,21 +142,19 @@ export function Categories() {
   const [archiveTarget, setArchiveTarget] = useState<Category | null>(null)
 
   async function refresh() {
-    setCategories(await api.listCategories())
-    setRules(await api.listRules())
+    const request = ++refreshRequest.current
+    const [nextCategories, nextRules] = await Promise.all([api.listCategories(), api.listRules()])
+    if (request !== refreshRequest.current) return
+    setCategories(nextCategories)
+    setRules(nextRules)
   }
 
   useEffect(() => {
-    void refresh()
+    void refresh().catch((e) => action.setError(String(e)))
+    return () => { refreshRequest.current++ }
   }, [])
 
-  async function withToast(action: () => Promise<void>) {
-    try {
-      await action()
-    } catch (e) {
-      setToast(String(e))
-    }
-  }
+  const withToast = action.run
 
   function rename(id: number, name: string) {
     void withToast(async () => {
@@ -205,47 +205,51 @@ export function Categories() {
 
   return (
     <div className="k-section">
-      {toast ? <Toast message={toast} /> : null}
-      <div className="k-row" style={{ alignItems: 'stretch' }}>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <Card
-            title="Kategórie"
-            footer={
-              <Button variant="primary" onClick={() => setAddOpen(true)}>
-                + kategória
-              </Button>
-            }
-          >
-            <CategoryTree
-              categories={categories}
-              onRename={rename}
-              onAddSub={(parent) => setSubParent(parent)}
-              onArchive={setArchiveTarget}
-            />
-          </Card>
+      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.busy ? <p role="status">Prebieha operácia...</p> : null}
+      <fieldset disabled={action.busy} className="k-section">
+        <div className="k-row" style={{ alignItems: 'stretch' }}>
+          <div style={{ flex: 1, minWidth: 320 }}>
+            <Card
+              title="Kategórie"
+              footer={
+                <Button variant="primary" onClick={() => setAddOpen(true)}>
+                  + kategória
+                </Button>
+              }
+            >
+              <CategoryTree
+                categories={categories}
+                onRename={rename}
+                onAddSub={(parent) => setSubParent(parent)}
+                onArchive={setArchiveTarget}
+              />
+            </Card>
+          </div>
+          <div style={{ flex: 1, minWidth: 320 }}>
+            <Card title="Pravidlá">
+              <RulesTable rules={rules} onDelete={deleteRule} />
+            </Card>
+          </div>
         </div>
-        <div style={{ flex: 1, minWidth: 320 }}>
-          <Card title="Pravidlá">
-            <RulesTable rules={rules} onDelete={deleteRule} />
-          </Card>
-        </div>
-      </div>
 
+      </fieldset>
       <Dialog
         open={addOpen}
         title="Pridať kategóriu"
-        onClose={() => setAddOpen(false)}
+        onClose={() => { if (!action.busy) setAddOpen(false) }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setAddOpen(false)}>
+            <Button variant="secondary" disabled={action.busy} onClick={() => setAddOpen(false)}>
               Zrušiť
             </Button>
-            <Button variant="primary" onClick={addTop}>
+            <Button variant="primary" disabled={action.busy} onClick={addTop}>
               Uložiť
             </Button>
           </>
         }
       >
+        {action.error ? <p role="alert">{action.error}</p> : null}
         <Field label="Názov">
           <input className="k-input k-well" value={newName} onChange={(e) => setNewName(e.target.value)} />
         </Field>
@@ -260,18 +264,19 @@ export function Categories() {
       <Dialog
         open={subParent !== null}
         title={`Pridať podkategóriu do ${subParent?.name ?? ''}`}
-        onClose={() => setSubParent(null)}
+        onClose={() => { if (!action.busy) setSubParent(null) }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setSubParent(null)}>
+            <Button variant="secondary" disabled={action.busy} onClick={() => setSubParent(null)}>
               Zrušiť
             </Button>
-            <Button variant="primary" onClick={addSub}>
+            <Button variant="primary" disabled={action.busy} onClick={addSub}>
               Uložiť
             </Button>
           </>
         }
       >
+        {action.error ? <p role="alert">{action.error}</p> : null}
         <Field label="Názov">
           <input className="k-input k-well" value={subName} onChange={(e) => setSubName(e.target.value)} />
         </Field>
@@ -280,18 +285,20 @@ export function Categories() {
       <Dialog
         open={archiveTarget !== null}
         title="Archivovať kategóriu"
-        onClose={() => setArchiveTarget(null)}
+        onClose={() => { if (!action.busy) setArchiveTarget(null) }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setArchiveTarget(null)}>
+            <Button variant="secondary" disabled={action.busy} onClick={() => setArchiveTarget(null)}>
               Zrušiť
             </Button>
-            <Button variant="primary" onClick={confirmArchive}>
+            <Button variant="primary" disabled={action.busy} onClick={confirmArchive}>
               Archivovať
             </Button>
           </>
         }
       >
+        {action.error ? <p role="alert">{action.error}</p> : null}
+        <p>{archiveTarget?.name}</p>
         <p>{ARCHIVE_CONFIRM_TEXT}</p>
       </Dialog>
     </div>

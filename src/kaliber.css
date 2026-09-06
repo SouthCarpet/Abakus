@@ -263,3 +263,6 @@ td.k-num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .k-round-row:last-child { border-bottom: 0; }
 .k-round-row:hover { background: var(--color-surface-hover); }
+
+/* Mutation groups use native disabled propagation without browser fieldset framing. */
+fieldset.k-section { border: 0; padding: 0; margin: 0; min-width: 0; }

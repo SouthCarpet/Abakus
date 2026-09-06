@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { AccountKind, Status } from './api'
 import { Rail } from './components/Rail'
-import { watchSystemTheme } from './lib/theme'
+import { ThemePicker } from './components/ThemePicker'
 import { Categories } from './screens/Categories'
 import { Import } from './screens/Import'
 import { Overview } from './screens/Overview'
@@ -29,10 +29,11 @@ export function App() {
   const [screen, setScreen] = useState<Screen>('overview')
   const [transactionsEntry, setTransactionsEntry] = useState<TransactionsEntry>({})
 
-  useEffect(() => watchSystemTheme(), [])
+  const [entryVersion, setEntryVersion] = useState(0)
 
   function goToTransactions(entry: TransactionsEntry = {}) {
     setTransactionsEntry(entry)
+    setEntryVersion((version) => version + 1)
     setScreen('transactions')
   }
 
@@ -45,11 +46,13 @@ export function App() {
     <div className="k-shell">
       <Rail items={RAIL_ITEMS} active={screen} onSelect={selectScreen} />
       <section className="k-page">
+        <ThemePicker />
         {screen === 'overview' ? (
           <Overview onNavigateToImport={() => setScreen('import')} onNavigateToTransactions={goToTransactions} />
         ) : null}
         {screen === 'transactions' ? (
           <Transactions
+            key={entryVersion}
             statementId={transactionsEntry.statementId}
             initialStatus={transactionsEntry.status ?? null}
             initialCategoryId={transactionsEntry.categoryId ?? null}

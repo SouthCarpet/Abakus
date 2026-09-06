@@ -7,6 +7,8 @@ export type Checksum = { status: 'ok' } | { status: 'off_by'; off_by: number } |
 export type ImportStatus = 'imported' | 'already_imported' | 'locked' | 'unknown_account' | 'error'
 
 export interface Account { id: number; iban: string; kind: AccountKind; label: string; has_password: boolean }
+export interface AccountDeletePreview { account_id: number; label: string; statement_count: number; transaction_count: number; confirmed_count: number; rules_deleted: number; has_password: boolean }
+export interface AccountDeleteOutcome { account_id: number; statements_deleted: number; transactions_deleted: number; rules_deleted: number; open_rows_reclassified: number }
 export interface StatementDeletePreview { statement_id: number; number: number; account_label: string; period_start: string; period_end: string; transaction_count: number; confirmed_count: number; rules_deleted: number }
 export interface StatementDeleteOutcome { statement_id: number; number: number; transactions_deleted: number; rules_deleted: number; open_rows_reclassified: number }
 export interface Category { id: number; parent_id: number | null; name: string; kind: CategoryKind; sort: number; system: boolean; archived: boolean }
@@ -29,6 +31,8 @@ export const api = {
   updateAccount: (id: number, label: string, kind: AccountKind, acknowledgeKindChange: boolean) =>
     invoke<Account>('update_account', { id, label, kind, acknowledgeKindChange }),
   clearPassword: (accountId: number) => invoke<void>('clear_password', { accountId }),
+  accountDeletePreview: (accountId: number) => invoke<AccountDeletePreview>('account_delete_preview', { accountId }),
+  deleteAccount: (accountId: number) => invoke<AccountDeleteOutcome>('delete_account', { accountId }),
   listCategories: () => invoke<Category[]>('list_categories'),
   saveCategory: (id: number | null, parentId: number | null, name: string, kind: CategoryKind) => invoke<Category>('save_category', { id, parentId, name, kind }),
   archiveCategory: (id: number) => invoke<void>('archive_category', { id }),

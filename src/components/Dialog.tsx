@@ -21,17 +21,20 @@ export function Dialog({
   actions?: ReactNode
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
 
   // Escape closes the dialog, and Tab never leaves it while it is open: both
   // are keyboard requirements a mouse-only scrim click and a `disabled`
   // field do not cover on their own.
   useEffect(() => {
     if (!open) return
+    const previousFocus = document.activeElement as HTMLElement | null
     focusableIn(rootRef.current ?? document.createElement('div'))[0]?.focus()
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        onClose()
+        closeRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -50,8 +53,11 @@ export function Dialog({
       }
     }
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      previousFocus?.focus()
+    }
+  }, [open])
 
   if (!open) return null
   return (
