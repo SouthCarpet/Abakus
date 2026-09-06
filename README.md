@@ -69,7 +69,7 @@ Databáza je v súbore `%LOCALAPPDATA%\Abakus\abakus.db`. Pred zálohovaním app
 
 ## Licencia a stav
 
-Abakus je vo verzii 0.1 a používa licenciu MIT. Aktuálne obmedzenia a otvorené problémy sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+Abakus je vo verzii 0.1.1 a používa licenciu MIT. Aktuálne obmedzenia a otvorené problémy sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Odstránenie účtu a vzhľad
 
