@@ -2,6 +2,7 @@
 pub mod accounts;
 pub mod assign;
 pub mod categories;
+pub mod delete_account;
 pub mod delete_statement;
 pub mod import;
 pub mod migrate;
@@ -15,6 +16,7 @@ pub mod summary;
 pub use accounts::Account;
 pub use assign::AssignOutcome;
 pub use categories::{Category, CategoryKind};
+pub use delete_account::{AccountDeleteOutcome, AccountDeletePreview};
 pub use delete_statement::{StatementDeleteOutcome, StatementDeletePreview};
 pub use import::ImportOutcome;
 pub use net_log::NetLogRow;

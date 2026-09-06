@@ -64,13 +64,7 @@ impl Store {
         if status == "transfer" {
             return Ok(None);
         }
-        let before = self.list_rules()?.len();
-        let exact = self.insert_rule(RuleKind::Exact, &merchant, place.as_deref(), category_id)?;
-        let merchant_rule = match merchant.is_empty() {
-            true => None,
-            false => Some(self.insert_rule(RuleKind::Merchant, &merchant, None, category_id)?),
-        };
-        let created = self.list_rules()?.len() - before;
+        let (exact, merchant_rule, created) = self.learn_rules_for(&merchant, place.as_deref(), category_id)?;
         self.conn.execute(
             "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = ?3, source = 'exact_rule' WHERE id = ?1 AND status <> 'transfer'",
             rusqlite::params![id, category_id, exact],
@@ -80,6 +74,22 @@ impl Store {
             self.record_rule_source(rule, id)?;
         }
         Ok(Some(Learned { merchant, merchant_rule, created }))
+    }
+
+    /// The exact rule this row itself teaches, plus the broader merchant
+    /// rule (skipped when the merchant name is empty), and how many of the
+    /// two were genuinely new rather than reused. Split out of `assign_one`
+    /// so each function's cyclomatic complexity (every `?` here counts as a
+    /// branch under the project's Lizard budget) stays within the limit.
+    fn learn_rules_for(&mut self, merchant: &str, place: Option<&str>, category_id: i64) -> Result<(i64, Option<i64>, usize)> {
+        let before = self.list_rules()?.len();
+        let exact = self.insert_rule(RuleKind::Exact, merchant, place, category_id)?;
+        let merchant_rule = match merchant.is_empty() {
+            true => None,
+            false => Some(self.insert_rule(RuleKind::Merchant, merchant, None, category_id)?),
+        };
+        let created = self.list_rules()?.len() - before;
+        Ok((exact, merchant_rule, created))
     }
 
     /// The rows this assignment sweeps along keep pointing at the merchant

@@ -14,6 +14,14 @@ pub fn set(iban: &str, pw: &str) -> Result<(), String> {
     keyring::Entry::new(SERVICE, iban).and_then(|e| e.set_password(pw)).map_err(|e| e.to_string())
 }
 
-pub fn clear(iban: &str) {
-    if let Ok(e) = keyring::Entry::new(SERVICE, iban) { let _ = e.delete_credential(); }
+/// A missing credential is not a failure: the caller wants it gone, and it
+/// already is. Anything else (locked vault, backend error) must reach the
+/// caller as `Err`, not be swallowed here: a credential-cleanup failure must
+/// never look like a completed cleanup (078 audit).
+pub fn clear(iban: &str) -> Result<(), String> {
+    let entry = keyring::Entry::new(SERVICE, iban).map_err(|e| e.to_string())?;
+    match entry.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
 }
