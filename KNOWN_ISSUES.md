@@ -6,12 +6,11 @@
   download. This proves the binary stays the same across re-runs. It does not prove the
   binary was safe on day one. Treat the pinned hash as trust-on-first-use, not as an
   independent security check.
-- **Encrypted-PDF import path: proved only by a real run.** No synthetic PDF in this
-  repo is password-protected (the generator only writes plain PDFs), so the locked-card
-  UI and the stored-password retry loop have unit coverage on the report shape but no
-  end-to-end proof against a real encrypted file. Michal's local check (D13, task 16
-  step 4) is the only run that opens a real locked statement; until it reports
-  `checksum: ok`, treat the encrypted path as unverified against a real PDF.
+- **Uložené heslo potrebuje samostatnú kontrolu systému Windows.** Audit 078
+  overil skutočný zamknutý PDF vytvorený zo syntetických údajov, zadanie hesla
+  a následné spracovanie bez uloženia hesla. Automatické opätovné použitie
+  skutočného hesla zo Správcu poverení nebolo súčasťou tejto kontroly.
+  Chyby čistenia poverení pokrývajú testy s náhradnou službou.
 - **Net-audit connection sampler is a single snapshot, not continuous monitoring.**
   `sample_connections` reads the process's open TCP sockets once, at app start
   (`src-tauri/src/lib.rs`), and again whenever the settings screen re-runs it. A
