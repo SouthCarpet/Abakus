@@ -124,3 +124,27 @@ describe('Transactions bulk assign toast', () => {
     expect(await screen.findByText('Prevody sa nepriraďujú, preskočené: 2')).toBeInTheDocument()
   })
 })
+
+// Oracle: parent-filter brief and independent native finding; metadata loading must not mislabel a retained parent constraint.
+it('retains parent drilldown 10 through asynchronous metadata and queries parent then child with the personal account constraint', async () => {
+  const categories = [
+    { id: 10, parent_id: null, name: 'Jedlo', kind: 'expense' as const, sort: 0, system: false, archived: false },
+    { id: 11, parent_id: 10, name: 'Potraviny', kind: 'expense' as const, sort: 1, system: false, archived: false },
+  ]
+  let resolveCategories!: (value: typeof categories) => void
+  vi.mocked(api.listCategories).mockReturnValueOnce(new Promise((resolve) => { resolveCategories = resolve }))
+  render(<Transactions initialCategoryId={10} initialAccountKind="personal" />)
+  const filter = screen.getByRole('combobox', { name: 'Filter kategórie' })
+  expect(filter).toHaveValue('10')
+  expect(filter).toHaveDisplayValue('Kategória ID 10 (názov nie je dostupný)')
+  await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ category_id: 10, account_kind: 'personal' })))
+
+  resolveCategories(categories)
+  await waitFor(() => expect(filter).toHaveDisplayValue('Jedlo'))
+  expect(filter).toHaveValue('10')
+  expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ category_id: 10, account_kind: 'personal' }))
+
+  fireEvent.change(filter, { target: { value: '11' } })
+  await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ category_id: 11, account_kind: 'personal' })))
+  expect(filter).toHaveDisplayValue('Potraviny')
+})

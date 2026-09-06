@@ -76,7 +76,7 @@ function FilterBar({
           </option>
         ))}
       </select>
-      <CategoryPicker label="Filter kategórie" emptyLabel="Všetky kategórie" value={categoryId} onChange={onCategory} categories={categories} />
+      <CategoryPicker mode="filter" label="Filter kategórie" emptyLabel="Všetky kategórie" value={categoryId} onChange={onCategory} categories={categories} />
       <input
         className="k-input k-well"
         aria-label="Hľadať obchodníka"
