@@ -4,10 +4,13 @@ import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
+import { OperationStatus } from '../components/OperationStatus'
 import { Toast } from '../components/Toast'
 import { statusLabel } from '../lib/categories'
 import { formatDate } from '../lib/format'
-import { periodRange } from '../lib/period'
+import { files } from '../lib/files'
+import { useAction } from '../lib/useAction'
+import { periodRange, validPeriod } from '../lib/period'
 
 const TEXT_DEBOUNCE_MS = 300
 const STATUSES: Status[] = ['transfer', 'confirmed', 'suggested', 'unassigned']
@@ -49,6 +52,7 @@ function FilterBar({
     <div className="k-row">
       <select
         className="k-select k-well"
+        aria-label="Účet"
         value={accountId ?? ''}
         onChange={(e) => onAccount(e.target.value ? Number(e.target.value) : null)}
       >
@@ -61,6 +65,7 @@ function FilterBar({
       </select>
       <select
         className="k-select k-well"
+        aria-label="Stav"
         value={status ?? ''}
         onChange={(e) => onStatus((e.target.value || null) as Status | null)}
       >
@@ -71,9 +76,10 @@ function FilterBar({
           </option>
         ))}
       </select>
-      <CategoryPicker value={categoryId} onChange={onCategory} categories={categories} />
+      <CategoryPicker label="Filter kategórie" emptyLabel="Všetky kategórie" value={categoryId} onChange={onCategory} categories={categories} />
       <input
         className="k-input k-well"
+        aria-label="Hľadať obchodníka"
         placeholder="Hľadať obchodníka..."
         value={text}
         onChange={(e) => onText(e.target.value)}
@@ -130,7 +136,7 @@ export function TransactionRow({
     <>
       <tr>
         <td>
-          <input type="checkbox" checked={selected} disabled={isTransfer} onChange={(e) => onSelect(row.id, e.target.checked)} />
+          <input aria-label={`Vybrať transakciu ${row.id}: ${row.merchant_raw}`} type="checkbox" checked={selected} disabled={isTransfer} onChange={(e) => onSelect(row.id, e.target.checked)} />
         </td>
         <td>{formatDate(row.tx_date)}</td>
         <td>
@@ -143,6 +149,7 @@ export function TransactionRow({
         <td className="k-num">{formatEur(row.amount_cents)}</td>
         <td>
           <CategoryPicker
+            label={`Kategória transakcie ${row.id}`}
             value={row.category_id}
             onChange={(catId) => onAssign(row.id, catId)}
             categories={categories}
@@ -158,7 +165,7 @@ export function TransactionRow({
           ) : null}
         </td>
         <td>
-          <Button variant="ghost" onClick={() => setExpanded((v) => !v)}>
+          <Button aria-label={`Detail transakcie ${row.id}`} aria-expanded={expanded} variant="ghost" onClick={() => setExpanded((v) => !v)}>
             {expanded ? '▾' : '▸'}
           </Button>
         </td>
@@ -176,8 +183,8 @@ export function TransactionRow({
 
 export function Transactions({
   statementId,
-  initialStatus,
-  initialCategoryId,
+  initialStatus = null,
+  initialCategoryId = null,
   initialAccountKind,
 }: {
   statementId?: number | null
@@ -192,46 +199,78 @@ export function Transactions({
   const [rows, setRows] = useState<TxRow[]>([])
   const [period, setPeriod] = usePeriod()
   const [accountId, setAccountId] = useState<number | null>(null)
-  const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId ?? null)
-  const [status, setStatus] = useState<Status | null>(initialStatus ?? null)
+  const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId)
+  const [status, setStatus] = useState<Status | null>(initialStatus)
   const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState<string | null>(null)
   // A17: distinguishes "no rows loaded yet" from "the filter really matches
   // nothing", so the empty sentence only shows once a real load finished.
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [metadataError, setMetadataError] = useState('')
+  const [metadataLoaded, setMetadataLoaded] = useState(false)
+  const [revision, setRevision] = useState(0)
+  const [drilldown, setDrilldown] = useState({ statementId, accountKind: initialAccountKind })
+  const action = useAction()
+  const exportAction = useAction()
+  const periodValid = validPeriod(period)
+  const effectivePeriodValid = !!drilldown.statementId || periodValid
 
   const { from, to } = useMemo(() => periodRange(period.kind, new Date(), period.custom), [period])
 
   const filter: TxFilter = useMemo(
     () => ({
-      from,
-      to,
+      from: drilldown.statementId ? null : from,
+      to: drilldown.statementId ? null : to,
       account_id: accountId,
-      account_kind: initialAccountKind ?? null,
+      account_kind: drilldown.accountKind ?? null,
       category_id: categoryId,
       status,
       text: debouncedText || null,
-      statement_id: statementId ?? null,
+      statement_id: drilldown.statementId ?? null,
     }),
-    [from, to, accountId, initialAccountKind, categoryId, status, debouncedText, statementId],
+    [from, to, accountId, drilldown, categoryId, status, debouncedText],
   )
 
-  const reload = useCallback(() => {
+  const reload = useCallback(() => setRevision((value) => value + 1), [])
+
+  useEffect(() => {
+    let active = true
+    setMetadataError(''); setMetadataLoaded(false)
+    void Promise.all([api.listAccounts(), api.listCategories()]).then(([a, c]) => {
+      if (!active) return
+      setAccounts(a); setCategories(c); setMetadataLoaded(true)
+    }).catch((e) => { if (active) setMetadataError(String(e)) })
+    return () => { active = false }
+  }, [revision])
+
+  useEffect(() => {
+    let active = true
+    setRows([]); setSelected(new Set()); setLoaded(false); setLoadError('')
+    if (!effectivePeriodValid || text !== debouncedText) return
     void api.listTransactions(filter).then((data) => {
-      setRows(data)
-      setLoaded(true)
-    })
-  }, [filter])
+      if (!active) return
+      setRows(data); setLoaded(true)
+    }).catch((e) => { if (active) setLoadError(String(e)) })
+    return () => { active = false }
+  }, [filter, revision, effectivePeriodValid, text, debouncedText])
 
-  useEffect(() => {
-    void api.listAccounts().then(setAccounts)
-    void api.listCategories().then(setCategories)
-  }, [])
+  function clearFilters() {
+    setPeriod({ kind: 'all' }); setAccountId(null); setCategoryId(null)
+    setStatus(null); setText(''); setDrilldown({ statementId: undefined, accountKind: undefined })
+    setSelected(new Set())
+  }
 
-  useEffect(() => {
-    reload()
-  }, [reload])
+  async function exportCsv() {
+    if (!effectivePeriodValid) return
+    const currentFilter = { ...filter, text: text || null }
+    setToast(null)
+    const path = await files.saveCsv()
+    if (!path) { setToast('Export zrušený.'); return }
+    const count = await api.exportCsv(currentFilter, path)
+    setToast(`Exportovaných transakcií: ${count}.`)
+  }
 
   function toggleSelect(id: number, checked: boolean) {
     setSelected((prev) => {
@@ -271,7 +310,8 @@ export function Transactions({
         <span className="k-card-badge">Nezaradené: {unassignedCount}</span>
         <span className="k-card-badge">Odhady: {suggestedCount}</span>
       </div>
-      <PeriodPicker value={period} onChange={setPeriod} />
+      {drilldown.statementId ? <p>Vybraný výpis, všetky jeho dátumy.</p> : <PeriodPicker value={period} onChange={setPeriod} />}
+      {drilldown.accountKind ? <p>Druh účtu: {drilldown.accountKind === 'personal' ? 'Osobný' : 'Firemný'}</p> : null}
       <FilterBar
         accounts={accounts}
         categories={categories}
@@ -284,44 +324,87 @@ export function Transactions({
         onStatus={setStatus}
         onText={setText}
       />
+      <div className="k-row">
+        <Button variant="secondary" onClick={clearFilters}>Vymazať všetky filtre</Button>
+        <Button variant="secondary" disabled={exportAction.busy || !effectivePeriodValid} onClick={() => void exportAction.run(exportCsv)}>Exportovať filtrované CSV</Button>
+        <Button variant="ghost" onClick={reload}>Obnoviť</Button>
+      </div>
+      <OperationStatus error={metadataError} />
+      <LoadStatus loaded={loaded} error={loadError} valid={effectivePeriodValid} />
+      <OperationStatus error={action.error} busy={action.busy} />
+      <OperationStatus error={exportAction.error} busy={exportAction.busy} />
+      <FilteredTotals rows={rows} categories={categories} loaded={loaded} categoriesLoaded={metadataLoaded} />
       {toast ? <Toast message={toast} /> : null}
-      <BulkBar
-        count={selected.size}
-        categories={categories}
-        onAssign={(catId, applyToMatching) => void bulkAssign(catId, applyToMatching)}
-      />
-      <table className="k-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Dátum</th>
-            <th>Účet</th>
-            <th>Obchodník</th>
-            <th className="k-num">Suma</th>
-            <th>Kategória</th>
-            <th>Stav</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {loaded && rows.length === 0 ? (
+      <fieldset disabled={action.busy} className="k-section">
+        <BulkBar
+          count={selected.size}
+          categories={categories}
+          onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
+        />
+        <table className="k-table">
+          <thead>
             <tr>
-              <td colSpan={8}>Za toto obdobie nič nie je. Skús iné obdobie hore.</td>
+              <th></th>
+              <th>Dátum</th>
+              <th>Účet</th>
+              <th>Obchodník</th>
+              <th className="k-num">Suma</th>
+              <th>Kategória</th>
+              <th>Stav</th>
+              <th></th>
             </tr>
-          ) : null}
-          {rows.map((row) => (
-            <TransactionRow
-              key={row.id}
-              row={row}
-              categories={categories}
-              selected={selected.has(row.id)}
-              onSelect={toggleSelect}
-              onAssign={(id, catId) => void assignOne(id, catId)}
-              onConfirm={(id) => void confirmOne(id)}
-            />
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {loaded && rows.length === 0 ? (
+              <tr>
+                <td colSpan={8}>Za toto obdobie nič nie je. Skús iné obdobie hore.</td>
+              </tr>
+            ) : null}
+            {rows.map((row) => (
+              <TransactionRow
+                key={row.id}
+                row={row}
+                categories={categories}
+                selected={selected.has(row.id)}
+                onSelect={toggleSelect}
+                onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
+                onConfirm={(id) => void action.run(() => confirmOne(id))}
+              />
+            ))}
+          </tbody>
+        </table>
+      </fieldset>
     </div>
   )
+}
+
+// Keep the same income/refund/category semantics as the existing Overview summary.
+function rowMoney(row: TxRow, kind: Category['kind'] | undefined) {
+  if (row.status === 'transfer') return { income: 0, expense: 0 }
+  const expense = kind === 'expense' || (!kind && (row.amount_cents < 0 || row.kind === 'refund'))
+  if (expense) return { income: 0, expense: -row.amount_cents }
+  const income = row.amount_cents > 0 && row.kind !== 'refund' ? row.amount_cents : 0
+  return { income, expense: 0 }
+}
+
+function FilteredTotals({ rows, categories, loaded, categoriesLoaded }: {
+  rows: TxRow[]; categories: Category[]; loaded: boolean; categoriesLoaded: boolean
+}) {
+  if (!loaded || !categoriesLoaded) return null
+  const kinds = new Map(categories.map((category) => [category.id, category.kind]))
+  const money = rows.map((row) => rowMoney(row, kinds.get(row.category_id ?? -1)))
+  const income = money.reduce((sum, row) => sum + row.income, 0)
+  const expense = money.reduce((sum, row) => sum + row.expense, 0)
+  const transfers = rows.filter((row) => row.status === 'transfer').length
+  return <section aria-label="Súčty zobrazených transakcií" className="k-row k-num">
+    <span>Zobrazené transakcie: {rows.length}</span>
+    <span>Príjem: {formatEur(income)}</span>
+    <span>Výdavky: {formatEur(expense)}</span>
+    <span>Čisté: {formatEur(income - expense)}</span>
+    <span>Prevody mimo súčtov: {transfers}</span>
+  </section>
+}
+
+function LoadStatus({ loaded, error, valid }: { loaded: boolean; error: string; valid: boolean }) {
+  return <OperationStatus error={error} busy={!loaded && !error && valid}>Načítava sa...</OperationStatus>
 }

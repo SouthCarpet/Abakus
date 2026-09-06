@@ -15,6 +15,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Node 25's global storage shadows jsdom unless disabled in test workers.
+    execArgv: Number(process.versions.node.split('.')[0]) >= 25 ? ['--no-experimental-webstorage'] : [],
     setupFiles: ['./src/test-setup.ts'],
   },
 })

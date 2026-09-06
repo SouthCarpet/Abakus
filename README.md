@@ -70,3 +70,17 @@ Databáza je v súbore `%LOCALAPPDATA%\Abakus\abakus.db`. Pred zálohovaním app
 ## Licencia a stav
 
 Abakus je vo verzii 0.1 a používa licenciu MIT. Aktuálne obmedzenia a otvorené problémy sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+## Odstránenie účtu a vzhľad
+
+V **Nastaveniach** kliknite v riadku účtu na **Zmazať účet**. Náhľad uvedie názov a počty výpisov, transakcií a pravidiel. Na potvrdenie napíšte presný názov účtu a kliknite na **Natrvalo zmazať účet**. Zrušenie nič neodstráni. Odstránenie importovaných údajov je nezvratné; pôvodné bankové PDF súbory zostanú na disku. Prípadné zlyhanie databázy alebo odstránenia hesla sa zobrazí v dialógu. Obnovenie zobrazenia po úspešnom odstránení neopakuje odstránenie.
+
+Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, **Podľa systému**. Prvé dve možnosti ignorujú zmeny systému, tretia ich sleduje. Voľba sa uloží pre ďalšie spustenie. Pri poškodenom alebo nedostupnom úložisku sa použije systémový režim; pri zlyhaní zápisu platí nová voľba len v aktuálnom behu.
+
+## Filtre a CSV
+
+- **Exportovať filtrované CSV** v Transakciách exportuje aktuálne obdobie, účet, druh účtu, kategóriu, stav, hľadaný text aj obmedzenie na konkrétny výpis. Použije text viditeľný pri kliknutí, aj keď tabuľka ešte čaká na dokončenie hľadania. Filter sa zachytí pri kliknutí; CSV číta údaje z databázy pri exporte. Zrušenie výberu súboru nič neexportuje a zlyhanie zápisu sa zobrazí. Pôvodný export v Nastaveniach naďalej používa iba uložené obdobie.
+- **Vymazať všetky filtre** zobrazí všetky obdobia, účty, druhy, kategórie a stavy bez vyhľadávania a bez obmedzenia na výpis. Vymaže aj hromadný výber. Obdobie Všetko sa uloží pre ďalšie obrazovky.
+- Panel **Súčty zobrazených transakcií** počíta presne načítané riadky tabuľky. Príjem, výdavky a čistá suma sa sčítajú v celých centoch podľa rovnakých pravidiel ako Prehľad, vrátane druhu priradenej kategórie a refundácií znižujúcich výdavky; interné prevody majú samostatný počet a do týchto súm nevstupujú. Pri načítavaní alebo chybe sa staré súčty nezobrazujú. Nejde o zostatok bankového účtu.
+
+Vlastné obdobie potrebuje dva platné dátumy so začiatkom najneskôr v deň konca. Kým nie sú platné, dotaz a export sa nespustia. Prechod z Importu na konkrétny výpis zobrazí všetky dátumy tohto výpisu bez obmedzenia predtým uloženým obdobím. Počet výpisov v Nastaveniach má limit 100 000 načítaných výpisov. Tabuľka transakcií a jej súčty pracujú s celým výsledkom dotazu v pamäti.

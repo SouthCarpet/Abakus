@@ -3,6 +3,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { open } from '@tauri-apps/plugin-dialog'
 import type { AccountKind, Checksum, ImportReport, RecentStatement, StatementDeletePreview } from '../api'
 import { api } from '../api'
+import { useAction } from '../lib/useAction'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
@@ -245,12 +246,17 @@ function DeleteStatementBody({ preview }: { preview: StatementDeletePreview | nu
   if (!preview) return <p>Načítava sa...</p>
   return (
     <p>
-      {`Natrvalo sa zmaže výpis č. ${preview.number} z účtu ${preview.account_label}. Odstráni sa ${preview.transaction_count} transakcií, z nich ${preview.confirmed_count} ručne potvrdených. Pravidlá, ktoré nepoužíva iný výpis: ${preview.rules_deleted}. Ostatné výpisy a nastavenia zostanú bez zmeny.`}
+      {`Natrvalo sa zmaže výpis č. ${preview.number} z účtu ${preview.account_label}. Odstráni sa ${preview.transaction_count} transakcií, z nich ${preview.confirmed_count} potvrdených. Pravidlá, ktoré nepoužíva iný výpis: ${preview.rules_deleted}. Ostatné výpisy zostanú zachované. Otvorené transakcie sa môžu znovu zaradiť podľa zostávajúcich pravidiel.`}
     </p>
   )
 }
 
 export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?: (statementId?: number) => void }) {
+  const action = useAction()
+  const deletion = useAction()
+  const previewRequest = useRef(0)
+  const recentRequest = useRef(0)
+  const [previewError, setPreviewError] = useState('')
   const [reports, setReports] = useState<ImportReport[]>([])
   const [recent, setRecent] = useState<RecentStatement[]>([])
   const [addAccount, setAddAccount] = useState<AddAccountTarget | null>(null)
@@ -258,14 +264,20 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
   const [addAccountError, setAddAccountError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<RecentStatement | null>(null)
   const [deletePreview, setDeletePreview] = useState<StatementDeletePreview | null>(null)
+  const canDrop = useRef(true)
+  canDrop.current = deleteTarget === null && addAccount === null
   const passwordsRef = useRef<Record<string, { password: string; remember: boolean }>>({})
 
   const loadRecent = useCallback(() => {
-    void api.recentStatements(RECENT_STATEMENTS_LIMIT).then(setRecent)
+    const request = ++recentRequest.current
+    void api.recentStatements(RECENT_STATEMENTS_LIMIT).then((rows) => {
+      if (request === recentRequest.current) setRecent(rows)
+    }).catch((e) => { if (request === recentRequest.current) action.setError(String(e)) })
   }, [])
 
   useEffect(() => {
     loadRecent()
+    return () => { recentRequest.current++; previewRequest.current++; passwordsRef.current = {} }
   }, [loadRecent])
 
   const mergeReports = useCallback(
@@ -279,6 +291,9 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
         }
         return next
       })
+      for (const report of incoming) {
+        if (report.status !== 'unknown_account') delete passwordsRef.current[report.path]
+      }
       loadRecent()
     },
     [loadRecent],
@@ -295,14 +310,19 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
 
   useEffect(() => {
     let unlisten: (() => void) | undefined
+    let disposed = false
     void getCurrentWebview()
       .onDragDropEvent((event) => {
-        if (event.payload.type === 'drop') void runImport(event.payload.paths)
+        if (event.payload.type === 'drop' && canDrop.current) {
+          const paths = event.payload.paths
+          void action.run(() => runImport(paths))
+        }
       })
       .then((fn) => {
-        unlisten = fn
-      })
-    return () => unlisten?.()
+        if (disposed) fn()
+        else unlisten = fn
+      }).catch((e) => action.setError(String(e)))
+    return () => { disposed = true; unlisten?.() }
   }, [runImport])
 
   async function pickFiles() {
@@ -344,16 +364,19 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
     }
   }
 
-  // A17/F1: the preview is loaded before the dialog opens, so the confirmation
-  // always names the backend's own counts, never a placeholder.
+  // Keep confirmation disabled until the current preview resolves.
   async function requestDelete(statement: RecentStatement) {
-    setDeletePreview(null)
+    const request = ++previewRequest.current
+    setDeletePreview(null); setPreviewError('')
     setDeleteTarget(statement)
-    setDeletePreview(await api.statementDeletePreview(statement.statement_id))
+    try {
+      const preview = await api.statementDeletePreview(statement.statement_id)
+      if (request === previewRequest.current) setDeletePreview(preview)
+    } catch (e) { if (request === previewRequest.current) setPreviewError(String(e)) }
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return
+    if (!deleteTarget || !deletePreview) return
     const id = deleteTarget.statement_id
     await api.deleteStatement(id)
     setDeleteTarget(null)
@@ -362,34 +385,44 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
     loadRecent()
   }
 
+  function closeDelete() {
+    if (deletion.busy) return
+    previewRequest.current += 1
+    setDeleteTarget(null)
+  }
+
   return (
     <div className="k-section">
-      <div className="k-well k-dropzone">
-        <p>Presuňte výpisy sem alebo</p>
-        <Button variant="primary" onClick={() => void pickFiles()}>
-          Vybrať PDF
-        </Button>
-      </div>
-      {reports.map((report) => (
-        <ImportResultCard
-          key={report.path}
-          report={report}
-          onPassword={(password, remember) => void handlePassword(report.path, password, remember)}
-          onAddAccount={(iban, kind) => handleAddAccount(report.path, iban, kind)}
-          onContinue={onNavigateToTransactions}
-        />
-      ))}
-      <RecentImports statements={recent} onNavigate={(id) => onNavigateToTransactions?.(id)} onDelete={(s) => void requestDelete(s)} />
+      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.busy ? <p role="status">Prebieha import...</p> : null}
+      <fieldset disabled={action.busy || deletion.busy} className="k-section">
+        <div className="k-well k-dropzone">
+          <p>Presuňte výpisy sem alebo</p>
+          <Button variant="primary" onClick={() => void action.run(pickFiles)}>
+            Vybrať PDF
+          </Button>
+        </div>
+        {reports.map((report) => (
+          <ImportResultCard
+            key={report.path}
+            report={report}
+            onPassword={(password, remember) => void action.run(() => handlePassword(report.path, password, remember))}
+            onAddAccount={(iban, kind) => handleAddAccount(report.path, iban, kind)}
+            onContinue={onNavigateToTransactions}
+          />
+        ))}
+        <RecentImports statements={recent} onNavigate={(id) => onNavigateToTransactions?.(id)} onDelete={(s) => void requestDelete(s)} />
+      </fieldset>
       <Dialog
         open={addAccount !== null}
         title="Pridať účet"
-        onClose={() => setAddAccount(null)}
+        onClose={() => { if (!action.busy) setAddAccount(null) }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setAddAccount(null)}>
+            <Button variant="secondary" disabled={action.busy} onClick={() => setAddAccount(null)}>
               Zrušiť
             </Button>
-            <Button variant="primary" onClick={() => void saveAccountAndRetry()}>
+            <Button variant="primary" disabled={action.busy} onClick={() => void action.run(saveAccountAndRetry)}>
               Uložiť
             </Button>
           </>
@@ -410,24 +443,27 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
             <option value="business">Firemný</option>
           </select>
         </Field>
-        {addAccountError ? <p className="k-text-danger">{addAccountError}</p> : null}
+        {addAccountError ? <p role="alert" className="k-text-danger">{addAccountError}</p> : null}
       </Dialog>
       <Dialog
         open={deleteTarget !== null}
         title="Natrvalo zmazať výpis?"
-        onClose={() => setDeleteTarget(null)}
+        onClose={closeDelete}
         actions={
           <>
-            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+            <Button variant="secondary" disabled={deletion.busy} onClick={closeDelete}>
               Späť
             </Button>
-            <Button variant="danger" disabled={!deletePreview} onClick={() => void confirmDelete()}>
+            <Button variant="danger" disabled={!deletePreview || deletion.busy} onClick={() => void deletion.run(confirmDelete)}>
               Natrvalo zmazať
             </Button>
           </>
         }
       >
-        <DeleteStatementBody preview={deletePreview} />
+        {previewError ? <p role="alert">{previewError}</p> : <DeleteStatementBody preview={deletePreview} />}
+        {deletion.error ? <p role="alert">{deletion.error}</p> : null}
+        {deletion.busy ? <p role="status">Odstraňuje sa...</p> : null}
+        <p>Pôvodné bankové PDF súbory sa neodstránia.</p>
       </Dialog>
     </div>
   )
