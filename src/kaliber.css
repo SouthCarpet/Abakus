@@ -266,3 +266,20 @@ td.k-num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Mutation groups use native disabled propagation without browser fieldset framing. */
 fieldset.k-section { border: 0; padding: 0; margin: 0; min-width: 0; }
+
+/* Let bounded table regions shrink inside the shell instead of widening the page. */
+.k-page { min-width: 0; }
+.k-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; padding: var(--space-1); }
+.k-money { white-space: nowrap; min-width: calc(var(--space-8) * 4); }
+.k-settings-layout { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: stretch; }
+.k-settings-layout > * { flex: 1 1 calc(var(--space-8) * 20); min-width: 0; }
+.k-accounts-table td:first-child { overflow-wrap: anywhere; }
+.k-accounts-table td:last-child { min-width: calc(var(--space-8) * 5); }
+.k-accounts-table .k-btn { white-space: nowrap; }
+
+.k-category-bars { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.k-category-bar { width: 100%; min-width: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
+.k-category-bar:hover { background: var(--color-surface-hover); }
+.k-category-bar-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
+.k-category-bar-label > :first-child { overflow-wrap: anywhere; min-width: 0; }
+.k-category-bar svg { display: block; width: 100%; height: var(--space-6); margin-top: var(--space-1); }

@@ -1,6 +1,6 @@
 ﻿; Abakus Windows installer (Inno Setup 6).
 ; Build with packaging\build-installer.ps1, or manually:
-;   iscc /DAppVersion=0.1.0 packaging\abakus.iss
+;   iscc /DAppVersion=0.1.1 packaging\abakus.iss
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"

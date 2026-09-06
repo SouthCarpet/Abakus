@@ -127,3 +127,16 @@ describe('Overview empty state names the real cause', () => {
     expect(screen.queryByText('Zatiaľ nič. Importuj prvý výpis.')).not.toBeInTheDocument()
   })
 })
+
+// Oracle: visual-corrections defect 3 preserves category drilldown and the existing account-kind filter.
+it('navigates from a negative category to transactions with the selected personal account kind', async () => {
+  vi.mocked(api.summary).mockResolvedValue({
+    ...nonEmptySummary,
+    by_month_category: [{ month: '2026-06', category_id: 42, name: 'Jedlo', cents: -5001 }],
+  })
+  const onNavigateToTransactions = vi.fn()
+  render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={onNavigateToTransactions} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Osobný' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Jedlo · -50,01 €' }))
+  expect(onNavigateToTransactions).toHaveBeenCalledWith({ categoryId: 42, accountKind: 'personal' })
+})

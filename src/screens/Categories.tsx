@@ -228,7 +228,9 @@ export function Categories() {
           </div>
           <div style={{ flex: 1, minWidth: 320 }}>
             <Card title="Pravidlá">
-              <RulesTable rules={rules} onDelete={deleteRule} />
+              <div className="k-table-scroll" role="region" aria-label="Pravidlá" tabIndex={0}>
+                <RulesTable rules={rules} onDelete={deleteRule} />
+              </div>
             </Card>
           </div>
         </div>

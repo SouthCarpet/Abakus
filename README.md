@@ -44,6 +44,8 @@ cargo test --jobs 4 --workspace
 3. V časti **Transakcie** skontrolujte navrhnuté kategórie. Odhad potvrdíte jedným kliknutím.
 4. V časti **Prehľad** si pozrite príjmy, výdavky, kategórie a vývoj v čase.
 
+Graf **Podľa kategórií** zachováva znamienko súčtu. Záporné hodnoty vľavo znižujú výdavky, kladné vpravo ich zvyšujú. Kliknutie na kategóriu otvorí príslušné transakcie. Tabuľky v menšom okne umožňujú vodorovné posúvanie; suma a mena zostávajú spolu.
+
 Každý importovaný výpis má odznak kontrolného súčtu. Appka overí, či počiatočný zostatok a všetky transakcie dávajú konečný zostatok. Text **Kontrolný súčet nesedí** znamená, že sa tieto hodnoty líšia o uvedenú sumu. Výpis sa importuje, ale zostane označený na kontrolu. Ak chýba potrebný zostatok, appka uvedie, že súčet nevie overiť.
 
 ## Ako sa appka učí

@@ -272,8 +272,8 @@ export function Settings() {
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
       {exportMessage ? <p role="status">{exportMessage}</p> : null}
       <fieldset disabled={action.busy} className="k-section">
-        <div className="k-row" style={{ alignItems: 'stretch' }}>
-          <div className="k-section" style={{ flex: 1, minWidth: 320 }}>
+        <div className="k-settings-layout">
+          <div className="k-section">
             <Card
               title="Účty"
               footer={
@@ -282,7 +282,8 @@ export function Settings() {
                 </Button>
               }
             >
-              <table className="k-table">
+              <div className="k-table-scroll" role="region" aria-label="Účty" tabIndex={0}>
+              <table className="k-table k-accounts-table">
                 <thead>
                   <tr>
                     <th>Názov</th>
@@ -298,6 +299,7 @@ export function Settings() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </Card>
             <Card title="Údaje">
               <p>Priečinok s dátami: {dataDir}</p>
@@ -306,7 +308,7 @@ export function Settings() {
               </Button>
             </Card>
           </div>
-          <div style={{ flex: 1, minWidth: 320 }}>
+          <div>
             <Card title="Stav">
               <p>Priečinok s dátami: {dataDir}</p>
               <p>

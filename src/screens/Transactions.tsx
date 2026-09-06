@@ -146,7 +146,7 @@ export function TransactionRow({
           <div>{row.merchant_raw}</div>
           {row.place ? <div className="k-field-label">{row.place}</div> : null}
         </td>
-        <td className="k-num">{formatEur(row.amount_cents)}</td>
+        <td className="k-num k-money">{formatEur(row.amount_cents)}</td>
         <td>
           <CategoryPicker
             label={`Kategória transakcie ${row.id}`}
@@ -341,6 +341,7 @@ export function Transactions({
           categories={categories}
           onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
         />
+        <div className="k-table-scroll" role="region" aria-label="Transakcie" tabIndex={0}>
         <table className="k-table">
           <thead>
             <tr>
@@ -348,7 +349,7 @@ export function Transactions({
               <th>Dátum</th>
               <th>Účet</th>
               <th>Obchodník</th>
-              <th className="k-num">Suma</th>
+              <th className="k-num k-money">Suma</th>
               <th>Kategória</th>
               <th>Stav</th>
               <th></th>
@@ -373,6 +374,7 @@ export function Transactions({
             ))}
           </tbody>
         </table>
+        </div>
       </fieldset>
     </div>
   )

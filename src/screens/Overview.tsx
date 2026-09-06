@@ -3,7 +3,7 @@ import type { AccountKind, BadChecksum, Status, Summary } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
-import { CategoryDonut } from '../components/charts/CategoryDonut'
+import { CategoryBars } from '../components/charts/CategoryBars'
 import { IncomeExpense } from '../components/charts/IncomeExpense'
 import { MonthlyStacked } from '../components/charts/MonthlyStacked'
 import { Kpi } from '../components/Kpi'
@@ -135,7 +135,7 @@ function SummaryBody({
         </div>
       </div>
       <Card title="Podľa kategórií">
-        <CategoryDonut rows={summary.by_month_category} onCategoryClick={onCategoryClick} />
+        <CategoryBars rows={summary.by_month_category} onCategoryClick={onCategoryClick} />
       </Card>
       <TopMerchantsTable rows={summary.top_merchants} />
     </>
