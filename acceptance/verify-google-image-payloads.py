@@ -10,6 +10,7 @@ import os
 import re
 import sqlite3
 import sys
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -277,22 +278,24 @@ def verify_rows(
     brain_root: Path,
 ) -> list[dict[str, object]]:
     payloads = [candidate for row in rows if (candidate := _payload_from_row(row)) is not None]
-    by_source = {payload.source_key: payload for payload in payloads}
-    if len(by_source) != len(payloads):
-        raise VerificationError("duplicate native view_file source paths")
+    expected_by_source = {image.source_key: image for image in expected}
+    actual_keys = {payload.source_key for payload in payloads}
     expected_keys = {image.source_key for image in expected}
-    missing = expected_keys - by_source.keys()
-    unexpected = by_source.keys() - expected_keys
+    missing = expected_keys - actual_keys
+    unexpected = actual_keys - expected_keys
     if missing or unexpected:
         raise VerificationError(
             f"native image coverage differs: missing={len(missing)}, unexpected={len(unexpected)}"
         )
-    return [_verify_image(by_source[image.source_key], image, brain_root) for image in expected]
+    return [
+        _verify_image(payload, expected_by_source[payload.source_key], brain_root)
+        for payload in payloads
+    ]
 
 
 def _read_rows(database: Path) -> list[tuple[object, ...]]:
-    uri = f"file:{quote(database.as_posix(), safe='/:')}?mode=ro&immutable=1"
-    with sqlite3.connect(uri, uri=True) as connection:
+    uri = f"file:{quote(database.as_posix(), safe='/:')}?mode=ro"
+    with closing(sqlite3.connect(uri, uri=True)) as connection:
         connection.execute("PRAGMA query_only = ON")
         return connection.execute(
             "SELECT idx, step_type, status, error_details, step_payload, step_format "
@@ -328,10 +331,12 @@ def main() -> int:
         raise VerificationError(f"conversation database is missing: {database}")
     expected = _read_expected(args.expected_manifest, conversation_id)
     images = verify_rows(_read_rows(database), expected, BRAIN_ROOT / conversation_id)
+    unique_image_count = len({str(image["source"]).lower() for image in images})
     _write_result(
         {
             "conversation_id": conversation_id,
-            "verified_image_count": len(images),
+            "verified_image_call_count": len(images),
+            "verified_unique_image_count": unique_image_count,
             "all_completed_with_native_image_content": True,
             "exact_source_media_hash_matches": True,
             "images": images,

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import sqlite3
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 
@@ -59,8 +61,8 @@ class VerifyGoogleImagePayloadsTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def row(self, payload: bytes | None) -> tuple[object, ...]:
-        return (7, 132, 3, b"", payload, 0)
+    def row(self, payload: bytes | None, step: int = 7) -> tuple[object, ...]:
+        return (step, 132, 3, b"", payload, 0)
 
     def assert_rejected(self, payload: bytes | None, message: str) -> None:
         with self.assertRaisesRegex(MODULE.VerificationError, message):
@@ -80,6 +82,33 @@ class VerifyGoogleImagePayloadsTests(unittest.TestCase):
         self.media.write_bytes(MODULE.PNG_SIGNATURE + b"different-image")
         payload = _native_payload(self.source, self.media)
         self.assert_rejected(payload, "source/media hash mismatch")
+
+    def test_accepts_and_verifies_duplicate_image_reads(self) -> None:
+        payload = _native_payload(self.source, self.media)
+        evidence = MODULE.verify_rows(
+            [self.row(payload, 7), self.row(payload, 8)], self.expected, self.brain
+        )
+        self.assertEqual([7, 8], [image["step"] for image in evidence])
+        self.assertEqual(1, len({image["source"] for image in evidence}))
+
+    def test_read_rows_sees_committed_wal_and_excludes_other_step_types(self) -> None:
+        database = self.root / "live.db"
+        with closing(sqlite3.connect(database)) as setup:
+            setup.execute("PRAGMA journal_mode = WAL")
+            setup.execute(
+                "CREATE TABLE steps (idx INTEGER, step_type INTEGER, status INTEGER, "
+                "error_details BLOB, step_payload BLOB, step_format INTEGER)"
+            )
+            setup.commit()
+            setup.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        with closing(sqlite3.connect(database)) as writer:
+            writer.execute("PRAGMA journal_mode = WAL")
+            writer.execute("PRAGMA wal_autocheckpoint = 0")
+            writer.execute("INSERT INTO steps VALUES (1, 7, 3, X'', X'0801', 0)")
+            writer.execute("INSERT INTO steps VALUES (2, 132, 3, X'', X'0801', 0)")
+            writer.commit()
+            rows = MODULE._read_rows(database)
+        self.assertEqual([(2, 132, 3, b"", b"\x08\x01", 0)], rows)
 
 
 if __name__ == "__main__":
