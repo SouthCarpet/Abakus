@@ -6,6 +6,8 @@ afterEach(() => cleanup())
 
 vi.mock('./api', () => ({
   api: {
+    listAccounts: vi.fn().mockResolvedValue([]),
+    statementHistory: vi.fn().mockResolvedValue([]),
     badChecksums: vi.fn().mockResolvedValue([]),
     summary: vi.fn().mockResolvedValue({
       income_cents: 0,

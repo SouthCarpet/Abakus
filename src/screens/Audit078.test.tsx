@@ -17,7 +17,7 @@ vi.mock('../api', async (original) => ({
     getCheckUpdates: vi.fn(), accountDeletePreview: vi.fn(), deleteAccount: vi.fn(),
     exportCsv: vi.fn(), confirm: vi.fn(), assign: vi.fn(),
     listRules: vi.fn(), saveCategory: vi.fn(), archiveCategory: vi.fn(),
-    summary: vi.fn(), badChecksums: vi.fn(), setCheckUpdates: vi.fn(), checkUpdateNow: vi.fn(),
+    summary: vi.fn(), badChecksums: vi.fn(), statementHistory: vi.fn(), setCheckUpdates: vi.fn(), checkUpdateNow: vi.fn(),
   },
 }))
 vi.mock('../lib/files', () => ({ files: { saveCsv: vi.fn() } }))
@@ -39,6 +39,7 @@ beforeEach(() => {
   vi.mocked(api.listTransactions).mockResolvedValue([row()])
   vi.mocked(api.dataDir).mockResolvedValue('C:/synthetic')
   vi.mocked(api.recentStatements).mockResolvedValue([])
+  vi.mocked(api.statementHistory).mockResolvedValue([])
   vi.mocked(api.netLog).mockResolvedValue([]); vi.mocked(api.netAuditFailures).mockResolvedValue([])
   vi.mocked(api.getCheckUpdates).mockResolvedValue(false)
   vi.mocked(api.accountDeletePreview).mockResolvedValue(preview)
