@@ -250,11 +250,31 @@ export function Transactions({
       const data = await api.listTransactions(filter)
       if (request !== fetchRequest.current) return
       setRows(data); setLoaded(true); setLoadError('')
+      // A note save can change which rows the active text filter matches; a
+      // row that just dropped out of view must drop out of the bulk
+      // selection with it, or a hidden row could still get bulk-assigned.
+      const visibleIds = new Set(data.map((r) => r.id))
+      setSelected((prev) => {
+        const next = new Set([...prev].filter((id) => visibleIds.has(id)))
+        return next.size === prev.size ? prev : next
+      })
     } catch (e) {
       if (request === fetchRequest.current) setLoadError(String(e))
       throw e
     }
   }
+
+  // `fetchRows` closes over `filter`, which is a fresh value every render.
+  // A NoteEditor's save keeps whichever `onSaved` closure was current when
+  // the save button was clicked; if the filter changes while that save's
+  // write is still in flight, invoking that stale closure directly would
+  // refetch with the OLD filter and, since it settles last, overwrite the
+  // current (correctly filtered) rows. Routing every call through this ref
+  // means it always runs the latest `fetchRows`, whichever render actually
+  // triggers it.
+  const latestFetchRows = useRef(fetchRows)
+  latestFetchRows.current = fetchRows
+  const refreshRows = useCallback(() => latestFetchRows.current(), [])
 
   useEffect(() => {
     let active = true
@@ -386,7 +406,7 @@ export function Transactions({
                 onSelect={toggleSelect}
                 onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
                 onConfirm={(id) => void action.run(() => confirmOne(id))}
-                onNoteSaved={fetchRows}
+                onNoteSaved={refreshRows}
               />
             ))}
           </tbody>

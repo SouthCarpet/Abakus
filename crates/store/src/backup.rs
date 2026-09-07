@@ -18,21 +18,28 @@ pub struct BackupOutcome {
 }
 
 impl Store {
-    /// Refuses an existing destination outright (this also refuses the
-    /// store's own file: it already exists, so `dest.exists()` alone catches
-    /// self-overwrite, an alias, or a previous backup, with no separate
-    /// path-identity check needed). Never touches the OS keyring: only
-    /// `self.conn`, already open, and the plain filesystem.
+    /// Refuses an existing destination outright, including the store's own
+    /// file, an alias, or a previous backup. `create_new` is the actual
+    /// guard: it atomically claims `dest`, failing instead of opening or
+    /// truncating it if the path already exists at that instant. A prior
+    /// separate `exists()` check followed by `Connection::open` would leave a
+    /// window for a competing writer to create `dest` in between, so this
+    /// call never does a plain existence check before opening. Never touches
+    /// the OS keyring: only `self.conn`, already open, and the filesystem.
     pub fn backup_to(&self, dest: &Path) -> Result<BackupOutcome> {
-        if dest.exists() {
-            return Err(StoreError::BackupTargetExists { path: dest.display().to_string() });
+        match std::fs::File::options().write(true).create_new(true).open(dest) {
+            Ok(file) => drop(file),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                return Err(StoreError::BackupTargetExists { path: dest.display().to_string() });
+            }
+            Err(e) => return Err(StoreError::Db(e.to_string())),
         }
         match self.run_backup(dest) {
             Ok(bytes) => Ok(BackupOutcome { path: dest.display().to_string(), bytes }),
             Err(e) => {
-                // Never leave a partial file that looks like a backup: a
-                // failure must restore the target to the "does not exist"
-                // state it was in before this call.
+                // This call is the exclusive creator of `dest` (claimed
+                // above via `create_new`), so cleanup here can never remove
+                // a file another process owns.
                 let _ = std::fs::remove_file(dest);
                 Err(e)
             }

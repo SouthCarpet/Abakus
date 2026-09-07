@@ -22,6 +22,12 @@ export function NoteEditor({ txId, initialNote, onSaved }: {
   // instance can tell it is stale before touching status or error state.
   const activeTxId = useRef(txId)
   activeTxId.current = txId
+  // The text this component instance last actually persisted for this txId,
+  // so a retry after a refresh failure (same unchanged draft, no further
+  // edits) only retries the refresh, never repeats an already-successful
+  // write. Starts at null (not initialNote): the first save for a freshly
+  // opened row always writes, even if the user re-types the same text.
+  const lastSaved = useRef<string | null>(null)
 
   useEffect(() => {
     mounted.current = true
@@ -35,6 +41,7 @@ export function NoteEditor({ txId, initialNote, onSaved }: {
   useEffect(() => {
     setDraft(initialNote); setStatus('idle'); setError(''); setRefreshError('')
     pending.current = false
+    lastSaved.current = null
   }, [txId])
 
   const codePoints = [...draft].length
@@ -46,12 +53,15 @@ export function NoteEditor({ txId, initialNote, onSaved }: {
     const stillCurrent = () => mounted.current && activeTxId.current === savingFor
     pending.current = true
     setStatus('saving'); setError(''); setRefreshError('')
-    try {
-      await api.saveTransactionNote(savingFor, draft)
-    } catch (e) {
-      if (activeTxId.current === savingFor) pending.current = false
-      if (stillCurrent()) { setStatus('error'); setError(String(e)) }
-      return
+    if (draft !== lastSaved.current) {
+      try {
+        await api.saveTransactionNote(savingFor, draft)
+      } catch (e) {
+        if (activeTxId.current === savingFor) pending.current = false
+        if (stillCurrent()) { setStatus('error'); setError(String(e)) }
+        return
+      }
+      lastSaved.current = draft
     }
     if (stillCurrent()) setStatus('saved')
     try {

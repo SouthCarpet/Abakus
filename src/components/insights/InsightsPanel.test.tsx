@@ -129,6 +129,22 @@ describe('InsightsPanel category comparison', () => {
     expect(screen.getAllByText('nedostupné').length).toBeGreaterThan(0)
   })
 
+  // Oracle: a custom period close enough to year 0000 makes the equal-length
+  // predecessor step before a representable YYYY-MM-DD year. previousEqualRange
+  // throws for that; the panel must show it as an honest unavailable previous
+  // period instead of crashing the whole Overview render.
+  it('reports the previous period as unavailable instead of crashing when it would fall before year 0000', async () => {
+    render(
+      <InsightsPanel
+        period={{ kind: 'custom', custom: { from: '0000-01-05', to: '0000-01-10' } }}
+        accountKind="all"
+        summary={{ ...emptySummary, by_category: [], expense_cents: 0 }}
+      />,
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent('Predchádzajúce obdobie')
+    expect(api.summary).not.toHaveBeenCalled()
+  })
+
   it('fetches the previous-range summary with the same account-kind scope as the current selection', async () => {
     vi.mocked(api.summary).mockResolvedValue({ ...emptySummary, by_category: [], expense_cents: 0 })
     render(

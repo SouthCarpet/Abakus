@@ -50,18 +50,18 @@ worktrees were touched.
   single-line parsed fields, `raw_block` is still never passed through it),
   so a leading line feed is now a real input, not the hypothetical case the
   old doc comment described.
-- `crates/store/src/backup.rs` (new): `Store::backup_to(dest) ->
-  BackupOutcome { path, bytes }`, via `rusqlite`'s online-backup API
-  (`Backup::new` + `run_to_completion`, not a filesystem copy of the live
-  file, and not the one-shot `Connection::backup` helper, which does not
-  retry `Busy`/`Locked`). `dest.exists()` is checked before anything else
-  and refuses the call outright; since the store's own file already exists
-  on disk, this single check also refuses self-overwrite and an alias/old
-  backup with no separate path-identity comparison needed. A failure at any
-  later step removes whatever partial file was created, so a destination
-  that did not exist before the call never ends up holding a broken
-  half-backup. Touches only `self.conn` and the filesystem; never the OS
-  keyring.
+- `crates/store/src/backup.rs` (new, race fixed in the 080-repair pass): `Store::backup_to(dest) -> BackupOutcome { path, bytes }`, via `rusqlite`'s
+  online-backup API (`Backup::new` + `run_to_completion`, not a filesystem
+  copy of the live file, and not the one-shot `Connection::backup` helper,
+  which does not retry `Busy`/`Locked`). `dest` is claimed with
+  `File::options().create_new(true)`, which atomically fails instead of
+  opening or truncating if the path already exists at that instant; this
+  refuses self-overwrite, an alias, an old backup, and a competing writer
+  that creates `dest` in the same window, all in one step, with no separate
+  existence check first. A failure at any later step removes `dest`, which
+  this call is always the exclusive creator of, so cleanup can never touch a
+  file another process owns. Touches only `self.conn` and the filesystem;
+  never the OS keyring.
 - `crates/store/Cargo.toml`: `rusqlite`'s `backup` feature enabled (both
   `[dependencies]` and `[dev-dependencies]`, matching the existing
   `bundled` duplication). This is a feature flag on the already-present
@@ -129,10 +129,14 @@ the brief.
   note, a changed setting) opens independently and keeps all four; a write
   made to the live store AFTER the backup never reaches the snapshot
   (isolation, both a note edit and a whole new account); backing up onto the
-  store's own file is refused; an occupied destination is refused with its
-  existing bytes left exactly as they were AND the live source unaffected; a
-  destination whose parent directory does not exist fails cleanly, leaves no
-  partial file, and leaves the source unaffected.
+  store's own file is refused; an occupied destination (with content, and
+  separately an empty file) is refused with its existing bytes left exactly
+  as they were AND the live source unaffected; a destination whose parent
+  directory does not exist fails cleanly, leaves no partial file, and leaves
+  the source unaffected; 8 threads racing `backup_to` at the same real
+  destination path resolve to exactly one winner and every loser reports
+  `BackupTargetExists`, never a corrupted or double write (080-repair,
+  proving the check-then-open race is closed).
 - **JSON drift gate** (`src-tauri/tests/commands_json.rs`): `{accountId,
   accountKind}` (both independently optional, including the field being
   absent, not just `null`) for `statement_history`; `{id, note}` for
@@ -140,27 +144,24 @@ the brief.
   and `BackupOutcome` serialize the fields the UI reads; `TxRow`'s existing
   round-trip test extended with `note`.
 
-## Commands and results (2026-09-07)
+## Commands and results (080-repair, 2026-09-07)
 
 ```powershell
 $env:CARGO_TARGET_DIR = "A:/projects-vault/apps/abakus/target"
-$env:ABAKUS_PDFIUM_DIR = "A:/projects-vault/apps/abakus/src-tauri/resources/pdfium"
-cargo test --jobs 4 --workspace                              # exit 0, 279 tests, 0 failed
+cargo test --jobs 4 --workspace                              # exit 0, 281 tests, 0 failed
 cargo clippy --workspace --all-targets -- -D warnings         # exit 0, no warnings
-py -m lizard -l rust -C12 -L1000 -a1000 -w crates src-tauri/src   # exit 0, no warnings
+python -m lizard -C 12 crates src-tauri/src                   # exit 0, no function over CC 12
 ```
+
+`pdfium::tests::env_override_wins` (crate `parser`, not owned by this lane)
+failed once under the full-workspace multi-threaded run and passed cleanly
+alone and on a second full run: two `parser::pdfium` tests race a shared
+process environment variable. Pre-existing, unrelated to this repair, not
+fixed here (out of scope: PDF parsing is explicitly excluded from this
+lane).
 
 ## Honest limits
 
-- `backup_to`'s clobber guard is a `Path::exists()` check before the backup
-  runs, not one atomic filesystem operation. Two processes racing to back up
-  to the exact same path at the exact same instant could both pass the
-  check before either creates the file; this is a real, if narrow, TOCTOU
-  window. Not addressed: Abakus is a single-user local desktop app with one
-  `Mutex<Store>` per process, so the realistic trigger (this same app,
-  called twice concurrently for the same destination) is already
-  vanishingly unlikely, and the failure mode if it did happen is
-  `rusqlite`/SQLite's own file-locking error, not silent corruption.
 - `Backup::run_to_completion`'s retry loop has no maximum attempt count; it
   sleeps and retries on `Busy`/`Locked` until the source connection is free.
   For this app that source is the SAME `Mutex`-guarded connection the

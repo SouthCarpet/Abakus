@@ -95,6 +95,54 @@ fn an_occupied_destination_is_refused_and_its_content_is_left_exactly_as_it_was(
 }
 
 #[test]
+fn an_empty_pre_existing_destination_is_refused_and_left_empty() {
+    let src = TempPath::new("empty-occ-source");
+    let dst = TempPath::new("empty-occ-dest");
+    let (s, _) = seeded_store(&src.0);
+    std::fs::write(&dst.0, b"").unwrap();
+
+    let e = s.backup_to(&dst.0).unwrap_err();
+
+    assert!(matches!(e, StoreError::BackupTargetExists { .. }), "got {e:?}");
+    assert_eq!(std::fs::metadata(&dst.0).unwrap().len(), 0, "an empty existing file at the destination must not be treated as free space to write into");
+}
+
+/// The bug this repairs: `dest.exists()` then `Connection::open(dest)` left a
+/// window between the check and the open where a competing writer could
+/// create the same path; whichever call opened it second could overwrite or,
+/// on cleanup, remove a file it never created. Many real threads racing for
+/// the same destination is the closest a single-process test gets to that
+/// window: with the fix (`create_new` claims the path atomically) exactly one
+/// can ever win, and every loser's own cleanup only ever touches a file it
+/// exclusively created, so the winner's snapshot is always left intact.
+#[test]
+fn concurrent_backups_to_the_same_destination_race_safely_and_exactly_one_wins() {
+    let src = TempPath::new("race-source");
+    let dst = TempPath::new("race-dest");
+    let (seed, _) = seeded_store(&src.0);
+    drop(seed);
+
+    let handles: Vec<_> = (0..8)
+        .map(|_| {
+            let src_path = src.0.clone();
+            let dest_path = dst.0.clone();
+            std::thread::spawn(move || Store::open(&src_path).unwrap().backup_to(&dest_path))
+        })
+        .collect();
+    let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+    let successes = results.iter().filter(|r| r.is_ok()).count();
+    assert_eq!(successes, 1, "exactly one concurrent backup_to the same destination may win: {results:?}");
+    for r in &results {
+        if let Err(e) = r {
+            assert!(matches!(e, StoreError::BackupTargetExists { .. }), "a losing race must be reported as an existing target, not a corrupted write: got {e:?}");
+        }
+    }
+    let backup = Store::open(&dst.0).unwrap();
+    assert_eq!(backup.list_accounts().unwrap().len(), 1, "the winning snapshot must be a complete, valid database, not a partial file from a lost race");
+}
+
+#[test]
 fn a_destination_whose_directory_does_not_exist_fails_cleanly_and_leaves_the_source_intact() {
     let src = TempPath::new("err-source");
     let (s, _) = seeded_store(&src.0);

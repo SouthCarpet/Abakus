@@ -19,6 +19,17 @@ function periodWindow(period: PeriodValue): DateRange | null {
   return from && to ? { from, to } : null
 }
 
+// previousEqualRange throws when the equal-length predecessor would fall
+// outside the representable YYYY-MM-DD year range: that must read as an
+// honestly unavailable previous period, never a crashed Overview.
+function safePreviousRange(range: DateRange): DateRange | null {
+  try {
+    return previousEqualRange(range)
+  } catch {
+    return null
+  }
+}
+
 function ComparisonSection({
   comparisonRange,
   previousError,
@@ -87,17 +98,22 @@ export function InsightsPanel({
     let active = true
     setPreviousSummary(null); setPreviousError('')
     if (comparisonRange) {
-      const prev = previousEqualRange(comparisonRange)
-      void api.summary(prev.from, prev.to, null, kind).then((v) => { if (active) setPreviousSummary(v) }).catch((e) => { if (active) setPreviousError(String(e)) })
+      const prev = safePreviousRange(comparisonRange)
+      if (prev) {
+        void api.summary(prev.from, prev.to, null, kind).then((v) => { if (active) setPreviousSummary(v) }).catch((e) => { if (active) setPreviousError(String(e)) })
+      } else {
+        setPreviousError('Predchádzajúce obdobie rovnakej dĺžky nie je možné vypočítať.')
+      }
     }
     return () => { active = false }
   }, [comparisonRange, kind])
 
   const coverages = useMemo(() => (history ? buildCoverage(accounts, history, kind, window) : []), [accounts, history, kind, window])
-  const previousCoverages = useMemo(
-    () => (history && comparisonRange ? buildCoverage(accounts, history, kind, previousEqualRange(comparisonRange)) : []),
-    [accounts, history, kind, comparisonRange],
-  )
+  const previousCoverages = useMemo(() => {
+    if (!history || !comparisonRange) return []
+    const prev = safePreviousRange(comparisonRange)
+    return prev ? buildCoverage(accounts, history, kind, prev) : []
+  }, [accounts, history, kind, comparisonRange])
   const balanceRows = useMemo(() => (history ? statementsOverlappingWindow(history, window) : []), [history, window])
   const comparison = useMemo(
     () => (comparisonRange && summary && previousSummary ? compareCategories(comparisonRange, todayIso(new Date()), summary, previousSummary) : null),

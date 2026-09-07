@@ -51,6 +51,14 @@ describe('mergeRanges', () => {
     expect(merged).toEqual([{ from: '2026-01-01', to: '2026-01-31' }])
     expect(invalid).toEqual([{ from: '2026-02-10', to: '2026-02-01' }])
   })
+  // Oracle: a statement naming a day that does not exist on the calendar
+  // (2026-02-30) lexically precedes '2026-03-01', so a from<=to check alone
+  // reads it as valid and would grant coverage for a nonexistent day.
+  it('sets a range naming a nonexistent calendar day aside as invalid instead of granting coverage for it', () => {
+    const { merged, invalid } = mergeRanges([{ from: '2026-02-30', to: '2026-03-01' }])
+    expect(merged).toEqual([])
+    expect(invalid).toEqual([{ from: '2026-02-30', to: '2026-03-01' }])
+  })
 })
 
 describe('gapsWithinWindow (finite selected period)', () => {

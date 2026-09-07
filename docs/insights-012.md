@@ -10,10 +10,19 @@ table. All three read existing backend endpoints only (`statement_history`,
 ## What shipped
 
 - `src/lib/insights/date.ts`: UTC calendar-day arithmetic (`addDaysIso`,
-  `dayCountInclusive`, `rangesOverlap`, `isValidRange`) for inclusive
-  `YYYY-MM-DD` ranges. Always `Date.UTC`, never the local constructor, so a
-  leap day or a DST transition in the host's local time zone never shifts a
-  day count.
+  `dayCountInclusive`, `rangesOverlap`, `isValidRange`, `isValidIsoDate`) for
+  inclusive `YYYY-MM-DD` ranges, via `setUTCFullYear` (not `Date.UTC`, whose
+  0-99 numeric-year argument silently remaps to 1900-1999; `080-repair`
+  fixed a real instance of this: `addDaysIso('0026-01-01', 1)` returned
+  `'1926-01-02'`). `fromUtcDays` zero-pads the year to 4 digits and throws a
+  `RangeError` instead of emitting a truncated or 5-digit year outside
+  `0000`-`9999`; callers of `previousEqualRange` catch this and report the
+  previous period as unavailable rather than crash (see Honest limits).
+  `isValidRange`/`isValidIsoDate` round-trip a date through UTC field
+  assignment to catch a syntactically well-formed but nonexistent calendar
+  day (`2026-02-30`), which a bare `from <= to` string comparison cannot see
+  (`080-repair` fixed a real instance: `isValidRange({from: '2026-02-30', to:
+  '2026-03-01'})` returned `true`).
 - `src/lib/insights/coverage.ts`: merges overlapping, nested, duplicate and
   immediately-adjacent statement date ranges per account
   (`mergeRanges`), then reports gaps two ways: `internalGaps` for Všetko
@@ -21,12 +30,15 @@ table. All three read existing backend endpoints only (`statement_history`,
   a gap invented before the first or after the last; `gapsWithinWindow` for a
   finite selected period reports leading/trailing edge gaps too, and clips a
   range that only partially overlaps the window to its actual coverage. A
-  reversed (`from > to`) statement range never merges into coverage; it is
-  set aside in `invalidRanges` and flagged for review instead.
-  `buildAccountCoverage`/`buildCoverage` build this strictly per account (an
-  account can never borrow another account's coverage) and, given `list
-  Accounts`, cover an account with zero statements as `hasStatements: false`
-  (rendered "Bez výpisov"), not silently dropped or shown as complete.
+  reversed (`from > to`) or calendar-invalid (nonexistent day) statement
+  range never merges into coverage; it is set aside in `invalidRanges` and
+  flagged for review instead (`mergeRanges` now delegates to `isValidRange`
+  for this check; the calendar-invalid case was not caught before
+  `080-repair`). `buildAccountCoverage`/`buildCoverage` build this strictly
+  per account (an account can never borrow another account's coverage) and,
+  given `listAccounts`, cover an account with zero statements as
+  `hasStatements: false` (rendered "Bez výpisov"), not silently dropped or
+  shown as complete.
 - `src/lib/insights/comparison.ts`: `previousEqualRange` returns the
   immediately preceding inclusive range with the same UTC calendar-day
   count as the current one (not calendar-month aligned: a 28-day February
@@ -118,18 +130,27 @@ table. All three read existing backend endpoints only (`statement_history`,
   transfers are excluded upstream by `Summary.by_category` already; nothing
   here re-implements that exclusion.
 
-## Tests (2026-09-07)
+## Tests (080-repair, 2026-09-07)
 
-81 tests across 6 owned files, all passing:
+93 tests across 6 owned files, all passing (81 from the initial insights
+lane plus 12 from the repair pass below):
 
 | File | Tests |
 | --- | --- |
-| `src/lib/insights/date.test.ts` | 15 |
-| `src/lib/insights/coverage.test.ts` | 23 |
+| `src/lib/insights/date.test.ts` | 25 |
+| `src/lib/insights/coverage.test.ts` | 24 |
 | `src/lib/insights/comparison.test.ts` | 20 |
 | `src/lib/insights/balances.test.ts` | 6 |
-| `src/components/insights/InsightsPanel.test.tsx` | 8 |
+| `src/components/insights/InsightsPanel.test.tsx` | 9 |
 | `src/screens/Overview.test.tsx` | 9 (8 pre-existing + 1 new) |
+
+080-repair added: the `addDaysIso('0026-01-01', 1)` low-year oracle and a
+year-0099-crossing case; `isValidRange`/`isValidIsoDate` calendar-validity
+cases (`2026-02-30`, non-leap `2026-02-29`); `addDaysIso` throwing at the
+year 0000/9999 boundary; a `mergeRanges` case for a calendar-invalid range;
+and an `InsightsPanel` case proving a comparison range whose predecessor
+would fall before year 0000 reports as unavailable instead of crashing the
+render.
 
 Coverage highlights: range overlap/nesting/duplicate/adjacency merging, a
 reversed range flagged instead of merged, an account borrowing no coverage
@@ -147,20 +168,27 @@ summary, a distinct error instead of a false-empty table on fetch failure, a
 slow stale account-kind response never overwriting a newer selection, and no
 comparison fetch at all for Všetko.
 
-## Commands and results (2026-09-07)
+## Commands and results (080-repair, 2026-09-07)
 
 ```powershell
-node node_modules/vitest/vitest.mjs run --configLoader runner src/lib/insights src/components/insights src/screens/Overview.test.tsx
-# 6 files, 81 tests, all passing
-node node_modules/typescript/bin/tsc -b --pretty false
-# 1 pre-existing error, unrelated: src/screens/Audit078.test.tsx(27,3), a
-# TxRow fixture missing the `note` field this worktree's api.ts already
-# requires; not an insights-owned file
-node node_modules/eslint/bin/eslint.js src/screens/Overview.tsx src/screens/Overview.test.tsx src/components/insights src/lib/insights
+npx vitest run --configLoader runner src/lib/insights src/components/insights src/screens/Overview.test.tsx
+# 6 files, 93 tests, all passing
+npx tsc --noEmit -p tsconfig.json
+# exit 0, no errors (the pre-existing Audit078.test.tsx TxRow-fixture gap the
+# initial insights report noted was fixed by the interactions lane before
+# integration; this worktree's full `tsc` is clean)
+npx eslint src/screens/Overview.tsx src/screens/Overview.test.tsx src/components/insights src/lib/insights
 # clean, 0 problems (complexity <= 12, max-depth <= 3 throughout)
 ```
 
 ## Honest limits
+
+- A comparison range whose equal-length predecessor would fall before year
+  `0000` or after `9999` cannot be computed; `InsightsPanel` catches this and
+  shows "Predchádzajúce obdobie rovnakej dĺžky nie je možné vypočítať."
+  instead of fetching a previous summary or crashing (080-repair). This only
+  matters for a custom period a user has typed near either boundary year;
+  it never happens for a period computed from "today".
 
 - Rendered appearance is not verified here: no screenshot or visual review
   was taken. That is a separate, independent step per the run contract.

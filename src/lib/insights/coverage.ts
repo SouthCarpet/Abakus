@@ -1,5 +1,5 @@
 import type { Account, AccountKind, StatementHistoryRow } from '../../api'
-import { addDaysIso, type DateRange } from './date'
+import { addDaysIso, isValidRange, type DateRange } from './date'
 
 export interface AccountCoverage {
   accountId: number
@@ -14,12 +14,13 @@ export interface AccountCoverage {
 
 /**
  * Merges overlapping, nested, duplicate and immediately adjacent inclusive
- * ranges. A reversed (from > to) range never merges and is reported
+ * ranges. A reversed (from > to) range, or one naming a day that does not
+ * exist on the calendar (2026-02-30), never merges and is reported
  * separately: it must never grant coverage.
  */
 export function mergeRanges(ranges: DateRange[]): { merged: DateRange[]; invalid: DateRange[] } {
-  const invalid = ranges.filter((r) => r.from > r.to)
-  const valid = ranges.filter((r) => r.from <= r.to)
+  const invalid = ranges.filter((r) => !isValidRange(r))
+  const valid = ranges.filter((r) => isValidRange(r))
   const sorted = [...valid].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0))
   const merged: DateRange[] = []
   for (const range of sorted) {

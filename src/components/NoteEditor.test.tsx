@@ -94,6 +94,21 @@ describe('NoteEditor: mutation success vs refresh failure', () => {
     expect(screen.getByRole('button', { name: 'Uložiť poznámku' })).toBeEnabled()
   })
 
+  it('retries the refresh without repeating the write when the user clicks save again with the same unchanged draft', async () => {
+    vi.mocked(api.saveTransactionNote).mockResolvedValue(undefined)
+    const onSaved = vi.fn().mockRejectedValueOnce(new Error('Zoznam sa nepodarilo obnoviť.')).mockResolvedValueOnce(undefined)
+    render(<NoteEditor txId={5} initialNote="" onSaved={onSaved} />)
+    fireEvent.change(screen.getByLabelText(label(5)), { target: { value: 'nová poznámka' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť poznámku' }))
+    await screen.findByRole('alert')
+    expect(api.saveTransactionNote).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť poznámku' }))
+    await screen.findByText('Poznámka uložená.')
+    expect(api.saveTransactionNote).toHaveBeenCalledTimes(1)
+    expect(onSaved).toHaveBeenCalledTimes(2)
+  })
+
   it('invokes the parent refresh exactly once after a successful save', async () => {
     vi.mocked(api.saveTransactionNote).mockResolvedValue(undefined)
     const onSaved = vi.fn().mockResolvedValue(undefined)
