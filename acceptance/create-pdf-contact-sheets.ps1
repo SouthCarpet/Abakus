@@ -119,6 +119,10 @@ try {
   [IO.Directory]::Move($stage, $outputPath)
   $result | ConvertTo-Json -Compress -Depth 8
 } catch {
-  if (Test-Path -LiteralPath $stage) { [IO.Directory]::Delete($stage, $true) }
+  if (Test-Path -LiteralPath $stage) {
+    $resolvedStage = (Resolve-Path -LiteralPath $stage).Path
+    Assert-Descendant -Parent $acceptanceRoot -Child $resolvedStage -Label 'Contact-sheet partial cleanup'
+    [IO.Directory]::Delete($resolvedStage, $true)
+  }
   throw
 }
