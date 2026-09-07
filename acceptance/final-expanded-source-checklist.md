@@ -147,6 +147,9 @@ directory.
 - [ ] Ordinary reports expose every page. The 5000-row report exposes an
   all-page contact sheet plus full-resolution representative and flagged
   pages, with the inspected page set stated exactly.
+- [ ] `create-pdf-contact-sheets.ps1` verifies each rendered-page hash and
+  maps every stress-report page to one labelled contact-sheet tile exactly
+  once. Contact-sheet creation is mechanical and makes no pixel judgment.
 
 The inspector example needs direct dev dependencies in
 `acceptance/inspect-pdf-report-dev-deps.patch`. The controller applies that
