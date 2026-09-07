@@ -803,31 +803,20 @@ async function restartMode() {
   }
 }
 
-const SCREENSHOT_SOURCE_FILES = [
-  'src/App.tsx',
-  'src/tokens.css',
-  'src/components/Rail.tsx',
-  'src/components/ThemePicker.tsx',
-  'src/components/Dialog.tsx',
-  'src/components/DeleteAccountDialog.tsx',
-  'src/components/BackupSection.tsx',
-  'src/components/NoteEditor.tsx',
-  'src/components/CategoryDialog.tsx',
-  'src/components/report/ExportPdfDialog.tsx',
-  'src/components/report/report.css',
-  'src/components/recurring/RecurringPanel.tsx',
-  'src/components/recurring/RecurringTable.tsx',
-  'src/components/recurring/RecurringDetail.tsx',
-  'src/components/recurring/RecurringEditor.tsx',
-  'src/screens/Overview.tsx',
-  'src/screens/Import.tsx',
-  'src/screens/Transactions.tsx',
-  'src/screens/Categories.tsx',
-  'src/screens/Settings.tsx',
-]
-
 function screenshotSourceFiles() {
-  return Object.fromEntries(SCREENSHOT_SOURCE_FILES.map((relative) => {
+  const sourceFiles = []
+  const pending = [path.join(ROOT, 'src')]
+  while (pending.length > 0) {
+    const current = pending.pop()
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const absolute = path.join(current, entry.name)
+      if (entry.isDirectory()) pending.push(absolute)
+      else if (entry.isFile()) sourceFiles.push(path.relative(ROOT, absolute).replaceAll('\\', '/'))
+    }
+  }
+  sourceFiles.push('index.html', 'package.json', 'package-lock.json', 'vite.config.ts', 'tsconfig.json', 'eslint.config.js')
+  sourceFiles.sort()
+  return Object.fromEntries(sourceFiles.map((relative) => {
     const absolute = path.join(ROOT, relative)
     assert(fs.statSync(absolute).isFile(), `screenshot source is missing: ${absolute}`)
     return [relative, sha256(absolute)]
@@ -859,6 +848,7 @@ async function captureScreenshot(page, screenshotDir, screenshots, options) {
     client_width: document.documentElement.clientWidth,
     scroll_width: document.documentElement.scrollWidth,
     scroll_height: document.documentElement.scrollHeight,
+    active_screen: document.querySelector('nav button.is-active')?.textContent?.trim() ?? null,
     active_element: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.trim() ?? null,
     theme: document.documentElement.dataset.theme ?? null,
   }))
