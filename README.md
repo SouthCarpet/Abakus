@@ -60,7 +60,9 @@ Každý pokus sa zobrazí v **Nastavenia > Stav > Sieťová aktivita**. Denník 
 
 ## Kde sú dáta a ako zálohovať
 
-Databáza je v súbore `%LOCALAPPDATA%\Abakus\abakus.db`. Pred zálohovaním appku zatvorte. Potom tento súbor skopírujte na bezpečné miesto.
+Databáza je v súbore `%LOCALAPPDATA%\Abakus\abakus.db`. V **Nastaveniach** vytvorte **Zálohu databázy** a vyberte nový súbor. Appka uloží konzistentnú kópiu aj počas svojho behu. Existujúci cieľový súbor neprepíše.
+
+Záloha obsahuje bankové údaje, účty, výpisy, kategórie, naučené pravidlá, poznámky a nastavenia databázy. Nie je šifrovaná, preto ju uložte na bezpečné miesto. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF. Obnova zo zálohy zatiaľ nemá ovládanie v appke.
 
 ## Čo appka nikdy nerobí
 
@@ -71,7 +73,19 @@ Databáza je v súbore `%LOCALAPPDATA%\Abakus\abakus.db`. Pred zálohovaním app
 
 ## Licencia a stav
 
-Abakus je vo verzii 0.1.1 a používa licenciu MIT. Aktuálne obmedzenia a otvorené problémy sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+Abakus je vo verzii 0.1.2 a používa licenciu MIT. Táto verzia spája päť nových funkcií s opravami 0.1.1. Zmeny opisuje [prehľad vydania](docs/release-0.1.2.md), obmedzenia sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+## Pokrytie, porovnanie a historické zostatky
+
+V **Prehľade** panel pokrytia uvedie medzery vo výpisoch pre jednotlivé účty. Pri vybranom období kontroluje aj jeho začiatok a koniec. Pri voľbe **Všetko** ukáže iba medzery medzi známymi výpismi. Prekrývajúce sa výpisy spočíta ako jedno pokryté obdobie. Ide o obdobia výpisov; dátumy jednotlivých transakcií môžu byť mimo nich.
+
+Porovnanie kategórií ukáže výdavky vo vybranom období a v bezprostredne predchádzajúcom období s rovnakým počtom dní. Oba rozsahy sú uvedené v paneli. Refundácie znižujú výdavky, interné prevody sa nezapočítavajú. Pri nulovom základe percentuálna zmena nie je dostupná. Chýbajúce výpisy a budúce dni sú označené. Pri voľbe **Všetko** sa porovnanie nezobrazuje.
+
+Historické konečné zostatky sú hodnoty z výpisov ku konkrétnemu dňu. Nie sú aktuálnym zostatkom bankového účtu. Chýbajúci zostatok zostáva neznámy a kontrolný súčet ukazuje stav overenia výpisu.
+
+## Poznámky k transakciám
+
+V detaile transakcie možno uložiť poznámku do 2 000 znakov vrátane nových riadkov. Prázdny text poznámku odstráni. Poznámky sa dajú vyhľadávať aj bez diakritiky a exportujú sa v stĺpci **poznamka** v CSV. Uloženie poznámky nemení kategóriu ani naučené pravidlo.
 
 ## Odstránenie účtu a vzhľad
 

@@ -1,5 +1,13 @@
 # Known issues
 
+- **Záloha je nešifrovaný súbor SQLite.** Obsahuje bankové údaje a poznámky.
+  Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Obnova nemá ovládanie
+  v appke; zálohovanie nemá plánovač.
+- **Pokrytie sa vzťahuje na obdobia výpisov.** Úplné pokrytie nie je dôkazom,
+  že existujú všetky transakcie pre daný rozsah dátumov. Transakcia sa môže
+  objaviť až vo výpise za neskorší mesiac. Historický zostatok je stav ku dňu
+  výpisu, nie aktuálny stav účtu. Porovnanie pri voľbe Všetko nie je dostupné.
+
 - **pdfium binary: trust on first use.** `scripts/fetch-pdfium.ps1` pins a release tag
   (`chromium/7469`) from `bblanchon/pdfium-binaries` and checks the archive against
   `scripts/pdfium.sha256`. The hash file was written on the first run, from that same
