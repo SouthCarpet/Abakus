@@ -50,7 +50,9 @@ Každý importovaný výpis má odznak kontrolného súčtu. Appka overí, či p
 
 ## Ako sa appka učí
 
-Po potvrdení si appka zapamätá presnú kombináciu obchodníka a miesta. Rovnakého obchodníka na inom mieste označí ako **odhad**, ktorý potvrdíte jedným kliknutím.
+Vytvorenie kategórie ani podkategórie samo nevytvorí pravidlo. Po priradení kategórie transakcii alebo potvrdení návrhu si appka zapamätá rozpoznaného obchodníka a miesto. Presná zhoda sa priradí automaticky. Rovnakého obchodníka na inom mieste označí ako **odhad**, ktorý potvrdíte jedným kliknutím. Platby bez rozpoznaného obchodníka sa týmto spôsobom neučia ako jedna spoločná skupina.
+
+Voľba **Použiť aj na podobné** navyše zaradí podobné už importované transakcie, ktoré ešte nie sú potvrdené. Potvrdené priradenia ponechá. V detaile transakcie možno zmeniť cieľ pôvodného vstavaného pravidla, ak ju zaradilo také pravidlo. Samostatný formulár na ručné vytváranie pravidiel zatiaľ nie je dostupný.
 
 ## Kontrola aktualizácií
 
@@ -62,7 +64,7 @@ Každý pokus sa zobrazí v **Nastavenia > Stav > Sieťová aktivita**. Denník 
 
 Databáza je v súbore `%LOCALAPPDATA%\Abakus\abakus.db`. V **Nastaveniach** vytvorte **Zálohu databázy** a vyberte nový súbor. Appka uloží konzistentnú kópiu aj počas svojho behu. Existujúci cieľový súbor neprepíše.
 
-Záloha obsahuje bankové údaje, účty, výpisy, kategórie, naučené pravidlá, poznámky a nastavenia databázy. Nie je šifrovaná, preto ju uložte na bezpečné miesto. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF. Obnova zo zálohy zatiaľ nemá ovládanie v appke.
+Záloha obsahuje bankové údaje, účty, výpisy, kategórie, naučené pravidlá, poznámky, uložené voľby pravidelných platieb a nastavenia databázy. Nie je šifrovaná, preto ju uložte na bezpečné miesto. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF. Obnova zo zálohy zatiaľ nemá ovládanie v appke.
 
 ## Čo appka nikdy nerobí
 
@@ -73,7 +75,30 @@ Záloha obsahuje bankové údaje, účty, výpisy, kategórie, naučené pravidl
 
 ## Licencia a stav
 
-Abakus je vo verzii 0.1.2 a používa licenciu MIT. Táto verzia spája päť nových funkcií s opravami 0.1.1. Zmeny opisuje [prehľad vydania](docs/release-0.1.2.md), obmedzenia sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+Abakus je vo verzii 0.1.2 a používa licenciu MIT. Táto verzia spája opravy 0.1.1, päť funkcií pre kontrolu údajov, pravidelné platby, správu kategórií a PDF reporty. Zmeny opisuje [prehľad vydania](docs/release-0.1.2.md), obmedzenia sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+## Pravidelné platby a kategórie
+
+V **Prehľade** nájdete pravidelné výdavky aj príjmy s mesačným, štvrťročným alebo ročným opakovaním. Odhady sú oddelené od platieb, ktoré potvrdíte. Detail ukáže konkrétne platby, ďalší očakávaný termín a prípadnú ustálenú zmenu ceny. Výpočty rozlišujú pôvodnú menu a prepočet do eur.
+
+Platbu možno potvrdiť, ignorovať alebo obnoviť jej automatický odhad. V detaile transakcie možno určiť opakovanie aj ručne. Pri ručnom výbere konkrétnych platieb treba ďalšie platby priraďovať ručne. Chýbajúce výpisy vedú k neznámemu stavu. Odhad ukončenia neznamená potvrdené zrušenie zmluvy. Historické obdobie zobrazuje stav k jeho koncu, bez neskorších údajov.
+
+Panel ukazuje mesačný alebo ročný prepočet a očakávané platby do konca mesiaca. Podiel na výdavkoch je dostupný iba pri dostatočnom overenom pokrytí všetkých vybraných účtov. Tieto hodnoty sú odhady z importovaných údajov, nie bankové príkazy ani aktuálny zostatok.
+
+Kategóriu možno vytvoriť priamo pri priraďovaní transakcie. V **Kategóriách** ju možno presunúť pod inú nadradenú kategóriu alebo osamostatniť. Kategórie majú najviac dve úrovne. Podkategória preberá druh príjem alebo výdavok od rodiča. Zmena druhu s dopadom na staršie transakcie vyžaduje potvrdenie zobrazených počtov. Spotify má vlastnú podkategóriu; úprava starých údajov zachováva používateľské zmeny pravidiel.
+
+## PDF s grafmi a výpisom
+
+Na každej obrazovke je pri voľbe vzhľadu tlačidlo **Exportovať PDF**. Vyberte účty a obdobie:
+
+- **Mesiac:** celý vybraný kalendárny mesiac.
+- **Šesť mesiacov:** šesť po sebe idúcich mesiacov vrátane vybraného koncového mesiaca.
+- **Rok:** celý vybraný kalendárny rok.
+- **Celé obdobie:** všetky uložené transakcie vybraných účtov.
+
+Náhľad ukáže rozsah a počet transakcií. PDF obsahuje súhrn, grafy, informáciu o pokrytí výpismi a úplný výpis vrátane poznámok. Použije všetky transakcie vo vybranom období a účtoch; filtre tabuľky sa nepoužijú. Aktuálne obdobie je označené ako neukončené. Údaje sa zachytia pri uložení, preto sa ich počet môže od náhľadu líšiť.
+
+Report má svetlé strany A4, vložené písmo so slovenčinou a číslovanie strán. Export pracuje lokálne. Vyberte nový súbor PDF; existujúci súbor sa neprepíše. Zrušenie dialógu nič nevytvorí. Pri prekročení limitu reportu sa zobrazí chyba a výpis sa potichu neskráti.
 
 ## Pokrytie, porovnanie a historické zostatky
 
@@ -96,7 +121,7 @@ Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, *
 ## Filtre a CSV
 
 - **Exportovať filtrované CSV** v Transakciách exportuje aktuálne obdobie, účet, druh účtu, kategóriu, stav, hľadaný text aj obmedzenie na konkrétny výpis. Použije text viditeľný pri kliknutí, aj keď tabuľka ešte čaká na dokončenie hľadania. Filter sa zachytí pri kliknutí; CSV číta údaje z databázy pri exporte. Zrušenie výberu súboru nič neexportuje a zlyhanie zápisu sa zobrazí. Pôvodný export v Nastaveniach naďalej používa iba uložené obdobie.
-- **Filter kategórie** umožňuje vybrať aj nadradenú kategóriu s podkategóriami a zobrazuje kategóriu prevzatú z grafu. Archivovaný alebo nedostupný výber zostáva označený; neznamená Všetky kategórie. Možnosti priraďovania kategórií sa nemenia.
+- **Filter kategórie** umožňuje vybrať aj nadradenú kategóriu s podkategóriami a zobrazuje kategóriu prevzatú z grafu. Archivovaný alebo nedostupný výber zostáva označený; neznamená Všetky kategórie.
 - **Vymazať všetky filtre** zobrazí všetky obdobia, účty, druhy, kategórie a stavy bez vyhľadávania a bez obmedzenia na výpis. Vymaže aj hromadný výber. Obdobie Všetko sa uloží pre ďalšie obrazovky.
 - Panel **Súčty zobrazených transakcií** počíta presne načítané riadky tabuľky. Príjem, výdavky a čistá suma sa sčítajú v celých centoch podľa rovnakých pravidiel ako Prehľad, vrátane druhu priradenej kategórie a refundácií znižujúcich výdavky; interné prevody majú samostatný počet a do týchto súm nevstupujú. Pri načítavaní alebo chybe sa staré súčty nezobrazujú. Nejde o zostatok bankového účtu.
 

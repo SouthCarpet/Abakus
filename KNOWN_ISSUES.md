@@ -1,5 +1,18 @@
 # Known issues
 
+- **Pravidelné platby sú odhady z importov.** Chýbajúce pokrytie nepreukazuje
+  vynechanú platbu. Odhad ukončenia neznamená zrušenie zmluvy. Ručný výber
+  konkrétnych platieb automaticky nepridáva budúce platby. Appka nevytvára
+  bankové príkazy, upozornenia ani plánované úlohy.
+- **PDF má výslovné limity.** Najviac 100 000 transakcií, 32 MiB zdrojového
+  textu, 2 000 strán a 100 MiB výsledného súboru. Prekročenie ukončí export
+  chybou, nie skráteným výpisom. Nepodporovaný znak má viditeľný zápis
+  `[U+...]`. PDF používa vlastný výber účtov a obdobia, nie filtre tabuľky.
+- **Ručný formulár na nové pravidlo nie je dostupný.** Pravidlá sa učia
+  pri priradení alebo potvrdení transakcie s rozpoznaným obchodníkom.
+  Samotné vytvorenie kategórie pravidlo nevytvorí. Cieľ vstavaného pravidla
+  možno zmeniť v detaile ním zaradenej transakcie.
+
 - **Záloha je nešifrovaný súbor SQLite.** Obsahuje bankové údaje a poznámky.
   Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Obnova nemá ovládanie
   v appke; zálohovanie nemá plánovač.
@@ -33,9 +46,9 @@
 - **Foreign-currency rate precision.** `card_foreign` transactions store the exchange
   rate as `rate_micros` (six decimal digits). Re-deriving the original-currency amount
   from `amount_cents` and `rate_micros` can be off by a cent from the bank's own
-  printed original amount because of this rounding; the parser keeps both the printed
-  original amount and the rate rather than recomputing one from the other, so this
-  affects only a hypothetical future feature, not any value shown today.
+  printed original amount because of this rounding. The parser keeps both the printed
+  original amount and the rate. Recurring price changes use the original currency;
+  a projection in euros remains an estimate based on the last booked conversion.
 - **Installer exists but is unsigned, and there is still no release.**
   `packaging/abakus.iss` and `packaging/build-installer.ps1` build a per-user
   Inno Setup installer (see `packaging/INSTALL.md`). `src-tauri/tauri.conf.json`
