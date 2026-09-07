@@ -462,6 +462,84 @@ async function recurringUiJourney(page) {
   return { manual: manual.decision, confirmed: confirmed.decision, edited: edited.decision, ignored: ignored.decision, reset: reset.decision }
 }
 
+async function recurringU03Journey(page, oracle) {
+  await openScreen(page, 'Prehľad')
+  const period = page.getByRole('group', { name: 'Obdobie' })
+  await period.getByRole('button', { name: 'Vlastné', exact: true }).click()
+  await page.getByLabel('Od dátumu').fill('2026-02-01')
+  await page.getByLabel('Do dátumu').fill('2026-02-28')
+
+  const exactDetailButton = page.getByRole('button', { name: 'Detail U03 rozdelená služba', exact: true }).first()
+  await exactDetailButton.waitFor()
+  await exactDetailButton.click()
+  const detailDialog = page.getByRole('dialog', { name: 'Presné členstvo' })
+  await detailDialog.waitFor()
+  await detailDialog.getByText('Vybrané obdobie 2026-02-01 až 2026-02-28, stav k 2026-09-07', { exact: true }).waitFor()
+  const periodMembers = detailDialog.getByRole('table', { name: 'Členovia vo zvolenom rozsahu' })
+  await periodMembers.getByText('5. 2. 2026', { exact: true }).waitFor()
+  assertEqual(await periodMembers.getByText('5. 1. 2026', { exact: true }).count(), 0, 'U03 selected-period membership')
+  for (const excludedDate of ['5. 3. 2026', '6. 4. 2026', '5. 5. 2026']) {
+    assertEqual(await detailDialog.getByText(excludedDate, { exact: true }).count(), 0, `U03 excluded ${excludedDate}`)
+  }
+  await detailDialog.getByRole('button', { name: 'Celá známa história', exact: true }).click()
+  await detailDialog.getByText('Celá známa história do 2026-09-07', { exact: true }).waitFor()
+  const historyMembers = detailDialog.getByRole('table', { name: 'Členovia vo zvolenom rozsahu' })
+  await historyMembers.getByText('5. 1. 2026', { exact: true }).waitFor()
+  await historyMembers.getByText('5. 2. 2026', { exact: true }).waitFor()
+  assertEqual(await historyMembers.locator('tbody tr').count(), 2, 'U03 exact full-history member count')
+  await detailDialog.getByRole('button', { name: 'Zavrieť', exact: true }).click()
+
+  await editRecurringThroughUi(page, 8061, 'U03 nový kontrakt', async (dialog) => {
+    await dialog.getByLabel('Len označené transakcie').check()
+    await dialog.getByLabel('Interval').selectOption('monthly')
+    await dialog.getByLabel('Kotva').fill('2026-01-18')
+    await dialog.getByRole('button', { name: 'Uložiť', exact: true }).click()
+  })
+  const createdContext = await invoke(page, 'transaction_recurring_context', { transactionId: 8061, asOf: '2026-09-07' })
+  assertEqual(createdContext.decision?.scope, 'selected', 'U03 manual selected scope')
+  const decisionId = createdContext.decision?.id
+  assert(Number.isSafeInteger(decisionId), 'U03 selected decision id is missing')
+
+  await openScreen(page, 'Prehľad')
+  await page.getByRole('group', { name: 'Obdobie' }).getByRole('button', { name: 'Všetko', exact: true }).click()
+  const edit = page.getByRole('button', { name: 'Upraviť U03 nový kontrakt', exact: true })
+  await edit.waitFor()
+  await edit.click()
+  const editor = page.getByRole('dialog', { name: 'Pravidelná platba' })
+  await editor.getByLabel('Člen 8062 U03 nový kontrakt 2026-02-18').check()
+  await editor.getByRole('button', { name: 'Uložiť', exact: true }).click()
+  await editor.waitFor({ state: 'hidden', timeout: 15000 })
+
+  const appended = await invoke(page, 'recurring_detail', {
+    request: { series_key: `s:${decisionId}`, query: { from: null, to: null, account_kind: null, today: '2026-09-07' } },
+  })
+  assertEqual(appended.matching_transaction_ids, [8061, 8062], 'U03 appended exact membership')
+  assert(appended.compatible_transactions.some((row) => row.id === 8063), 'U03 compatible occurrence disappeared')
+
+  const membersBeforeOverlap = databaseState(oracle.db_path).tables.recurring_members
+  const overlapError = await invokeError(page, 'save_recurring', {
+    request: {
+      decision_id: null,
+      selection: { scope: 'selected', transaction_ids: [8054, 8051] },
+      decision: { mode: 'confirmed', cadence: 'monthly', anchor_date: '2026-04-05' },
+    },
+  })
+  assert(/súčasťou|ručného výberu|manual/i.test(overlapError), `U03 overlap error is unclear: ${overlapError}`)
+  assertEqual(databaseState(oracle.db_path).tables.recurring_members, membersBeforeOverlap, 'U03 overlap changed membership')
+  const original = await invoke(page, 'recurring_detail', {
+    request: { series_key: 's:503', query: { from: null, to: null, account_kind: null, today: '2026-09-07' } },
+  })
+  assertEqual(original.matching_transaction_ids, oracle.recurring.u03.first_contract_members, 'U03 original contract after overlap')
+  return {
+    period_members: [8052],
+    full_history_members: original.matching_transaction_ids,
+    created_decision_id: decisionId,
+    appended_members: appended.matching_transaction_ids,
+    compatible_remaining: appended.compatible_transactions.map((row) => row.id),
+    overlap_error: overlapError,
+  }
+}
+
 async function categoryUiJourney(page) {
   const name = 'UI syntetická kategória'
   await showTransaction(page, 1005, 'Nezaradená refundácia')
@@ -599,12 +677,13 @@ async function flowsMode() {
     await occupiedDialog.getByRole('button', { name: 'Zrušiť', exact: true }).click()
 
     const recurringUi = await recurringUiJourney(page)
+    const recurringU03 = await recurringU03Journey(page, oracle)
     const categoryUi = await categoryUiJourney(page)
     const fileSafety = await fileSafetyCanaries(page, oracle)
     const expanded = await expandedCommandCanaries(page)
     const notesAndBackup = await noteAndBackupCanaries(page, oracle)
     const stateAfter = databaseState(oracle.db_path)
-    const result = { mode: 'flows', data_dir: actualDataDir, pdfs, cancel, occupied, recurring_ui: recurringUi, category_ui: categoryUi, file_safety: fileSafety, expanded, notes_and_backup: notesAndBackup, state_after: stateAfter }
+    const result = { mode: 'flows', data_dir: actualDataDir, pdfs, cancel, occupied, recurring_ui: recurringUi, recurring_u03: recurringU03, category_ui: categoryUi, file_safety: fileSafety, expanded, notes_and_backup: notesAndBackup, state_after: stateAfter }
     writeNewJson(path.join(RESULTS_DIR, 'flows.json'), result)
     writeNewJson(path.join(RESULTS_DIR, 'state-after-flows.json'), stateAfter)
     console.log(JSON.stringify({ ok: true, mode: 'flows', pdf_count: Object.keys(pdfs).length }))
@@ -663,9 +742,17 @@ async function restartMode() {
     const previews = await previewFamilies(page, oracle)
     const recurring = await invoke(page, 'recurring_overview', { query: { from: null, to: null, account_kind: 'personal', today: oracle.today } })
     assert(recurring.rows.some((row) => row.decision === 'confirmed'), 'confirmed recurrence missing after restart')
+    const flows = readJson(path.join(RESULTS_DIR, 'flows.json'))
+    const u03Detail = await invoke(page, 'recurring_detail', {
+      request: {
+        series_key: `s:${flows.recurring_u03.created_decision_id}`,
+        query: { from: null, to: null, account_kind: null, today: oracle.today },
+      },
+    })
+    assertEqual(u03Detail.matching_transaction_ids, flows.recurring_u03.appended_members, 'U03 membership after restart')
     const pageInspection = {}
     for (const name of Object.keys(oracle.families)) pageInspection[name] = inspectPageManifest(name, oracle)
-    const result = { mode: 'restart', executable: { path: ready.exe_path, sha256: ready.binary_sha256, pid: ready.pid }, data_dir: actualDataDir, state: currentState, previews, recurring_confirmed: true, page_inspection: pageInspection }
+    const result = { mode: 'restart', executable: { path: ready.exe_path, sha256: ready.binary_sha256, pid: ready.pid }, data_dir: actualDataDir, state: currentState, previews, recurring_confirmed: true, recurring_u03_members: u03Detail.matching_transaction_ids, page_inspection: pageInspection }
     writeNewJson(path.join(RESULTS_DIR, 'restart.json'), result)
     console.log(JSON.stringify({ ok: true, mode: 'restart', inspected_pdfs: Object.keys(pageInspection).length }))
   } finally {

@@ -237,6 +237,15 @@ def recurring_transactions() -> list[tuple[Any, ...]]:
             transaction(8032, 802, 7, "2026-08-20", "incoming", 250000, "Mesačný príjem", 11),
             transaction(8033, 802, 7, "2026-09-20", "incoming", 250000, "Mesačný príjem", 11),
             transaction(8041, 802, 7, "2026-09-05", "card", -899, "Spotify", 13, "suggested", rule_id=402, source="seed"),
+            transaction(8051, 801, 7, "2026-01-05", "card", -1700, "U03 rozdelená služba", 13),
+            transaction(8052, 801, 7, "2026-02-05", "card", -1700, "U03 rozdelená služba", 13),
+            transaction(8053, 801, 7, "2026-03-05", "card", -1700, "U03 rozdelená služba", 13),
+            transaction(8054, 801, 7, "2026-04-05", "card", -1700, "U03 rozdelená služba", 13),
+            transaction(3051, 301, 3, "2026-04-06", "card", -1700, "U03 rozdelená služba", 13),
+            transaction(8055, 801, 7, "2026-05-05", "card", -1600, "U03 rozdelená služba", 13, orig_amount_cents=-1800, orig_currency="USD"),
+            transaction(8061, 801, 7, "2026-01-18", "card", -2300, "U03 nový kontrakt", 13),
+            transaction(8062, 801, 7, "2026-02-18", "card", -2300, "U03 nový kontrakt", 13),
+            transaction(8063, 801, 7, "2026-03-18", "card", -2300, "U03 nový kontrakt", 13),
         ]
     )
     return rows
@@ -253,11 +262,16 @@ def all_transactions() -> list[tuple[Any, ...]]:
 RECURRING_DECISIONS = [
     (501, 7, "selected-insurance-oracle", "selected", "confirmed", "yearly", "2026-01-10", '{"direction":"expense","currency":null,"name":"Ručné poistenie"}', "2026-09-07 10:00:00"),
     (502, 7, "selected-ignored-oracle", "selected", "ignored", None, None, '{"direction":"expense","currency":null,"name":"Ignorovaná platba"}', "2026-09-07 10:05:00"),
+    (503, 7, "selected-u03-a", "selected", "confirmed", "monthly", "2026-01-05", '{"direction":"expense","currency":null,"name":"U03 rozdelená služba"}', "2026-09-07 10:10:00"),
+    (504, 7, "selected-u03-b", "selected", "confirmed", "monthly", "2026-03-05", '{"direction":"expense","currency":null,"name":"U03 rozdelená služba"}', "2026-09-07 10:15:00"),
 ]
 
 RECURRING_MEMBERS = [
     (501, "pdf-oracle-fp-8021"),
     (502, "pdf-oracle-fp-8022"),
+    (503, "pdf-oracle-fp-8051"),
+    (503, "pdf-oracle-fp-8052"),
+    (504, "pdf-oracle-fp-8053"),
 ]
 
 FAMILIES = {
@@ -390,16 +404,24 @@ def main() -> int:
             "statements": 12,
             "categories": 19,
             "rules": 3,
-            "transactions": 5082,
+            "transactions": 5091,
             "rule_sources": 2,
-            "recurring_decisions": 2,
-            "recurring_members": 2,
+            "recurring_decisions": 4,
+            "recurring_members": 5,
         },
         "initial_state": initial_state,
         "recurring": {
             "anchor_candidate": {"name": "Mesačný kotviaci obchod", "cadence": "monthly", "anchor_date": "2026-01-31", "next_due": "2026-04-30", "state_at_2026_04_15": "upcoming"},
             "stable_price": {"name": "Cena služby", "previous_cents": 1000, "current_cents": 1200, "delta_cents": 200, "effective_from": "2026-04-15"},
-            "persisted_decision_ids": [501, 502],
+            "persisted_decision_ids": [501, 502, 503, 504],
+            "u03": {
+                "first_contract_members": [8051, 8052],
+                "other_contract_members": [8053],
+                "compatible_unselected": [8054],
+                "excluded_other_account": [3051],
+                "excluded_other_currency": [8055],
+                "new_contract_pool": [8061, 8062, 8063],
+            },
         },
         "safety": {"synthetic_only": True, "private_fixtures_read": False, "network_used": False, "pid": os.getpid()},
     }
