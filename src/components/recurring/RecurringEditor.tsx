@@ -93,6 +93,7 @@ export function RecurringEditor({
         seedId={seedId}
         categories={categories}
         CategoryDialog={CategoryDialog}
+        onChanged={onChanged}
         busy={mutation.busy}
         loadError={draft.loadError}
         error={mutation.error}
@@ -136,6 +137,7 @@ function EditorForm({
   seedId,
   categories,
   CategoryDialog,
+  onChanged,
   busy,
   loadError,
   error,
@@ -147,6 +149,7 @@ function EditorForm({
   seedId: number | null
   categories: Category[]
   CategoryDialog?: ComponentType<RecurringCategoryDialogProps>
+  onChanged: () => Promise<void>
   busy: boolean
   loadError: string
   error: string
@@ -183,7 +186,7 @@ function EditorForm({
         disabled={busy}
         onToggle={draft.toggleMember}
       />
-      <CategorySlot seedId={seedId} categories={categories} CategoryDialog={CategoryDialog} disabled={busy} />
+      <CategorySlot seedId={seedId} categories={categories} CategoryDialog={CategoryDialog} disabled={busy} onChanged={onChanged} />
     </div>
   )
 }
@@ -226,19 +229,23 @@ function CategorySlot({
   categories,
   CategoryDialog,
   disabled,
+  onChanged,
 }: {
   seedId: number | null
   categories: Category[]
   CategoryDialog?: ComponentType<RecurringCategoryDialogProps>
   disabled: boolean
+  onChanged: () => Promise<void>
 }) {
   if (seedId === null) return null
   return (
     <RecurringCategoryFields
+      key={seedId}
       categories={categories}
       transactionId={seedId}
       CategoryDialog={CategoryDialog}
       disabled={disabled}
+      onChanged={onChanged}
     />
   )
 }

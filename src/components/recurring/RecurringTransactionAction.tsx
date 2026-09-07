@@ -4,6 +4,7 @@ import { isRecurringEligible, localTodayIso } from '../../lib/recurring-labels'
 import type { RecurringQuery, TransactionRecurringContext } from '../../lib/recurring-api'
 import { recurringApi } from '../../lib/recurring-api'
 import { Button } from '../Button'
+import { CategoryDialog } from '../CategoryDialog'
 import { RecurringEditor } from './RecurringEditor'
 
 export function RecurringTransactionAction({
@@ -66,6 +67,7 @@ function RecurringTransactionActionReady({
       <RecurringEditor
         source={source}
         categories={categories}
+        CategoryDialog={CategoryDialog}
         onClose={() => { setOpen(false); setContext(null) }}
         onChanged={onChanged}
       />

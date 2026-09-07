@@ -35,7 +35,7 @@ function FakeCategoryDialog({ open, onCreated, onClose }: RecurringCategoryDialo
   if (!open) return null
   return (
     <div role="dialog" aria-label="Nová kategória">
-      <button type="button" onClick={() => onCreated({ id: 99, parent_id: 9, name: 'Doména', kind: 'expense', sort: 2, system: false, archived: false })}>
+      <button type="button" onClick={() => onCreated({ id: 99, parent_id: null, name: 'Doména', kind: 'expense', sort: 2, system: false, archived: false })}>
         Vytvoriť Doména
       </button>
       <button type="button" onClick={onClose}>Zavrieť kategóriu</button>
@@ -202,6 +202,7 @@ describe('RecurringEditor selected membership', () => {
 
 describe('RecurringEditor category create is independent of recurrence save', () => {
   it('preselects a created category and retries assign without creating it again', async () => {
+    const onChanged = vi.fn().mockResolvedValue(undefined)
     vi.mocked(api.assign).mockRejectedValueOnce(new Error('zaradenie zlyhalo')).mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0 })
     render(
       <RecurringEditor
@@ -209,18 +210,60 @@ describe('RecurringEditor category create is independent of recurrence save', ()
         categories={categories}
         CategoryDialog={FakeCategoryDialog}
         onClose={() => {}}
-        onChanged={vi.fn()}
+        onChanged={onChanged}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Nová kategória...' }))
     fireEvent.click(screen.getByRole('button', { name: 'Vytvoriť Doména' }))
+    expect(screen.getByLabelText('Kategória')).toHaveDisplayValue('Doména')
     fireEvent.click(screen.getByRole('button', { name: 'Zaradiť kategóriu' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('zaradenie zlyhalo')
     expect(screen.getByText(/ostala vytvorená/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Zaradiť kategóriu' }))
     await waitFor(() => expect(api.assign).toHaveBeenCalledTimes(2))
+    expect(onChanged).toHaveBeenCalledTimes(1)
     expect(api.assign).toHaveBeenNthCalledWith(1, [11], 99, false)
     expect(api.assign).toHaveBeenNthCalledWith(2, [11], 99, false)
     expect(recurringApi.save).not.toHaveBeenCalled()
+  })
+
+  it('retries only refresh after category assignment succeeded', async () => {
+    const onChanged = vi.fn().mockRejectedValueOnce(new Error('obnova zlyhala')).mockResolvedValueOnce(undefined)
+    render(
+      <RecurringEditor
+        source={transactionSource()}
+        categories={[{ ...SAMPLE_CATEGORY, parent_id: null }]}
+        CategoryDialog={FakeCategoryDialog}
+        onClose={() => {}}
+        onChanged={onChanged}
+      />,
+    )
+    fireEvent.change(screen.getByLabelText('Kategória'), { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Zaradiť kategóriu' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Kategória je zaradená, obnovenie zlyhalo')
+    fireEvent.click(screen.getByRole('button', { name: 'Zaradiť kategóriu' }))
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(2))
+    expect(api.assign).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears the created-category selection when the source transaction changes', () => {
+    const first = transactionSource()
+    if (first.kind !== 'transaction') throw new Error('expected transaction source')
+    const nextTx = txRow({ id: 12, tx_date: '2026-02-15' })
+    const second: RecurringEditorSource = {
+      ...first,
+      tx: nextTx,
+      context: { ...first.context, transaction_id: 12, compatible_transactions: [nextTx] },
+    }
+    const { rerender } = render(
+      <RecurringEditor source={first} categories={categories} CategoryDialog={FakeCategoryDialog} onClose={() => {}} onChanged={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Nová kategória...' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Vytvoriť Doména' }))
+    expect(screen.getByLabelText('Kategória')).toHaveValue('99')
+
+    rerender(<RecurringEditor source={second} categories={categories} CategoryDialog={FakeCategoryDialog} onClose={() => {}} onChanged={vi.fn()} />)
+    expect(screen.getByLabelText('Kategória')).toHaveValue('')
+    expect(screen.queryByRole('option', { name: 'Doména' })).not.toBeInTheDocument()
   })
 })

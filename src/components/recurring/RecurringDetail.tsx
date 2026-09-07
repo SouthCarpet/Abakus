@@ -29,15 +29,17 @@ export function RecurringDetailDialog({
   }, [seriesKey])
 
   useEffect(() => {
+    const mine = ++gen.current
     if (!seriesKey) {
       setDetail(null)
       setError('')
+      setLoading(false)
       return
     }
-    const mine = ++gen.current
     const requestQuery = fullHistory
       ? { from: null, to: null, account_kind: query.account_kind, today: query.today }
       : query
+    setDetail(null)
     setLoading(true)
     setError('')
     void recurringApi.detail({ series_key: seriesKey, query: requestQuery }).then(
@@ -53,7 +55,25 @@ export function RecurringDetailDialog({
         setLoading(false)
       },
     )
+    return () => { gen.current += 1 }
   }, [seriesKey, fullHistory, query.from, query.to, query.account_kind, query.today])
+
+  function close() {
+    gen.current += 1
+    setDetail(null)
+    setError('')
+    setLoading(false)
+    onClose()
+  }
+
+  function showFullHistory(value: boolean) {
+    if (value === fullHistory) return
+    gen.current += 1
+    setDetail(null)
+    setError('')
+    setLoading(true)
+    setFullHistory(value)
+  }
 
   const scopeLabel = fullHistory
     ? `Celá známa história do ${query.today}`
@@ -63,12 +83,12 @@ export function RecurringDetailDialog({
     <Dialog
       open={seriesKey !== null}
       title="Presné členstvo"
-      onClose={onClose}
+      onClose={close}
       actions={(
         <>
-          <Button variant="secondary" onClick={onClose}>Zavrieť</Button>
+          <Button variant="secondary" onClick={close}>Zavrieť</Button>
           <Button
-            disabled={!detail}
+            disabled={loading || !detail}
             onClick={() => { if (detail) onEdit(detail.row, detail) }}
           >
             Upraviť pravidelnosť
@@ -79,10 +99,10 @@ export function RecurringDetailDialog({
       <div data-recurring-wide>
         <RecurringWideDialogStyle />
         <div className="k-row" role="group" aria-label="Rozsah detailu">
-          <Button variant={fullHistory ? 'secondary' : 'primary'} aria-pressed={!fullHistory} onClick={() => setFullHistory(false)}>
+          <Button variant={fullHistory ? 'secondary' : 'primary'} aria-pressed={!fullHistory} onClick={() => showFullHistory(false)}>
             Vybrané obdobie
           </Button>
-          <Button variant={fullHistory ? 'primary' : 'secondary'} aria-pressed={fullHistory} onClick={() => setFullHistory(true)}>
+          <Button variant={fullHistory ? 'primary' : 'secondary'} aria-pressed={fullHistory} onClick={() => showFullHistory(true)}>
             Celá známa história
           </Button>
         </div>
@@ -98,14 +118,15 @@ export function RecurringDetailDialog({
 function DetailBody({ detail }: { detail: RecurringDetail }) {
   const row = detail.row
   const memberSet = new Set(detail.matching_transaction_ids)
+  const selected = row.scope === 'selected'
   return (
     <>
       <p>{row.name} · {row.account_label} · {stateLabel(row)}</p>
       <p>{categoryStatusLabel(row, null)} · {actualChargeLabel(row)}</p>
       {row.foreign_eur_estimate ? <p>Prepočet podľa poslednej platby; kurz sa môže zmeniť</p> : null}
-      <p>Členovia presného výberu. Rovnaký obchodník na inom účte alebo v inej mene sem nepatrí.</p>
-      <MemberTable caption="Členovia vo zvolenom rozsahu" rows={detail.transactions} memberSet={memberSet} />
-      <p>Ďalšie platby priraďte ručne.</p>
+      <p>{selected ? 'Členovia presného výberu.' : 'Transakcie v rovnakej skupine.'} Rovnaký obchodník na inom účte alebo v inej mene sem nepatrí.</p>
+      <MemberTable caption={selected ? 'Členovia vo zvolenom rozsahu' : 'Transakcie vo zvolenom rozsahu'} rows={detail.transactions} memberSet={memberSet} />
+      {selected ? <p>Ďalšie platby priraďte ručne.</p> : null}
       <MemberTable caption="Kompatibilné transakcie" rows={detail.compatible_transactions} memberSet={memberSet} />
     </>
   )
@@ -163,7 +184,8 @@ function originalMoney(cents: number | null, currency: string | null): string {
 }
 
 function periodScopeLabel(query: RecurringQuery): string {
-  if (query.from && query.to) return `Vybrané obdobie ${query.from} až ${query.to}, stav k ${query.today}`
+  const asOf = query.to && query.to < query.today ? query.to : query.today
+  if (query.from && query.to) return `Vybrané obdobie ${query.from} až ${query.to}, stav k ${asOf}`
   return `Celá história, stav k ${query.today}`
 }
 

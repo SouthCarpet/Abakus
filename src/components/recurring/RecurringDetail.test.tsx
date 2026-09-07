@@ -43,7 +43,8 @@ describe('RecurringDetailDialog exact membership and period switch', () => {
     render(<RecurringDetailDialog seriesKey="g:netflix" query={query} onClose={() => {}} onEdit={() => {}} />)
     expect(await screen.findByText('15. 3. 2026')).toBeInTheDocument()
     expect(screen.queryByText('15. 1. 2026')).not.toBeInTheDocument()
-    expect(screen.getByText(/Vybrané obdobie 2026-03-01 až 2026-03-31/)).toBeInTheDocument()
+    expect(screen.getByText('Vybrané obdobie 2026-03-01 až 2026-03-31, stav k 2026-03-31')).toBeInTheDocument()
+    expect(screen.queryByText(/Ďalšie platby priraďte ručne/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Celá známa história' }))
     expect(await screen.findByText('15. 1. 2026')).toBeInTheDocument()
     expect(screen.getByText('15. 3. 2026')).toBeInTheDocument()
@@ -92,5 +93,45 @@ describe('RecurringDetailDialog exact membership and period switch', () => {
     })
     await waitFor(() => expect(screen.getByText('15. 3. 2026')).toBeInTheDocument())
     expect(screen.queryByText('15. 1. 2026')).not.toBeInTheDocument()
+  })
+
+  it('clears the previous series and keeps edit disabled while the next detail loads', async () => {
+    const next = deferred<Awaited<ReturnType<typeof recurringApi.detail>>>()
+    vi.mocked(recurringApi.detail)
+      .mockResolvedValueOnce({
+        row,
+        transactions: [periodMember],
+        matching_transaction_ids: [21],
+        compatible_transactions: [],
+      })
+      .mockReturnValueOnce(next.promise)
+    const { rerender } = render(<RecurringDetailDialog seriesKey="g:netflix" query={query} onClose={() => {}} onEdit={() => {}} />)
+    expect(await screen.findByText('15. 3. 2026')).toBeInTheDocument()
+
+    rerender(<RecurringDetailDialog seriesKey="g:other" query={query} onClose={() => {}} onEdit={() => {}} />)
+    expect(screen.queryByText('15. 3. 2026')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upraviť pravidelnosť' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('Načítava sa detail')
+
+    next.resolve({
+      row: recurringRow({ series_key: 'g:other', group_key: 'other', name: 'Iná služba' }),
+      transactions: [txRow({ id: 31, tx_date: '2026-03-20', merchant_raw: 'Iná služba' })],
+      matching_transaction_ids: [31],
+      compatible_transactions: [],
+    })
+    expect(await screen.findByText('20. 3. 2026')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upraviť pravidelnosť' })).toBeEnabled()
+  })
+
+  it('shows future membership guidance only for an explicit selection', async () => {
+    vi.mocked(recurringApi.detail).mockResolvedValue({
+      row: recurringRow({ scope: 'selected', manual_membership: true }),
+      transactions: [periodMember],
+      matching_transaction_ids: [21],
+      compatible_transactions: [],
+    })
+    render(<RecurringDetailDialog seriesKey="s:1" query={query} onClose={() => {}} onEdit={() => {}} />)
+    expect(await screen.findByText('Ďalšie platby priraďte ručne.')).toBeInTheDocument()
+    expect(screen.getByText('Členovia presného výberu. Rovnaký obchodník na inom účte alebo v inej mene sem nepatrí.')).toBeInTheDocument()
   })
 })

@@ -40,6 +40,8 @@ in lane C's `CategoryDialog`.
   selected period or full known history. The switch is explicit; the
   displayed period is never silently widened. Compatible rows are listed
   separately. Same-name rows on another account are not treated as members.
+  A series or scope switch clears the old detail while the new request loads,
+  and a late response cannot restore the old series.
 - `src/components/recurring/RecurringEditor.tsx`: cadence, anchor, selected
   membership, ignore and reset. Dialog drafts survive a failed save.
   Mutation success plus refresh failure reads as saved, and retrying the
@@ -87,16 +89,20 @@ Foreign rows show original cents and ISO code beside booked EUR. A
 môže zmeniť`. Quarterly and yearly rows show the backend `monthly_cents`
 as `mesačne (štvrťročne|ročne)`, never a frontend `amount/12`.
 
-## CategoryDialog seam
+## Category creation
 
-Lane C owns `src/components/CategoryDialog.tsx`. This lane does not ship a
-placeholder. `RecurringEditor` accepts an optional `CategoryDialog`
-component with the contract props `{ open, initialParentId?, initialKind?,
-onClose, onCreated }`. After parent copies C's file into this tree, pass
-that export into `RecurringEditor` from `RecurringTransactionAction` and
-from `RecurringPanel`. Until then, "Nová kategória..." is hidden; explicit
-assignment of an existing category still works through `CategoryPicker` and
-`api.assign([id], categoryId, false)`.
+The recurring editor uses the shared `CategoryDialog` from the Overview panel
+and from expanded transaction detail. A new category remains a separate step:
+creation selects it, and `Zaradiť kategóriu` then assigns only the source
+transaction through `api.assign([id], categoryId, false)`. The created
+category remains visible for assignment, and a refresh retry does not repeat
+an assignment that already succeeded.
+
+The Transactions assignment area and the Categories rules card explain rule
+learning. Creating a category alone creates no rule. Assigning a category or
+confirming a suggestion for a recognizable merchant creates a rule for future
+payments. `Použiť aj na podobné` also applies it to matching open rows that are
+already imported.
 
 ## Honest limits
 
@@ -109,5 +115,5 @@ assignment of an existing category still works through `CategoryPicker` and
   tokens so 1024 and 1280 layouts can show a member table).
 - `Dialog.tsx` and `kaliber.css` are not owned here, so the width override
   is scoped CSS rather than a new dialog API.
-- Native acceptance, installer and README integration are parent-owned.
+- Native acceptance, installer and README integration are release tasks.
 - PDF export is a separate lane; Overview was not reserved for it.

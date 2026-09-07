@@ -66,6 +66,7 @@ describe('RecurringTransactionAction U01 manual yearly confirm', () => {
     render(<RecurringTransactionAction row={row} categories={[SAMPLE_CATEGORY]} onChanged={onChanged} />)
     fireEvent.click(screen.getByRole('button', { name: 'Pravidelná platba 11' }))
     expect(await screen.findByRole('dialog', { name: 'Pravidelná platba' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('Kotva')).toHaveValue('2026-01-15'))
     fireEvent.change(screen.getByLabelText('Interval'), { target: { value: 'yearly' } })
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
     await waitFor(() => expect(recurringApi.save).toHaveBeenCalledWith({
@@ -74,5 +75,22 @@ describe('RecurringTransactionAction U01 manual yearly confirm', () => {
       decision: { mode: 'confirmed', cadence: 'yearly', anchor_date: '2026-01-15' },
     }))
     expect(onChanged).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the real category creation dialog', async () => {
+    const row = txRow({ id: 11, status: 'unassigned', category_id: null })
+    vi.mocked(recurringApi.transactionContext).mockResolvedValue({
+      transaction_id: 11,
+      group_key: 'ins-key',
+      ambiguous: false,
+      decision: null,
+      inferred_cadence: null,
+      compatible_transactions: [row],
+    })
+    render(<RecurringTransactionAction row={row} categories={[SAMPLE_CATEGORY]} onChanged={vi.fn().mockResolvedValue(undefined)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Pravidelná platba 11' }))
+    expect(await screen.findByRole('dialog', { name: 'Pravidelná platba' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Nová kategória...' }))
+    expect(await screen.findByRole('dialog', { name: 'Nová kategória' })).toBeInTheDocument()
   })
 })

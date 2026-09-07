@@ -111,6 +111,20 @@ describe('TransactionRow', () => {
     )
     expect(screen.getByRole('checkbox')).toBeDisabled()
   })
+
+  it('mounts the recurring action after the note editor in expanded detail', () => {
+    render(
+      <table>
+        <tbody>
+          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={vi.fn()} onNoteSaved={vi.fn()} onCreateCategory={vi.fn()} />
+        </tbody>
+      </table>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Detail transakcie 7' }))
+    const note = screen.getByLabelText('Poznámka k transakcii 7')
+    const recurring = screen.getByRole('button', { name: 'Pravidelná platba 7' })
+    expect(note.compareDocumentPosition(recurring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })
 
 // A17: an empty filter used to show only the table headers with no next-action.
@@ -119,6 +133,8 @@ describe('Transactions empty state', () => {
     vi.mocked(api.listTransactions).mockResolvedValueOnce([])
     render(<Transactions />)
     expect(await screen.findByText('Za toto obdobie nič nie je. Skús iné obdobie hore.')).toBeInTheDocument()
+    expect(screen.getByText(/Vytvorenie kategórie nevytvorí pravidlo/)).toBeInTheDocument()
+    expect(screen.getByText(/Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby/)).toBeInTheDocument()
   })
 })
 

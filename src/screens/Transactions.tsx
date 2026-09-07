@@ -8,6 +8,7 @@ import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { OperationStatus } from '../components/OperationStatus'
 import { Toast } from '../components/Toast'
 import { NoteEditor } from '../components/NoteEditor'
+import { RecurringTransactionAction } from '../components/recurring'
 import { statusLabel } from '../lib/categories'
 import { categoryApi } from '../lib/category-api'
 import { formatDate } from '../lib/format'
@@ -240,8 +241,8 @@ export function TransactionRow({
           <td colSpan={8}>
             <pre className="k-well">{row.raw_block}</pre>
             <NoteEditor txId={row.id} initialNote={row.note} onSaved={onNoteSaved} />
+            <RecurringTransactionAction row={row} categories={categories} onChanged={onNoteSaved} />
             {!isTransfer ? <SeedRuleRedirect row={row} categories={categories} onChanged={onNoteSaved} onCreate={() => onCreateCategory(row.id)} /> : null}
-            {/* B's RecurringTransactionAction (recurring-ui, not yet published) mounts here, after NoteEditor, for eligible non-transfer/non-refund/nonzero rows: <RecurringTransactionAction row={row} categories={categories} onChanged={onNoteSaved} /> */}
           </td>
         </tr>
       ) : null}
@@ -455,6 +456,9 @@ export function Transactions({
       <OperationStatus error={exportAction.error} busy={exportAction.busy} />
       <FilteredTotals rows={rows} categories={categories} loaded={loaded} categoriesLoaded={metadataLoaded} />
       {toast ? <Toast message={toast} /> : null}
+      <p className="k-field-label">
+        Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby. Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby rovnakého obchodníka.
+      </p>
       <fieldset disabled={action.busy} className="k-section">
         <BulkBar
           count={selected.size}

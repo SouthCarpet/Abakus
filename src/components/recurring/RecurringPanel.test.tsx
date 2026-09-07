@@ -76,6 +76,12 @@ describe('RecurringPanel empty and future states', () => {
     render(<RecurringPanel period={ALL} accountKind="all" today="2026-09-01" />)
     expect(await screen.findByText('Obdobie ešte neskončilo')).toBeInTheDocument()
   })
+
+  it('labels the selected range as Obdobie', async () => {
+    render(<RecurringPanel period={ALL} accountKind="all" today="2026-09-07" />)
+    expect(await screen.findByText(/Obdobie začiatok histórie až bez konca/)).toBeInTheDocument()
+    expect(screen.queryByText(/Dotaz začiatok histórie/)).not.toBeInTheDocument()
+  })
 })
 
 describe('RecurringPanel R14/R15 rendering and honest labels', () => {
@@ -175,9 +181,57 @@ describe('RecurringPanel generation guard U04', () => {
     await waitFor(() => expect(screen.getByText('FRESH')).toBeInTheDocument())
     expect(screen.queryByText('STALE')).not.toBeInTheDocument()
   })
+
+  it('does not refresh an old account scope after its save settles', async () => {
+    const save = deferred<Awaited<ReturnType<typeof recurringApi.save>>>()
+    vi.mocked(recurringApi.overview)
+      .mockResolvedValueOnce({ ...EMPTY_OVERVIEW, rows: [R14_ESTIMATE] })
+      .mockResolvedValueOnce({ ...EMPTY_OVERVIEW, rows: [recurringRow({ name: 'FRESH' })] })
+    vi.mocked(recurringApi.detail).mockResolvedValue({
+      row: R14_ESTIMATE,
+      transactions: [txRow({ id: 44 })],
+      matching_transaction_ids: [44],
+      compatible_transactions: [],
+    })
+    vi.mocked(recurringApi.save).mockReturnValue(save.promise)
+    const { rerender } = render(<RecurringPanel period={ALL} accountKind="all" today="2026-09-07" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Potvrdiť Hosting' }))
+    await waitFor(() => expect(recurringApi.save).toHaveBeenCalledTimes(1))
+
+    rerender(<RecurringPanel period={ALL} accountKind="personal" today="2026-09-07" />)
+    expect(await screen.findByText('FRESH')).toBeInTheDocument()
+    save.resolve({
+      id: 8,
+      series_key: R14_ESTIMATE.series_key,
+      group_key: R14_ESTIMATE.group_key,
+      account_id: 1,
+      scope: 'group',
+      mode: 'confirmed',
+      cadence: 'monthly',
+      anchor_date: '2026-01-15',
+      updated_at: '2026-09-07T00:00:00Z',
+    })
+    await waitFor(() => expect(screen.getByText('FRESH')).toBeInTheDocument())
+    expect(recurringApi.overview).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('RecurringPanel confirm, ignore, reset and saved-refresh failure', () => {
+  it('opens the real category creation dialog from the recurring editor', async () => {
+    vi.mocked(recurringApi.overview).mockResolvedValue({ ...EMPTY_OVERVIEW, rows: [R14_ESTIMATE] })
+    vi.mocked(recurringApi.detail).mockResolvedValue({
+      row: R14_ESTIMATE,
+      transactions: [txRow({ id: 44 })],
+      matching_transaction_ids: [44],
+      compatible_transactions: [],
+    })
+    render(<RecurringPanel period={ALL} accountKind="all" today="2026-09-07" />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Zmeniť interval Hosting' }))
+    expect(await screen.findByRole('dialog', { name: 'Pravidelná platba' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Nová kategória...' }))
+    expect(await screen.findByRole('dialog', { name: 'Nová kategória' })).toBeInTheDocument()
+  })
+
   it('confirms an estimate with the row cadence and does not invent a second save on refresh retry', async () => {
     vi.mocked(recurringApi.overview).mockResolvedValue({
       ...EMPTY_OVERVIEW,

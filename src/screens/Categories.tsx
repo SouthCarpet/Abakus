@@ -393,6 +393,9 @@ export function Categories() {
           </div>
           <div style={{ flex: 1, minWidth: 320 }}>
             <Card title="Pravidlá">
+              <p className="k-field-label">
+                Pravidlá vzniknú po priradení kategórie alebo potvrdení návrhu pri rozpoznateľnom obchodníkovi. Samotné vytvorenie kategórie pravidlo nevytvorí.
+              </p>
               <div className="k-table-scroll" role="region" aria-label="Pravidlá" tabIndex={0}>
                 <RulesTable rules={rules} onDelete={deleteRule} />
               </div>

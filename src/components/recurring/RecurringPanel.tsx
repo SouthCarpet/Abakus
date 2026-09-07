@@ -4,6 +4,7 @@ import { api } from '../../api'
 import type { PeriodValue } from '../PeriodPicker'
 import { Card } from '../Card'
 import { Button } from '../Button'
+import { CategoryDialog } from '../CategoryDialog'
 import { periodRange, validPeriod } from '../../lib/period'
 import {
   emptyPanelExplanation,
@@ -140,6 +141,7 @@ export function RecurringPanel({
       <RecurringEditor
         source={editor}
         categories={categories}
+        CategoryDialog={CategoryDialog}
         onClose={() => setEditor(null)}
         onChanged={refreshAfterSave}
       />
@@ -201,7 +203,7 @@ function OverviewBody({
           <RecurringTable caption="Ignorované" rows={parts.ignored} busy={busy} onDetail={onDetail} onConfirm={onConfirm} onEdit={onEdit} onIgnore={onIgnore} onReset={onReset} />
         </details>
       ) : null}
-      <p className="k-field-label">Dotaz {query.from ?? 'začiatok histórie'} až {query.to ?? 'bez konca'}, dnes {query.today}.</p>
+      <p className="k-field-label">Obdobie {query.from ?? 'začiatok histórie'} až {query.to ?? 'bez konca'}, dnes {query.today}.</p>
     </>
   )
 }
@@ -212,31 +214,35 @@ function useRecurringOverview(query: RecurringQuery | null) {
   const [loading, setLoading] = useState(false)
   const gen = useRef(0)
   const queryKey = query ? `${query.from}|${query.to}|${query.account_kind}|${query.today}` : ''
+  const activeQueryKey = useRef(queryKey)
+  activeQueryKey.current = queryKey
 
   const reload = useCallback(async () => {
     if (!query) return
+    const requestedQueryKey = queryKey
     const mine = ++gen.current
     setOverview(null)
     setLoading(true)
     setError('')
     try {
       const value = await recurringApi.overview(query)
-      if (mine !== gen.current) return
+      if (mine !== gen.current || requestedQueryKey !== activeQueryKey.current) return
       setOverview(value)
     } catch (e) {
-      if (mine !== gen.current) return
+      if (mine !== gen.current || requestedQueryKey !== activeQueryKey.current) return
       setOverview(null)
       setError(String(e))
     } finally {
-      if (mine === gen.current) setLoading(false)
+      if (mine === gen.current && requestedQueryKey === activeQueryKey.current) setLoading(false)
     }
   }, [queryKey])
 
   const refreshAfterSave = useCallback(async () => {
-    if (!query) return
+    if (!query || queryKey !== activeQueryKey.current) return
+    const requestedQueryKey = queryKey
     const mine = ++gen.current
     const value = await recurringApi.overview(query)
-    if (mine !== gen.current) return
+    if (mine !== gen.current || requestedQueryKey !== activeQueryKey.current) return
     setOverview(value)
     setError('')
   }, [queryKey])
