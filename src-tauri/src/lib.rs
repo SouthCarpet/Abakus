@@ -2,6 +2,7 @@
 pub mod commands;
 pub mod import_flow;
 pub mod net;
+pub mod recurring_commands;
 pub mod secrets;
 pub mod state;
 pub mod update;
@@ -65,6 +66,11 @@ pub fn run() {
             commands::net_log,
             commands::net_audit_failures,
             commands::run_net_audit,
+            recurring_commands::recurring_overview,
+            recurring_commands::recurring_detail,
+            recurring_commands::transaction_recurring_context,
+            recurring_commands::save_recurring,
+            recurring_commands::reset_recurring,
         ])
         .run(tauri::generate_context!())
         .expect("abakus failed to start");

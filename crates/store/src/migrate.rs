@@ -7,30 +7,75 @@
 //! Version 1 is any database written before A17/F1 (no `schema_version` row).
 //! Version 2 adds `rule_sources`, the provenance of learned rules.
 //! Version 3 (0.1.2) adds `transactions.note`.
-use crate::{Result, Store};
+//! Version 4 (0.1.2 recurring/category release) adds `recurring_decisions`
+//! and `recurring_members`. This step runs through the same versioned path
+//! for a brand-new database too (`Store::init` never creates these tables
+//! via `schema.sql`'s unconditional `CREATE TABLE IF NOT EXISTS`), so a
+//! fresh install and an upgraded one reach v4 by the identical code path.
+//!
+//! `Store::init` wraps `schema.sql` (base table creation) and this whole
+//! function in ONE `BEGIN IMMEDIATE`/`COMMIT`: a failure anywhere from the
+//! first `CREATE TABLE IF NOT EXISTS` through the final `schema_version`
+//! write leaves a database that was already on disk completely unchanged,
+//! and never leaves a brand-new file with some v4 objects but no version
+//! marker.
+use crate::{Result, Store, StoreError};
 
 const VERSION_KEY: &str = "schema_version";
-pub(crate) const SCHEMA_VERSION: i64 = 3;
+pub(crate) const SCHEMA_VERSION: i64 = 4;
+
+const V4_DDL: &str = "\
+CREATE TABLE recurring_decisions (
+ id INTEGER PRIMARY KEY,
+ account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+ group_key TEXT NOT NULL,
+ scope TEXT NOT NULL CHECK(scope IN ('group','selected')),
+ mode TEXT NOT NULL CHECK(mode IN ('confirmed','ignored')),
+ cadence TEXT CHECK(cadence IN ('monthly','quarterly','yearly')),
+ anchor_date TEXT,
+ identity_json TEXT NOT NULL DEFAULT '{}',
+ updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+ CHECK((mode='confirmed' AND cadence IS NOT NULL AND anchor_date IS NOT NULL)
+    OR (mode='ignored' AND cadence IS NULL AND anchor_date IS NULL))
+);
+CREATE UNIQUE INDEX recurring_group_unique ON recurring_decisions(group_key) WHERE scope='group';
+CREATE TABLE recurring_members (
+ decision_id INTEGER NOT NULL REFERENCES recurring_decisions(id) ON DELETE CASCADE,
+ fingerprint TEXT NOT NULL UNIQUE,
+ PRIMARY KEY(decision_id,fingerprint)
+);
+";
 
 impl Store {
-    /// One transaction for every step below: a database that fails partway
-    /// through (disk full, another process holding the file) must come back
-    /// up still at its OLD version, not stuck between two schemas.
-    pub(crate) fn migrate(&mut self) -> Result<()> {
-        self.conn.execute_batch("BEGIN IMMEDIATE")?;
-        match self.migrate_tx() {
-            Ok(()) => { self.conn.execute_batch("COMMIT")?; Ok(()) }
-            Err(e) => { let _ = self.conn.execute_batch("ROLLBACK"); Err(e) }
-        }
-    }
-
-    fn migrate_tx(&mut self) -> Result<()> {
+    /// Called once, from inside `Store::init`'s own transaction: this
+    /// function must never open or close a transaction itself (nested
+    /// `BEGIN` is a SQLite error), per the migration contract's "do not
+    /// start nested transactions in seed or repair helpers".
+    pub(crate) fn migrate_tx(&mut self) -> Result<()> {
         let from = self.schema_version()?;
+        if from > SCHEMA_VERSION {
+            // A database written by a NEWER Abakus than this binary: refuse
+            // to touch it rather than silently downgrading its marker or
+            // running migration steps meant for an older shape.
+            return Err(StoreError::Parse(format!(
+                "databáza má novšiu verziu schémy ({from}) než táto aplikácia podporuje ({SCHEMA_VERSION}). Aktualizujte Abakus."
+            )));
+        }
         if from < 2 {
             self.backfill_rule_sources()?;
         }
         if from < 3 {
             self.add_notes_column()?;
+        }
+        if from < 4 {
+            self.conn.execute_batch(V4_DDL)?;
+            // repair_spotify_seed_tx(&mut self) belongs here, inside this
+            // same transaction (contract recurring-contract.md §8/§9). Not
+            // called: C's crates/store/src/seed_repair.rs does not exist yet
+            // in this isolated worktree. Tracked as the one open integration
+            // seam in docs/recurring-backend-012.md; adding a stub or
+            // referencing a nonexistent module was explicitly disallowed by
+            // the maker brief.
         }
         self.set_setting(VERSION_KEY, &SCHEMA_VERSION.to_string())
     }

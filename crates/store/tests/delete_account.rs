@@ -7,6 +7,7 @@
 //! as an inline unit test in `src/delete_account.rs` instead of here.
 use parser::{parse_text, AccountKind};
 use rules::{RuleKind, Status};
+use store::recurring::{Cadence, RecurringDecisionInput, RecurringQuery, RecurringSelection, SaveRecurringRequest};
 use store::{Store, StoreError, TxFilter};
 
 const PERSONAL_IBAN: &str = "SK4411000000000012345678";
@@ -346,6 +347,32 @@ fn reclassify_open_never_touches_a_retained_accounts_confirmed_or_transfer_rows(
     assert_eq!((confirmed_after.status, confirmed_after.category_id), (Status::Confirmed, Some(cat)));
     let transfer_after = account_rows(&s, business_id).into_iter().find(|r| r.id == transfer_before.id).unwrap();
     assert_eq!(transfer_after.status, Status::Transfer);
+}
+
+// --- 12: recurring decisions cascade with their own account only --------
+
+/// recurring-contract.md §8: "Account deletion cascades only that
+/// account's decisions and selection members." A confirmed recurring
+/// decision on the deleted account must go with it; the retained account's
+/// own confirmed decision must survive byte-for-byte.
+#[test]
+fn deleting_an_account_cascades_only_its_own_recurring_decisions() {
+    let mut s = loaded();
+    let personal_id = account_id(&s, PERSONAL_IBAN);
+    let business_id = account_id(&s, BUSINESS_IBAN);
+    let personal_tx = account_rows(&s, personal_id).into_iter().next().unwrap().id;
+    let business_tx = account_rows(&s, business_id).into_iter().next().unwrap().id;
+    let anchor = chrono::NaiveDate::from_ymd_opt(2026, 6, 1).unwrap();
+    let doomed = s.save_recurring(&SaveRecurringRequest { decision_id: None, selection: RecurringSelection::Group { transaction_id: personal_tx }, decision: RecurringDecisionInput::Confirmed { cadence: Cadence::Monthly, anchor_date: anchor } }).unwrap();
+    let kept = s.save_recurring(&SaveRecurringRequest { decision_id: None, selection: RecurringSelection::Group { transaction_id: business_tx }, decision: RecurringDecisionInput::Confirmed { cadence: Cadence::Monthly, anchor_date: anchor } }).unwrap();
+
+    s.delete_account(personal_id).unwrap();
+
+    let today = chrono::NaiveDate::from_ymd_opt(2026, 6, 15).unwrap();
+    let overview = s.recurring_overview(&RecurringQuery { from: None, to: None, account_kind: None, today }).unwrap();
+    assert!(!overview.rows.iter().any(|r| r.decision_id == Some(doomed.id)), "the deleted account's own recurring decision must cascade away");
+    let kept_row = overview.rows.iter().find(|r| r.decision_id == Some(kept.id)).expect("the retained account's recurring decision must survive");
+    assert_eq!(kept_row.account_id, business_id);
 }
 
 // A concrete case where reclassification changes a retained row's result

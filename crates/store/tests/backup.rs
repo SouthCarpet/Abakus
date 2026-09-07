@@ -3,6 +3,7 @@
 //! source (`Store::open`, not `open_in_memory`) and the destination: the
 //! shape the real app is in when a user clicks "Zálohovať".
 use parser::AccountKind;
+use store::recurring::{Cadence, RecurringDecisionInput, RecurringSelection, SaveRecurringRequest};
 use store::{Store, StoreError, TxFilter};
 
 struct TempPath(std::path::PathBuf);
@@ -71,6 +72,33 @@ fn a_snapshot_retains_rules_notes_and_settings_and_opens_independently() {
     assert!(backup.list_rules().unwrap().iter().any(|r| r.kind == rules::RuleKind::Exact), "the learned rule from `assign` must survive the snapshot");
     let row = backup.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == noted_id).unwrap();
     assert_eq!(row.note, "záloha si toto poznamenala");
+}
+
+/// recurring-contract.md §8: the existing SQLite backup API needs no
+/// special-case branch for the new tables, since it snapshots the whole
+/// live database. A confirmed recurring decision must survive the same
+/// way the rule/note/setting evidence above does.
+#[test]
+fn a_snapshot_retains_a_confirmed_recurring_decision() {
+    let src = TempPath::new("recurring-source");
+    let dst = TempPath::new("recurring-dest");
+    let (mut s, noted_id) = seeded_store(&src.0);
+    let decision = s
+        .save_recurring(&SaveRecurringRequest {
+            decision_id: None,
+            selection: RecurringSelection::Group { transaction_id: noted_id },
+            decision: RecurringDecisionInput::Confirmed { cadence: Cadence::Monthly, anchor_date: chrono::NaiveDate::from_ymd_opt(2026, 6, 1).unwrap() },
+        })
+        .unwrap();
+
+    s.backup_to(&dst.0).unwrap();
+
+    let backup = Store::open(&dst.0).unwrap();
+    let overview = backup
+        .recurring_overview(&store::recurring::RecurringQuery { from: None, to: None, account_kind: None, today: chrono::NaiveDate::from_ymd_opt(2026, 7, 1).unwrap() })
+        .unwrap();
+    let row = overview.rows.iter().find(|r| r.decision_id == Some(decision.id)).expect("a confirmed recurring decision must survive the snapshot");
+    assert_eq!(row.cadence, Some(Cadence::Monthly));
 }
 
 #[test]

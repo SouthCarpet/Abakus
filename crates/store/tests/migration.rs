@@ -4,6 +4,12 @@
 use rules::RuleKind;
 use store::Store;
 
+fn recurring_tables_exist(path: &std::path::Path) -> bool {
+    let conn = rusqlite::Connection::open(path).unwrap();
+    let n: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('recurring_decisions','recurring_members')", [], |r| r.get(0)).unwrap();
+    n == 2
+}
+
 /// `crates/store/src/schema.sql` exactly as it stood before A17 (commit
 /// fc7a649): no `rule_sources`, no `schema_version`. Kept verbatim on purpose,
 /// so this test keeps testing the real old shape even after schema.sql moves on.
@@ -68,6 +74,19 @@ fn opening_an_old_database_keeps_every_row_and_reaches_the_current_schema() {
     assert!(s.get_check_updates().unwrap(), "a user setting survives the migration");
     assert_eq!(s.list_categories().unwrap().len(), 2, "seeding must not re-run over an existing category tree");
     assert_eq!(s.list_rules().unwrap().len(), 3, "no rule is created or dropped by the migration");
+}
+
+/// recurring-contract.md §8: a pre-A17 (schema version 1) database jumps
+/// straight to v4 in the same atomic open, gaining the recurring tables
+/// alongside the A17/0.1.2 steps, with every old row still intact.
+#[test]
+fn a_v1_database_reaches_v4_directly_and_gains_the_recurring_tables() {
+    let db = TempDb::with_old_schema("v1-to-v4");
+
+    let s = Store::open(&db.0).unwrap();
+
+    assert!(recurring_tables_exist(&db.0), "a straight v1->v4 jump must create the recurring tables");
+    assert_eq!(s.list_transactions(&store::TxFilter::default()).unwrap().len(), 3, "the v1->v4 jump must not touch old transaction rows");
 }
 
 /// Provenance is backfilled from the only evidence an old database has: which

@@ -11,6 +11,7 @@ pub mod migrate;
 pub mod net_log;
 pub mod notes;
 pub mod query;
+pub mod recurring;
 pub mod rules_repo;
 pub mod seed_categories;
 pub mod settings;
@@ -68,14 +69,32 @@ pub struct Store { pub(crate) conn: Connection }
 impl Store {
     pub fn open(path: &Path) -> Result<Self> { Self::init(Connection::open(path)?) }
     pub fn open_in_memory() -> Result<Self> { Self::init(Connection::open_in_memory()?) }
+
+    /// recurring-contract.md §8: base schema creation, the notes migration,
+    /// v4 DDL, the (pending) Spotify repair and the `schema_version` write
+    /// all share ONE transaction, for both a brand-new database and an
+    /// existing one. Category/rule seeding stays outside it, unchanged from
+    /// before: it only ever runs once against an already-committed empty
+    /// `categories` table, has its own transaction
+    /// (`categories::seed_categories`, owned by lane C), and the contract
+    /// does not name it among the steps that must share this transaction.
+    ///
+    /// Mirrors `delete_account`'s rollback shape: a failure inside the body
+    /// OR of `COMMIT` itself rolls back and returns the error, never leaving
+    /// the connection with an open transaction on it.
     fn init(conn: Connection) -> Result<Self> {
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-        conn.execute_batch(include_str!("schema.sql"))?;
         let mut s = Store { conn };
+        s.conn.execute_batch("BEGIN IMMEDIATE")?;
+        let init_result = s.conn.execute_batch(include_str!("schema.sql")).map_err(Into::into).and_then(|()| s.migrate_tx());
+        match init_result {
+            Ok(()) => match s.conn.execute_batch("COMMIT") {
+                Ok(()) => {}
+                Err(e) => { let _ = s.conn.execute_batch("ROLLBACK"); return Err(e.into()); }
+            },
+            Err(e) => { let _ = s.conn.execute_batch("ROLLBACK"); return Err(e); }
+        }
         if s.conn.query_row("SELECT COUNT(*) FROM categories", [], |r| r.get::<_, i64>(0))? == 0 { s.seed_categories()?; s.seed_rules()?; }
-        // Runs on every open, does its work once: an existing user database
-        // must reach the current schema, not only a freshly created one.
-        s.migrate()?;
         Ok(s)
     }
 }
