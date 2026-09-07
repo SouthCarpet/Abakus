@@ -180,7 +180,7 @@ fn inspect(arguments: &Arguments, stage: &Path) -> AnyResult<Manifest> {
         return Err("PDF contains no pages".into());
     }
 
-    let mut pages = Vec::with_capacity(document.pages().len());
+    let mut pages = Vec::new();
     for (index, page) in document.pages().iter().enumerate() {
         pages.push(render_page(&page, index + 1, stage)?);
     }
