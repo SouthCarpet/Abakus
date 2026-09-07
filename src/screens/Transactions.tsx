@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Account, AccountKind, Category, Status, TxFilter, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
@@ -6,6 +6,7 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { OperationStatus } from '../components/OperationStatus'
 import { Toast } from '../components/Toast'
+import { NoteEditor } from '../components/NoteEditor'
 import { statusLabel } from '../lib/categories'
 import { formatDate } from '../lib/format'
 import { files } from '../lib/files'
@@ -79,8 +80,8 @@ function FilterBar({
       <CategoryPicker mode="filter" label="Filter kategórie" emptyLabel="Všetky kategórie" value={categoryId} onChange={onCategory} categories={categories} />
       <input
         className="k-input k-well"
-        aria-label="Hľadať obchodníka"
-        placeholder="Hľadať obchodníka..."
+        aria-label="Hľadať obchodníka alebo poznámku"
+        placeholder="Hľadať obchodníka alebo poznámku..."
         value={text}
         onChange={(e) => onText(e.target.value)}
       />
@@ -122,6 +123,7 @@ export function TransactionRow({
   onSelect,
   onAssign,
   onConfirm,
+  onNoteSaved,
 }: {
   row: TxRow
   categories: Category[]
@@ -129,6 +131,7 @@ export function TransactionRow({
   onSelect: (id: number, checked: boolean) => void
   onAssign: (id: number, categoryId: number | null) => void
   onConfirm: (id: number) => void
+  onNoteSaved: () => Promise<void>
 }) {
   const [expanded, setExpanded] = useState(false)
   const isTransfer = row.status === 'transfer'
@@ -174,6 +177,7 @@ export function TransactionRow({
         <tr>
           <td colSpan={8}>
             <pre className="k-well">{row.raw_block}</pre>
+            <NoteEditor txId={row.id} initialNote={row.note} onSaved={onNoteSaved} />
           </td>
         </tr>
       ) : null}
@@ -234,6 +238,23 @@ export function Transactions({
   )
 
   const reload = useCallback(() => setRevision((value) => value + 1), [])
+  const fetchRequest = useRef(0)
+
+  // Shared by the filter-driven effect below and by a note save's own
+  // refresh, so whichever request is actually the latest always wins: a
+  // note-triggered refresh in flight when the filter changes again never
+  // overwrites rows with a stale answer, and vice versa.
+  async function fetchRows(): Promise<void> {
+    const request = ++fetchRequest.current
+    try {
+      const data = await api.listTransactions(filter)
+      if (request !== fetchRequest.current) return
+      setRows(data); setLoaded(true); setLoadError('')
+    } catch (e) {
+      if (request === fetchRequest.current) setLoadError(String(e))
+      throw e
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -246,14 +267,9 @@ export function Transactions({
   }, [revision])
 
   useEffect(() => {
-    let active = true
     setRows([]); setSelected(new Set()); setLoaded(false); setLoadError('')
-    if (!effectivePeriodValid || text !== debouncedText) return
-    void api.listTransactions(filter).then((data) => {
-      if (!active) return
-      setRows(data); setLoaded(true)
-    }).catch((e) => { if (active) setLoadError(String(e)) })
-    return () => { active = false }
+    if (!effectivePeriodValid || text !== debouncedText) { fetchRequest.current++; return }
+    void fetchRows().catch(() => {})
   }, [filter, revision, effectivePeriodValid, text, debouncedText])
 
   function clearFilters() {
@@ -370,6 +386,7 @@ export function Transactions({
                 onSelect={toggleSelect}
                 onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
                 onConfirm={(id) => void action.run(() => confirmOne(id))}
+                onNoteSaved={fetchRows}
               />
             ))}
           </tbody>

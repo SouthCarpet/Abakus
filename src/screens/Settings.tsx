@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
+import { BackupSection } from '../components/BackupSection'
 import { DeleteAccountDialog } from '../components/DeleteAccountDialog'
 import type { Account, AccountKind, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
@@ -307,6 +308,7 @@ export function Settings() {
                 Exportovať CSV
               </Button>
             </Card>
+            <BackupSection />
           </div>
           <div>
             <Card title="Stav">

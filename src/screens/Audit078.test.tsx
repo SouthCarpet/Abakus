@@ -24,7 +24,7 @@ vi.mock('../lib/files', () => ({ files: { saveCsv: vi.fn() } }))
 const account: Account = { id: 7, label: 'Test účet', iban: 'SK3112000000198742637541', kind: 'personal', has_password: false }
 const preview: AccountDeletePreview = { account_id: 7, label: 'Test účet', statement_count: 2, transaction_count: 3, confirmed_count: 1, rules_deleted: 1, has_password: false }
 function row(overrides: Partial<TxRow> = {}): TxRow {
-  return { id: 1, account_id: 7, account_kind: 'personal', statement_number: 1, posted_date: '2026-09-01', tx_date: '2026-09-01', kind: 'card', amount_cents: 12345, orig_amount_cents: null, orig_currency: null, merchant_raw: 'Mzda', place: null, counterparty_name: null, counterparty_iban: null, category_id: null, category_name: null, parent_name: null, status: 'unassigned', source: 'pdf', raw_block: '', ...overrides }
+  return { id: 1, account_id: 7, account_kind: 'personal', statement_number: 1, posted_date: '2026-09-01', tx_date: '2026-09-01', kind: 'card', amount_cents: 12345, orig_amount_cents: null, orig_currency: null, merchant_raw: 'Mzda', place: null, counterparty_name: null, counterparty_iban: null, category_id: null, category_name: null, parent_name: null, status: 'unassigned', source: 'pdf', raw_block: '', note: '', ...overrides }
 }
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -111,7 +111,7 @@ describe('transaction filters, export and sums', () => {
     render(<Transactions statementId={42} initialAccountKind="personal" initialCategoryId={8} initialStatus="unassigned" />)
     await screen.findByText('Mzda')
     fireEvent.change(screen.getByRole('combobox', { name: 'Účet' }), { target: { value: '7' } })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka' }), { target: { value: 'čerstvý text' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'čerstvý text' } })
     fireEvent.click(screen.getByRole('button', { name: 'Exportovať filtrované CSV' }))
     await waitFor(() => expect(api.exportCsv).toHaveBeenCalledWith({ from: null, to: null, account_id: 7, account_kind: 'personal', category_id: 8, status: 'unassigned', text: 'čerstvý text', statement_id: 42 }, 'C:/synthetic/export.csv'))
     expect(await screen.findByText('Exportovaných transakcií: 1.')).toBeVisible()
@@ -123,7 +123,7 @@ describe('transaction filters, export and sums', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Vymazať všetky filtre' }))
     await waitFor(() => expect(api.listTransactions).toHaveBeenLastCalledWith({ from: null, to: null, account_id: null, account_kind: null, category_id: null, status: null, text: null, statement_id: null }))
     expect(screen.queryByText('1 vybraných')).not.toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
   })
   it('counts three rows but excludes a 900 euro transfer from 123.45 income and 23.45 expense', async () => {
     vi.mocked(api.listTransactions).mockResolvedValue([row(), row({ id: 2, amount_cents: -2345 }), row({ id: 3, amount_cents: 90000, status: 'transfer' })])

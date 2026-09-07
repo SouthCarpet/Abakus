@@ -36,6 +36,7 @@ vi.mock('../api', async (importOriginal) => {
           status: 'unassigned',
           source: 'pdf',
           raw_block: '',
+          note: '',
         },
       ]),
       assign: vi.fn().mockResolvedValue({ updated: 1, rules_created: 0, skipped_transfers: 2 }),
@@ -56,6 +57,7 @@ const row = {
   status: 'suggested',
   raw_block: 'raw',
   kind: 'card',
+  note: '',
 } as never
 
 describe('TransactionRow', () => {
@@ -64,7 +66,7 @@ describe('TransactionRow', () => {
     render(
       <table>
         <tbody>
-          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={onConfirm} />
+          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={onConfirm} onNoteSaved={vi.fn()} />
         </tbody>
       </table>,
     )
@@ -76,7 +78,7 @@ describe('TransactionRow', () => {
     render(
       <table>
         <tbody>
-          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={vi.fn()} />
+          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={vi.fn()} onNoteSaved={vi.fn()} />
         </tbody>
       </table>,
     )
@@ -93,6 +95,7 @@ describe('TransactionRow', () => {
             onSelect={vi.fn()}
             onAssign={vi.fn()}
             onConfirm={vi.fn()}
+            onNoteSaved={vi.fn()}
           />
         </tbody>
       </table>,
