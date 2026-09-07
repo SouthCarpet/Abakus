@@ -32,6 +32,8 @@ tempfile = "3"
 unicode-normalization = "0.1"
 
 [dev-dependencies]
+pdfium-render = { version = "0.9", default-features = false, features = ["thread_safe", "pdfium_7350"] }
+png = "0.18"
 regex.workspace = true
 tokio = { version = "1", features = ["rt", "macros"] }
 
