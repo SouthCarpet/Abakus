@@ -482,7 +482,7 @@ async function recurringU03Journey(page, oracle) {
   await exactDetailButton.click()
   const detailDialog = page.getByRole('dialog', { name: 'Presné členstvo' })
   await detailDialog.waitFor()
-  await detailDialog.getByText('Vybrané obdobie 2026-02-01 až 2026-02-28, stav k 2026-09-07', { exact: true }).waitFor()
+  await detailDialog.getByText('Vybrané obdobie 2026-02-01 až 2026-02-28, stav k 2026-02-28', { exact: true }).waitFor()
   const periodMembers = detailDialog.getByRole('table', { name: 'Členovia vo zvolenom rozsahu' })
   await periodMembers.getByText('5. 2. 2026', { exact: true }).waitFor()
   assertEqual(await periodMembers.getByText('5. 1. 2026', { exact: true }).count(), 0, 'U03 selected-period membership')

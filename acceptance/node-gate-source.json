@@ -1,0 +1,32 @@
+{
+  "tested_verifier_head": "49a2f6adae6fc976faa5ce11bd3bd2b606d83127",
+  "integrated_product_commit": "6df1854f28f18c1310bd0b408e0b9679b845feef",
+  "source_tree": "a437583097b12853fe67d5f9ec6bb78bdfbe6f64",
+  "config_blobs": {
+    "package.json": "d87ded99b5df1cbc1c2f02e0fa8e3048b73c643e",
+    "package-lock.json": "6c3ef2c65c94e9289561a9aa41698a13d310336e",
+    "vite.config.ts": "87a77c7edbd21382c5bc0136fefad4542d9c01f8",
+    "tsconfig.json": "f2f6898a2d56452eaca889b03957947efa6f9373",
+    "eslint.config.js": "daedab0d4b355b091efcfff1e082168ab9c494f7"
+  },
+  "executed_at": "2026-09-07T19:05:00+02:00",
+  "commands": [
+    {
+      "command": "npm test -- --configLoader runner",
+      "exit_code": 0,
+      "test_files_passed": 38,
+      "tests_passed": 319,
+      "tests_skipped": 0
+    },
+    {
+      "command": "npm run lint",
+      "exit_code": 0
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "modules_transformed": 684,
+      "vite_warning": "705.41 kB JavaScript chunk exceeds the advisory 500 kB threshold"
+    }
+  ]
+}
