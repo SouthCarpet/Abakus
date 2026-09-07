@@ -1,0 +1,24 @@
+.k-dialog:has(.report-export-dialog) {
+  width: min(620px, calc(100vw - var(--space-6)));
+  max-height: calc(100vh - var(--space-6));
+  overflow: auto;
+}
+
+.k-app-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-3); }
+.report-export-dialog { display: flex; flex-direction: column; gap: var(--space-3); }
+.report-export-dialog fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.report-export-dialog fieldset > :first-child,
+.report-export-dialog fieldset > :last-child { grid-column: 1 / -1; }
+.report-export-dialog p { margin: 0; }
+.report-preview { border-top: 1px solid var(--color-border); padding-top: var(--space-3); }
+.report-preview h2 { font-size: var(--text-md); margin: 0 0 var(--space-2); }
+.report-preview dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); margin: 0; }
+.report-preview dl div { min-width: 0; }
+.report-preview dt { color: var(--color-text-muted); font-size: var(--text-xs); }
+.report-preview dd { margin: 0; overflow-wrap: anywhere; }
+.report-account-list { margin: 0; padding-left: var(--space-4); }
+.report-account-list li { overflow-wrap: anywhere; }
+
+@media (max-width: 480px) {
+  .report-export-dialog fieldset, .report-preview dl { grid-template-columns: 1fr; }
+}
