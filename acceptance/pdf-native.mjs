@@ -387,6 +387,8 @@ async function fileSafetyCanaries(page, oracle) {
 
   const directoryPath = path.join(RESULTS_DIR, 'directory.pdf')
   fs.mkdirSync(directoryPath)
+  const reservedLeafDirectory = path.join(RESULTS_DIR, 'dos-reserved-leaf-targets')
+  fs.mkdirSync(reservedLeafDirectory)
   const errors = {
     occupied: existingError,
     hardlink: hardlinkError,
@@ -394,6 +396,8 @@ async function fileSafetyCanaries(page, oracle) {
     missing_parent: await invokeError(page, 'export_pdf_report', { request, path: path.join(RESULTS_DIR, 'missing-parent', 'report.pdf') }),
     alternate_stream: await invokeError(page, 'export_pdf_report', { request, path: `${occupied}:stream.pdf` }),
     device: await invokeError(page, 'export_pdf_report', { request, path: '\\\\.\\NUL.pdf' }),
+    reserved_nul_leaf: await invokeError(page, 'export_pdf_report', { request, path: path.join(reservedLeafDirectory, 'NUL.pdf') }),
+    reserved_con_leaf: await invokeError(page, 'export_pdf_report', { request, path: path.join(reservedLeafDirectory, 'CON.pdf') }),
     database_path: await invokeError(page, 'export_pdf_report', { request, path: oracle.db_path }),
   }
 
@@ -410,8 +414,20 @@ async function fileSafetyCanaries(page, oracle) {
 }
 
 async function openScreen(page, name) {
-  await page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
-  await page.getByRole('heading', { name, exact: true }).waitFor()
+  const button = page.getByRole('navigation').getByRole('button', { name, exact: true })
+  await button.click()
+  await page.waitForFunction(
+    (label) => [...document.querySelectorAll('nav button')].some((item) => item.textContent?.trim() === label && item.classList.contains('is-active')),
+    name,
+  )
+  const anchors = {
+    Prehľad: 'Pravidelné platby',
+    Import: 'Posledné importy',
+    Transakcie: 'Transakcie',
+    Kategórie: 'Pravidlá',
+    Nastavenia: 'Záloha databázy',
+  }
+  await page.getByText(anchors[name], { exact: true }).first().waitFor()
 }
 
 async function showTransaction(page, transactionId, merchant) {
@@ -441,6 +457,15 @@ async function recurringUiJourney(page) {
   const manual = await invoke(page, 'transaction_recurring_context', { transactionId: 1010, asOf: '2026-09-07' })
   assertEqual(manual.decision?.cadence, 'yearly', 'U01 manual recurrence through UI')
 
+  await editRecurringThroughUi(page, 8031, 'Mesačný príjem', async (dialog) => {
+    await dialog.getByLabel('Interval').selectOption('monthly')
+    await dialog.getByLabel('Kotva').fill('2026-07-20')
+    await dialog.getByRole('button', { name: 'Uložiť', exact: true }).click()
+  })
+  const income = await invoke(page, 'transaction_recurring_context', { transactionId: 8031, asOf: '2026-09-07' })
+  assertEqual(income.decision?.mode, 'confirmed', 'U01 manual income recurrence through UI')
+  assertEqual(income.decision?.cadence, 'monthly', 'U01 manual income cadence through UI')
+
   await editRecurringThroughUi(page, 8001, 'Mesačný kotviaci obchod', async (dialog) => {
     await dialog.getByLabel('Interval').selectOption('monthly')
     await dialog.getByLabel('Kotva').fill('2026-01-31')
@@ -467,7 +492,7 @@ async function recurringUiJourney(page) {
   })
   const reset = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: '2026-09-07' })
   assertEqual(reset.decision, null, 'U02 reset state')
-  return { manual: manual.decision, confirmed: confirmed.decision, edited: edited.decision, ignored: ignored.decision, reset: reset.decision }
+  return { manual: manual.decision, income: income.decision, confirmed: confirmed.decision, edited: edited.decision, ignored: ignored.decision, reset: reset.decision }
 }
 
 async function recurringU03Journey(page, oracle) {
@@ -637,7 +662,12 @@ async function expandedCommandCanaries(page) {
 async function noteAndBackupCanaries(page, oracle) {
   const note = `${'Ž'.repeat(1980)}\nFINAL-NOTE-SENTINEL`
   assertEqual([...note].length, 2000, 'native note boundary fixture')
-  await invoke(page, 'save_transaction_note', { id: 1008, note })
+  await showTransactionInRange(page, 1008, 'Zero row', '2024-02-01', '2024-02-29')
+  const editor = page.getByLabel('Poznámka k transakcii 1008')
+  await editor.fill(note)
+  await editor.locator('xpath=..').getByRole('button', { name: 'Uložiť poznámku', exact: true }).click()
+  await editor.locator('xpath=..').getByRole('status').filter({ hasText: 'Poznámka uložená.' }).waitFor({ timeout: 15000 })
+  assertEqual(await editor.inputValue(), note, 'UI note editor retained saved value')
   const tooLong = await invokeError(page, 'save_transaction_note', { id: 1008, note: `${note}X` })
   const nul = await invokeError(page, 'save_transaction_note', { id: 1008, note: 'before\0after' })
   const unknown = await invokeError(page, 'save_transaction_note', { id: 9_999_999, note: 'unknown' })
@@ -690,8 +720,11 @@ async function flowsMode() {
     const fileSafety = await fileSafetyCanaries(page, oracle)
     const expanded = await expandedCommandCanaries(page)
     const notesAndBackup = await noteAndBackupCanaries(page, oracle)
+    await chooseTheme(page, 'dark')
+    const theme = await page.evaluate(() => ({ preference: localStorage.getItem('abakus.theme'), applied: document.documentElement.dataset.theme }))
+    assertEqual(theme, { preference: 'dark', applied: 'dark' }, 'theme selection through actual UI')
     const stateAfter = databaseState(oracle.db_path)
-    const result = { mode: 'flows', data_dir: actualDataDir, pdfs, cancel, occupied, recurring_ui: recurringUi, recurring_u03: recurringU03, category_ui: categoryUi, file_safety: fileSafety, expanded, notes_and_backup: notesAndBackup, state_after: stateAfter }
+    const result = { mode: 'flows', data_dir: actualDataDir, pdfs, cancel, occupied, recurring_ui: recurringUi, recurring_u03: recurringU03, category_ui: categoryUi, file_safety: fileSafety, expanded, notes_and_backup: notesAndBackup, theme, state_after: stateAfter }
     writeNewJson(path.join(RESULTS_DIR, 'flows.json'), result)
     writeNewJson(path.join(RESULTS_DIR, 'state-after-flows.json'), stateAfter)
     console.log(JSON.stringify({ ok: true, mode: 'flows', pdf_count: Object.keys(pdfs).length }))
@@ -747,6 +780,8 @@ async function restartMode() {
     const expectedState = readJson(path.join(RESULTS_DIR, 'state-after-flows.json'))
     const currentState = databaseState(oracle.db_path)
     assertEqual(currentState, expectedState, 'non-audit database state after native restart')
+    const theme = await page.evaluate(() => ({ preference: localStorage.getItem('abakus.theme'), applied: document.documentElement.dataset.theme }))
+    assertEqual(theme, { preference: 'dark', applied: 'dark' }, 'theme after native restart')
     const previews = await previewFamilies(page, oracle)
     const recurring = await invoke(page, 'recurring_overview', { query: { from: null, to: null, account_kind: 'personal', today: oracle.today } })
     assert(recurring.rows.some((row) => row.decision === 'confirmed'), 'confirmed recurrence missing after restart')
@@ -760,7 +795,7 @@ async function restartMode() {
     assertEqual(u03Detail.matching_transaction_ids, flows.recurring_u03.appended_members, 'U03 membership after restart')
     const pageInspection = {}
     for (const name of Object.keys(oracle.families)) pageInspection[name] = inspectPageManifest(name, oracle)
-    const result = { mode: 'restart', executable: { path: ready.exe_path, sha256: ready.binary_sha256, pid: ready.pid }, data_dir: actualDataDir, state: currentState, previews, recurring_confirmed: true, recurring_u03_members: u03Detail.matching_transaction_ids, page_inspection: pageInspection }
+    const result = { mode: 'restart', executable: { path: ready.exe_path, sha256: ready.binary_sha256, pid: ready.pid }, data_dir: actualDataDir, state: currentState, theme, previews, recurring_confirmed: true, recurring_u03_members: u03Detail.matching_transaction_ids, page_inspection: pageInspection }
     writeNewJson(path.join(RESULTS_DIR, 'restart.json'), result)
     console.log(JSON.stringify({ ok: true, mode: 'restart', inspected_pdfs: Object.keys(pageInspection).length }))
   } finally {
@@ -768,26 +803,359 @@ async function restartMode() {
   }
 }
 
+const SCREENSHOT_SOURCE_FILES = [
+  'src/App.tsx',
+  'src/tokens.css',
+  'src/components/Rail.tsx',
+  'src/components/ThemePicker.tsx',
+  'src/components/Dialog.tsx',
+  'src/components/DeleteAccountDialog.tsx',
+  'src/components/BackupSection.tsx',
+  'src/components/NoteEditor.tsx',
+  'src/components/CategoryDialog.tsx',
+  'src/components/report/ExportPdfDialog.tsx',
+  'src/components/report/report.css',
+  'src/components/recurring/RecurringPanel.tsx',
+  'src/components/recurring/RecurringTable.tsx',
+  'src/components/recurring/RecurringDetail.tsx',
+  'src/components/recurring/RecurringEditor.tsx',
+  'src/screens/Overview.tsx',
+  'src/screens/Import.tsx',
+  'src/screens/Transactions.tsx',
+  'src/screens/Categories.tsx',
+  'src/screens/Settings.tsx',
+]
+
+function screenshotSourceFiles() {
+  return Object.fromEntries(SCREENSHOT_SOURCE_FILES.map((relative) => {
+    const absolute = path.join(ROOT, relative)
+    assert(fs.statSync(absolute).isFile(), `screenshot source is missing: ${absolute}`)
+    return [relative, sha256(absolute)]
+  }))
+}
+
+async function chooseTheme(page, theme) {
+  await page.getByLabel('Vzhľad').selectOption(theme)
+  await page.waitForFunction((value) => document.documentElement.dataset.theme === value, theme)
+}
+
+async function captureScreenshot(page, screenshotDir, screenshots, options) {
+  const { slug, state, theme, width, requiredText = [], locator = null } = options
+  await page.setViewportSize({ width, height: 800 })
+  await page.waitForTimeout(100)
+  const surface = locator ?? page.locator('body')
+  await surface.waitFor({ state: 'visible' })
+  const visibleText = await surface.innerText()
+  for (const required of requiredText) assert(visibleText.includes(required), `${state} lacks required text: ${required}`)
+  const controls = await surface.locator('input, select, textarea').evaluateAll((elements) => elements.map((element) => ({
+    aria_label: element.getAttribute('aria-label'),
+    tag: element.tagName.toLowerCase(),
+    type: element.getAttribute('type'),
+    value: element.value,
+    checked: 'checked' in element ? element.checked : undefined,
+    disabled: element.disabled,
+  })))
+  const metrics = await page.evaluate(() => ({
+    client_width: document.documentElement.clientWidth,
+    scroll_width: document.documentElement.scrollWidth,
+    scroll_height: document.documentElement.scrollHeight,
+    active_element: document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.trim() ?? null,
+    theme: document.documentElement.dataset.theme ?? null,
+  }))
+  const target = path.join(screenshotDir, `${theme}-${width}-${slug}.png`)
+  assert(!fs.existsSync(target), `refusing existing screenshot: ${target}`)
+  if (locator) await locator.screenshot({ path: target, animations: 'disabled' })
+  else await page.screenshot({ path: target, fullPage: true, animations: 'disabled' })
+  screenshots.push({
+    path: target,
+    sha256: sha256(target),
+    theme,
+    viewport: { width, height: 800 },
+    state,
+    surface: locator ? 'element' : 'full-page',
+    required_text: requiredText,
+    visible_text_sha256: crypto.createHash('sha256').update(visibleText).digest('hex'),
+    visible_text_code_points: [...visibleText].length,
+    controls,
+    metrics,
+  })
+}
+
+async function selectOverviewPeriod(page, label) {
+  await openScreen(page, 'Prehľad')
+  await page.getByRole('group', { name: 'Obdobie' }).getByRole('button', { name: label, exact: true }).click()
+  await page.locator('.k-card-title').filter({ hasText: 'Pravidelné platby' }).waitFor()
+}
+
+async function captureMainScreens(page, screenshotDir, screenshots) {
+  for (const theme of ['light', 'dark']) {
+    await chooseTheme(page, theme)
+    for (const width of [1024, 1280]) {
+      await selectOverviewPeriod(page, 'Tento mesiac')
+      await page.getByRole('group', { name: 'Účet' }).getByRole('button', { name: 'Všetko', exact: true }).click()
+      await captureScreenshot(page, screenshotDir, screenshots, { slug: 'overview-main', state: 'Prehľad main screen with comparison, coverage, balances, and recurring schedules', theme, width, requiredText: ['Pravidelné platby', 'Pokrytie výpismi', 'Zostatky z výpisov', 'Porovnanie výdavkov podľa kategórií'] })
+      await openScreen(page, 'Import')
+      await captureScreenshot(page, screenshotDir, screenshots, { slug: 'import-main', state: 'Import main screen and statement history', theme, width, requiredText: ['Vybrať PDF', 'Posledné importy'] })
+      await openScreen(page, 'Transakcie')
+      await captureScreenshot(page, screenshotDir, screenshots, { slug: 'transactions-main', state: 'Transactions main screen with filters, totals, and category help', theme, width, requiredText: ['Transakcie', 'Vymazať všetky filtre', 'Vytvorenie kategórie nevytvorí pravidlo.'] })
+      await openScreen(page, 'Kategórie')
+      await captureScreenshot(page, screenshotDir, screenshots, { slug: 'categories-main', state: 'Categories and learned-rule help main screen', theme, width, requiredText: ['Kategórie', 'Pravidlá', 'Samotné vytvorenie kategórie pravidlo nevytvorí.'] })
+      await openScreen(page, 'Nastavenia')
+      await captureScreenshot(page, screenshotDir, screenshots, { slug: 'settings-main', state: 'Settings main screen with accounts, privacy, backup, and network audit help', theme, width, requiredText: ['Účty', 'Záloha databázy', 'Toto je jediné sieťové volanie aplikácie.'] })
+    }
+  }
+}
+
+function recurringCard(page) {
+  return page.locator('.k-card-title').filter({ hasText: 'Pravidelné platby' }).locator('xpath=ancestor::section[1]')
+}
+
+async function captureRecurringStates(page, screenshotDir, screenshots) {
+  await chooseTheme(page, 'light')
+  await selectOverviewPeriod(page, 'Všetko')
+  await page.getByRole('group', { name: 'Účet' }).getByRole('button', { name: 'Všetko', exact: true }).click()
+  await page.getByText('Mesačný príjem', { exact: true }).first().waitFor()
+  await page.getByText('Cena služby', { exact: true }).first().waitFor()
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'recurring-mixed-states', state: 'Recurring expenses, income, estimates, status, price change, and coverage uncertainty', theme: 'light', width: 1280, locator: recurringCard(page), requiredText: ['Výdavky', 'Príjmy', 'Mesačný príjem', 'Cena služby'] })
+
+  const detailButton = page.getByRole('button', { name: 'Detail U03 nový kontrakt', exact: true })
+  await detailButton.waitFor()
+  await detailButton.click()
+  const detail = page.getByRole('dialog', { name: 'Presné členstvo' })
+  await detail.getByText('U03 nový kontrakt', { exact: false }).first().waitFor()
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'recurring-manual-members', state: 'Manual selected-member exact detail', theme: 'light', width: 1280, locator: detail, requiredText: ['Členovia presného výberu.', 'Kompatibilné transakcie'] })
+  await detail.getByRole('button', { name: 'Upraviť pravidelnosť', exact: true }).click()
+  const editor = page.getByRole('dialog', { name: 'Pravidelná platba' })
+  await editor.getByLabel('Len označené transakcie').waitFor()
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'recurring-manual-editor', state: 'Manual recurring editor with selected membership', theme: 'light', width: 1280, locator: editor, requiredText: ['Len označené transakcie', 'Interval', 'Kotva'] })
+  await editor.getByRole('button', { name: 'Zrušiť', exact: true }).click()
+
+  await chooseTheme(page, 'dark')
+  await page.setViewportSize({ width: 1024, height: 800 })
+  await selectOverviewPeriod(page, 'Tento mesiac')
+  await page.getByRole('group', { name: 'Účet' }).getByRole('button', { name: 'Firemný', exact: true }).click()
+  const emptyHelp = 'Na odhad treba tri mesačné alebo dve štvrťročné či ročné pozorovania.'
+  await page.getByText(emptyHelp, { exact: false }).waitFor()
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'recurring-empty-help', state: 'Recurring empty-state help', theme: 'dark', width: 1024, locator: recurringCard(page), requiredText: [emptyHelp, 'Ručné zadanie začína v detaile transakcie.'] })
+
+  await page.getByRole('group', { name: 'Obdobie' }).getByRole('button', { name: 'Vlastné', exact: true }).click()
+  await page.getByLabel('Od dátumu').fill('2026-10-02')
+  await page.getByLabel('Do dátumu').fill('2026-10-01')
+  const invalid = 'Zadajte platný začiatok a koniec obdobia. Začiatok nesmie byť po konci.'
+  await page.getByRole('alert').filter({ hasText: invalid }).waitFor()
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'overview-invalid-period-error', state: 'Overview visible invalid-period error', theme: 'dark', width: 1024, requiredText: [invalid] })
+}
+
+async function openCategoryEditor(page, categoryId, categoryName) {
+  await openScreen(page, 'Kategórie')
+  const row = page.getByLabel(`Názov kategórie ${categoryId}`).locator('xpath=..')
+  await row.getByRole('button', { name: 'Upraviť', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: `Upraviť kategóriu ${categoryName}` })
+  await dialog.waitFor()
+  return dialog
+}
+
+async function captureCategoryStates(page, screenshotDir, screenshots, flows) {
+  await chooseTheme(page, 'light')
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await showTransaction(page, 1005, 'Nezaradená refundácia')
+  await page.getByLabel('Kategória transakcie 1005').selectOption('__create__')
+  const create = page.getByRole('dialog', { name: 'Nová kategória' })
+  await create.getByLabel('Názov kategórie').fill('Spotify')
+  await create.getByLabel('Nadradená kategória').selectOption('12')
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'category-create', state: 'New category dialog with explicit parent and kind', theme: 'light', width: 1280, locator: create, requiredText: ['Nová kategória', 'Nadradená kategória', 'Druh'] })
+  await create.getByRole('button', { name: 'Uložiť', exact: true }).click()
+  await create.getByRole('alert').waitFor()
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'category-create-error', state: 'Category duplicate error with draft retained', theme: 'light', width: 1280, locator: create, requiredText: ['Spotify'] })
+  assertEqual(await create.getByLabel('Názov kategórie').inputValue(), 'Spotify', 'category error retains draft')
+  await create.getByRole('button', { name: 'Zrušiť', exact: true }).click()
+
+  const created = flows.category_ui.created
+  let edit = await openCategoryEditor(page, created.id, created.name)
+  await edit.getByLabel('Upraviť nadradenú kategóriu').selectOption('11')
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'category-move-draft', state: 'Category move draft with inherited parent kind', theme: 'light', width: 1280, locator: edit, requiredText: ['Nadradená kategória', 'Druh'] })
+  await edit.getByRole('button', { name: 'Zrušiť', exact: true }).click()
+
+  edit = await openCategoryEditor(page, created.id, created.name)
+  await edit.getByLabel('Upraviť druh kategórie').selectOption('expense')
+  await edit.getByRole('button', { name: 'Uložiť', exact: true }).click()
+  await edit.getByText(/Zmena druhu ovplyvní/).waitFor()
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'category-kind-preview', state: 'Category kind-change acknowledgement with affected counts', theme: 'light', width: 1280, locator: edit, requiredText: ['Zmena druhu ovplyvní', 'potvrdených', 'Potvrdiť zmenu druhu'] })
+  await edit.getByRole('button', { name: 'Zrušiť', exact: true }).click()
+  await edit.getByRole('button', { name: 'Zrušiť', exact: true }).click()
+
+  await showTransaction(page, 8041, 'Spotify')
+  const seedArea = page.getByLabel('Presmerovať pravidlo transakcie 8041').locator('xpath=ancestor::td[1]')
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'learned-seed-rule-help', state: 'Expanded transaction with seed-rule explanation and redirect', theme: 'light', width: 1280, locator: seedArea, requiredText: ['Zaradené podľa slovníka', 'Poznámka'] })
+}
+
+async function showTransactionInRange(page, transactionId, search, from, to) {
+  await openScreen(page, 'Transakcie')
+  const period = page.getByRole('group', { name: 'Obdobie' })
+  await period.getByRole('button', { name: 'Vlastné', exact: true }).click()
+  await page.getByLabel('Od dátumu').fill(from)
+  await page.getByLabel('Do dátumu').fill(to)
+  await page.getByLabel('Hľadať obchodníka alebo poznámku').fill(search)
+  const detail = page.getByRole('button', { name: `Detail transakcie ${transactionId}`, exact: true })
+  await detail.waitFor()
+  await detail.click()
+}
+
+const SQLITE_WRITE_LOCK = String.raw`
+import json, sqlite3, sys
+connection = sqlite3.connect(sys.argv[1])
+connection.execute("BEGIN IMMEDIATE")
+print(json.dumps({"ready": True}), flush=True)
+sys.stdin.readline()
+connection.rollback()
+connection.close()
+`
+
+function acquireSqliteWriteLock(dbPath) {
+  assertInside(path.join(ROOT, 'acceptance'), dbPath, 'locked synthetic database')
+  return new Promise((resolve, reject) => {
+    const child = spawn('py', ['-c', SQLITE_WRITE_LOCK, dbPath], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code !== 0) reject(new Error(`SQLite lock helper failed (${code}): ${stderr || stdout}`))
+    })
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+      if (stdout.includes('\n')) resolve(child)
+    })
+  })
+}
+
+function releaseSqliteWriteLock(child) {
+  return new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', (code) => code === 0 ? resolve() : reject(new Error(`SQLite lock helper exited ${code}`)))
+    child.stdin.end('\n')
+  })
+}
+
+async function captureNoteStates(page, screenshotDir, screenshots, oracle) {
+  await chooseTheme(page, 'dark')
+  await page.setViewportSize({ width: 1024, height: 800 })
+  await showTransactionInRange(page, 5001, 'FINAL-NOTE-SENTINEL', '2025-06-01', '2025-06-30')
+  const note = page.getByLabel('Poznámka k transakcii 5001')
+  assert((await note.inputValue()).endsWith('FINAL-NOTE-SENTINEL'), 'long Unicode note is not visible in its editor')
+  const area = note.locator('xpath=ancestor::td[1]')
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'note-long-unicode', state: 'Expanded note editor with 2000-code-point Unicode/newline note', theme: 'dark', width: 1024, locator: area, requiredText: ['2000 / 2000 znakov', 'Uložiť poznámku'] })
+
+  const originalTransactions = databaseState(oracle.db_path).tables.transactions
+  const originalNote = await note.inputValue()
+  const draftPrefix = 'NEULOŽENÝ-SYNTETICKÝ-DRAFT'
+  const failedDraft = `${draftPrefix}${[...originalNote].slice([...draftPrefix].length).join('')}`
+  assertEqual([...failedDraft].length, 2000, 'note failure draft length')
+  await note.fill(failedDraft)
+  const lock = await acquireSqliteWriteLock(oracle.db_path)
+  try {
+    await area.getByRole('button', { name: 'Uložiť poznámku', exact: true }).click()
+    await area.getByRole('alert').waitFor({ timeout: 15000 })
+    assert((await note.inputValue()).startsWith('NEULOŽENÝ-SYNTETICKÝ-DRAFT'), 'note failure did not retain its draft')
+    await captureScreenshot(page, screenshotDir, screenshots, { slug: 'note-save-error', state: 'Note save failure with the typed draft retained', theme: 'dark', width: 1024, locator: area, requiredText: ['Uložiť poznámku'] })
+  } finally {
+    await releaseSqliteWriteLock(lock)
+  }
+  assertEqual(databaseState(oracle.db_path).tables.transactions, originalTransactions, 'note error changed transactions')
+}
+
+function cardByTitle(page, title) {
+  return page.locator('.k-card-title').filter({ hasText: title }).locator('xpath=ancestor::section[1]')
+}
+
+async function captureSettingsStates(page, screenshotDir, stateDir, screenshots, ready, oracle) {
+  await chooseTheme(page, 'light')
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await openScreen(page, 'Nastavenia')
+  const backupCard = cardByTitle(page, 'Záloha databázy')
+  const backupTarget = path.join(stateDir, 'screenshot-backup.db')
+  assert(!fs.existsSync(backupTarget), `backup screenshot target exists: ${backupTarget}`)
+  let automation = automateDialog(ready.pid, 'save', backupTarget)
+  await backupCard.getByRole('button', { name: 'Zálohovať databázu', exact: true }).click()
+  await automation
+  await backupCard.getByRole('status').filter({ hasText: 'Záloha uložená:' }).waitFor({ timeout: 30000 })
+  const backupState = databaseState(backupTarget)
+  assertEqual(backupState.integrity, 'ok', 'UI screenshot backup integrity')
+  assertEqual(backupState.foreign_key_errors, [], 'UI screenshot backup foreign keys')
+  assert(backupState.tables.recurring_decisions.count > 0, 'UI screenshot backup omitted recurring decisions')
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'backup-success', state: 'SQLite backup success from the native Save dialog', theme: 'light', width: 1280, locator: backupCard, requiredText: ['Záloha uložená:', 'nezašifrované bankové údaje'] })
+
+  automation = automateDialog(ready.pid, 'occupied', backupTarget)
+  await backupCard.getByRole('button', { name: 'Zálohovať databázu', exact: true }).click()
+  await automation
+  await backupCard.getByRole('alert').waitFor({ timeout: 30000 })
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'backup-error', state: 'SQLite backup occupied-target error', theme: 'light', width: 1280, locator: backupCard, requiredText: ['Záloha databázy'] })
+
+  const accountLabel = 'Prázdny PDF účet'
+  const accountRow = page.getByRole('row').filter({ hasText: accountLabel })
+  await accountRow.getByRole('button', { name: 'Zmazať účet', exact: true }).click()
+  const deletion = page.getByRole('dialog', { name: `Zmazať účet ${accountLabel}?` })
+  const confirmation = deletion.getByLabel(`Na potvrdenie napíšte názov účtu: ${accountLabel}`)
+  await confirmation.fill(accountLabel)
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'account-delete-confirmation', state: 'Typed account-deletion confirmation with exact impact preview', theme: 'light', width: 1280, locator: deletion, requiredText: ['nezvratné lokálne odstránenie', 'Natrvalo zmazať účet'] })
+
+  const accountsBefore = databaseState(oracle.db_path).tables.accounts
+  const lock = await acquireSqliteWriteLock(oracle.db_path)
+  try {
+    await deletion.getByRole('button', { name: 'Natrvalo zmazať účet', exact: true }).click()
+    await deletion.getByRole('alert').waitFor({ timeout: 15000 })
+    await captureScreenshot(page, screenshotDir, screenshots, { slug: 'account-delete-error', state: 'Account deletion write-lock error with preview and typed name retained', theme: 'light', width: 1280, locator: deletion, requiredText: [accountLabel] })
+  } finally {
+    await releaseSqliteWriteLock(lock)
+  }
+  assertEqual(databaseState(oracle.db_path).tables.accounts, accountsBefore, 'account deletion error changed accounts')
+  await deletion.getByRole('button', { name: 'Zrušiť', exact: true }).click()
+}
+
+async function capturePdfDialogStates(page, screenshotDir, stateDir, screenshots, ready, oracle) {
+  await chooseTheme(page, 'dark')
+  await page.setViewportSize({ width: 1024, height: 800 })
+  const dialog = await openExportDialog(page)
+  await chooseFamily(dialog, 'screenshot preview', oracle.families.month)
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'pdf-preview-help', state: 'PDF period, scope, preview, and capture help', theme: 'dark', width: 1024, locator: dialog, requiredText: ['Náhľad', 'Náhľad sa môže zmeniť. PDF zachytí údaje pri uložení.'] })
+
+  const successTarget = path.join(stateDir, 'screenshot-report-success.pdf')
+  await saveFamilyThroughUi(page, dialog, ready, 'screenshot success', oracle.families.month, successTarget)
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'pdf-success', state: 'PDF native Save success with actual capture count', theme: 'dark', width: 1024, locator: dialog, requiredText: ['PDF uložené:', `Transakcie zachytené pri uložení: ${oracle.families.month.transaction_count}`] })
+
+  const occupiedTarget = path.join(stateDir, 'screenshot-report-occupied.pdf')
+  await occupiedUi(page, dialog, ready, oracle.families.month, occupiedTarget)
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'pdf-error', state: 'PDF occupied-target error with draft and selectors retained', theme: 'dark', width: 1024, locator: dialog, requiredText: ['Exportovať PDF'] })
+  await dialog.getByRole('button', { name: 'Zrušiť', exact: true }).click()
+}
+
 async function screenshotsMode() {
-  const { browser, page, ready, actualDataDir } = await attach()
+  const { browser, page, ready, oracle, actualDataDir } = await attach()
   const screenshotDir = path.join(RESULTS_DIR, 'screenshots')
+  const stateDir = path.join(RESULTS_DIR, 'screenshot-state-files')
   assert(!fs.existsSync(screenshotDir), `refusing existing screenshot directory: ${screenshotDir}`)
+  assert(!fs.existsSync(stateDir), `refusing existing screenshot state directory: ${stateDir}`)
   fs.mkdirSync(screenshotDir, { recursive: true })
+  fs.mkdirSync(stateDir, { recursive: true })
   const screenshots = []
   try {
-    for (const theme of ['light', 'dark']) {
-      await page.getByLabel('Vzhľad').selectOption(theme)
-      await page.waitForFunction((value) => document.documentElement.dataset.theme === value, theme)
-      for (const width of [1024, 1280]) {
-        await page.setViewportSize({ width, height: 800 })
-        const dialog = await openExportDialog(page)
-        const target = path.join(screenshotDir, `${theme}-${width}-pdf-dialog.png`)
-        await dialog.screenshot({ path: target })
-        screenshots.push({ path: target, sha256: sha256(target), theme, viewport: { width, height: 800 }, state: 'PDF dialog' })
-        await dialog.getByRole('button', { name: 'Zrušiť', exact: true }).click()
-      }
+    const flows = readJson(path.join(RESULTS_DIR, 'flows.json'))
+    await captureMainScreens(page, screenshotDir, screenshots)
+    await captureRecurringStates(page, screenshotDir, screenshots)
+    await captureCategoryStates(page, screenshotDir, screenshots, flows)
+    await captureNoteStates(page, screenshotDir, screenshots, oracle)
+    await captureSettingsStates(page, screenshotDir, stateDir, screenshots, ready, oracle)
+    await capturePdfDialogStates(page, screenshotDir, stateDir, screenshots, ready, oracle)
+    const manifest = {
+      mode: 'screenshots',
+      visual_judgment: 'reserved for the routed Google reviewer',
+      source: { commit: ready.commit, files: screenshotSourceFiles(), ready_manifest_sha256: sha256(READY_PATH), oracle_sha256: sha256(ready.oracle_path) },
+      executable_sha256: ready.binary_sha256,
+      pid: ready.pid,
+      data_dir: actualDataDir,
+      state_artifacts: Object.fromEntries(fs.readdirSync(stateDir).sort().map((name) => [name, sha256(path.join(stateDir, name))])),
+      screenshots,
     }
-    const manifest = { mode: 'screenshots', visual_judgment: 'reserved for the routed Google reviewer', executable_sha256: ready.binary_sha256, pid: ready.pid, data_dir: actualDataDir, screenshots }
     writeNewJson(path.join(screenshotDir, 'manifest.json'), manifest)
     console.log(JSON.stringify({ ok: true, mode: 'screenshots', count: screenshots.length }))
   } finally {

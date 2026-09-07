@@ -88,7 +88,8 @@ directory.
 - [ ] P13: real 5000-row file plus deterministic arithmetic seams at every
   hard limit.
 - [ ] P14-P15: occupied/source/hardlink/symlink/WAL/SHM/directory/device/ADS,
-  two writers and late write/flush/sync/persist failures.
+  DOS-reserved `NUL.pdf`/`CON.pdf` leaf names, two writers and late
+  write/flush/sync/persist failures.
 - [ ] P16: actual dialog cancel and occupied selection, stale preview guard,
   busy control lock and actual capture count after a post-preview commit.
 - [ ] P17: literal v4 decisions/members/notes/category edits/settings survive
@@ -131,6 +132,14 @@ directory.
 
 ## Visual handoff
 
+- [ ] Screenshot manifest covers all five main screens in light and dark at
+  1024x800 and 1280x800, with the visible theme selector.
+- [ ] Focused screenshots cover recurring mixed/unknown/empty states, manual
+  membership, category create/edit/move/kind acknowledgement, learned-rule
+  help, long-note normal/error, account-delete confirmation/error, backup
+  normal/error and PDF preview/error/success.
+- [ ] Every screenshot records its state, viewport, DOM width, visible-text
+  hash, control values, executable/oracle hashes and relevant UI source hashes.
 - [ ] All PDFium PNGs and the native screenshot manifest are immutable and
   hash-bound to the accepted executable and PDFs.
 - [ ] The separately routed Google reviewer opens the rendered pixels. This
