@@ -13,14 +13,14 @@ thiserror.workspace = true
 sha2.workspace = true
 hex.workspace = true
 toml = "0.8"
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled", "backup"] }
 parser = { path = "../parser" }
 rules = { path = "../rules" }
 
 # The migration test writes a database with the OLD schema before opening it
 # through `Store`, which needs raw SQLite access from an integration test.
 [dev-dependencies]
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled", "backup"] }
 
 [lints]
 workspace = true

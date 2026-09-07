@@ -9,8 +9,9 @@ use parser::{AccountKind, Checksum};
 use rules::{RuleKind, Status};
 use serde_json::json;
 use store::{
-    Account, AssignOutcome, BadChecksum, Category, CategoryKind, NetLogRow, RecentStatement,
-    RuleView, StatementDeleteOutcome, StatementDeletePreview, Summary, TxFilter, TxRow,
+    Account, AssignOutcome, BackupOutcome, BadChecksum, Category, CategoryKind, NetLogRow,
+    RecentStatement, RuleView, StatementDeleteOutcome, StatementDeletePreview,
+    StatementHistoryRow, Summary, TxFilter, TxRow,
 };
 
 /// Tauri deserializes each command argument from its own JSON field (there is
@@ -89,6 +90,19 @@ struct ConfirmArgs { ids: Vec<i64> }
 #[derive(serde::Deserialize)]
 struct ExportCsvArgs { filter: TxFilter, path: String }
 
+/// 0.1.2: both filters are optional and independent, same shape as `SummaryArgs`'s kind field.
+#[derive(serde::Deserialize)]
+struct StatementHistoryArgs {
+    #[serde(default, rename = "accountId")] account_id: Option<i64>,
+    #[serde(default, rename = "accountKind")] account_kind: Option<AccountKind>,
+}
+
+#[derive(serde::Deserialize)]
+struct SaveTransactionNoteArgs { id: i64, note: String }
+
+#[derive(serde::Deserialize)]
+struct BackupDatabaseArgs { path: String }
+
 #[test]
 fn import_statements_args_match_the_ui_call() {
     let args: ImportStatementsArgs = serde_json::from_value(json!({"paths": ["x.pdf"]})).unwrap();
@@ -160,10 +174,12 @@ fn tx_row_and_summary_serialize_snake_case() {
         kind: "card".into(), amount_cents: -199, orig_amount_cents: None, orig_currency: None,
         merchant_raw: "ALDI SUED".into(), place: Some("Neuss".into()), counterparty_name: None, counterparty_iban: None,
         category_id: None, category_name: None, parent_name: None, status: Status::Suggested, source: "seed".into(), raw_block: "raw".into(),
+        note: "kúpiť darček".into(),
     };
     let v = serde_json::to_value(&row).unwrap();
     assert_eq!(v["account_id"], json!(2));
     assert_eq!(v["merchant_raw"], json!("ALDI SUED"));
+    assert_eq!(v["note"], json!("kúpiť darček"));
     assert!(v.get("accountId").is_none(), "TxRow keeps snake_case field names, no camelCase");
 
     let summary = Summary { income_cents: 0, expense_cents: 199, transfer_cents: 0, net_cents: -199, unassigned_count: 0, suggested_count: 1, by_category: Vec::new(), by_month: Vec::new(), by_month_category: Vec::new(), top_merchants: Vec::new() };
@@ -413,4 +429,54 @@ fn rule_view_serializes_snake_case() {
     let r = RuleView { id: 9, kind: RuleKind::Exact, key: "aldi".into(), place: Some("neuss".into()), category_id: 4, category_name: "potraviny".into(), parent_name: Some("Jedlo".into()), hit_count: 2 };
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v, json!({"id": 9, "kind": "exact", "key": "aldi", "place": "neuss", "category_id": 4, "category_name": "potraviny", "parent_name": "Jedlo", "hit_count": 2}));
+}
+
+/// 0.1.2 contract: `statement_history` takes both filters under camelCase,
+/// each independently optional (an absent field, not just `null`, must still
+/// deserialize, same as `SummaryArgs.account_kind`).
+#[test]
+fn statement_history_args_match_the_ui_call() {
+    let both: StatementHistoryArgs = serde_json::from_value(json!({"accountId": 3, "accountKind": "business"})).unwrap();
+    assert_eq!((both.account_id, both.account_kind), (Some(3), Some(AccountKind::Business)));
+    let neither: StatementHistoryArgs = serde_json::from_value(json!({})).unwrap();
+    assert_eq!((neither.account_id, neither.account_kind), (None, None));
+}
+
+#[test]
+fn statement_history_row_serializes_snake_case() {
+    let r = StatementHistoryRow {
+        statement_id: 9, account_id: 1, account_label: "Osobný".into(), account_kind: AccountKind::Personal,
+        number: 6, period_start: NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(), period_end: NaiveDate::from_ymd_opt(2026, 6, 30).unwrap(),
+        opening_cents: Some(69_392), closing_cents: None, checksum: Checksum::NotVerifiable,
+    };
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(v["statement_id"], json!(9));
+    assert_eq!(v["account_label"], json!("Osobný"));
+    assert_eq!(v["opening_cents"], json!(69_392));
+    assert_eq!(v["closing_cents"], json!(null));
+    assert_eq!(v["checksum"], json!({"status": "not_verifiable"}));
+    assert!(v.get("statementId").is_none(), "StatementHistoryRow keeps snake_case field names, no camelCase");
+}
+
+/// 0.1.2 contract: `save_transaction_note` takes `{id, note}`, note as a plain
+/// string (not `Option`) so clearing a note is an empty string, not null.
+#[test]
+fn save_transaction_note_args_match_the_ui_call() {
+    let args: SaveTransactionNoteArgs = serde_json::from_value(json!({"id": 7, "note": "zaplatiť do 5.\n"})).unwrap();
+    assert_eq!(args.id, 7);
+    assert_eq!(args.note, "zaplatiť do 5.\n");
+}
+
+/// 0.1.2 contract: `backup_database` takes only `{path}`, never touches secrets.
+#[test]
+fn backup_database_args_match_the_ui_call() {
+    let args: BackupDatabaseArgs = serde_json::from_value(json!({"path": "C:/zálohy/abakus-2026-09-07.db"})).unwrap();
+    assert_eq!(args.path, "C:/zálohy/abakus-2026-09-07.db");
+}
+
+#[test]
+fn backup_outcome_serializes_the_fields_the_ui_reads() {
+    let o = BackupOutcome { path: "C:/zálohy/abakus.db".into(), bytes: 45_056 };
+    let v = serde_json::to_value(&o).unwrap();
+    assert_eq!(v, json!({"path": "C:/zálohy/abakus.db", "bytes": 45_056}));
 }

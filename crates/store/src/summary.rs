@@ -95,7 +95,7 @@ impl Store {
     }
 
     pub fn export_csv(&self, f: &TxFilter) -> Result<String> {
-        let mut out = String::from("datum;ucet;obchodnik;miesto;suma_eur;kategoria;podkategoria;stav\n");
+        let mut out = String::from("datum;ucet;obchodnik;miesto;suma_eur;kategoria;podkategoria;stav;poznamka\n");
         for r in self.list_transactions(f)? {
             out.push_str(&csv_line(&r));
         }
@@ -122,16 +122,19 @@ impl Store {
 /// covered here by forcing the cell to a literal.
 ///
 /// Limits, stated honestly rather than as a universal guarantee: OWASP's
-/// list also names a leading line feed, which cannot reach this function (
-/// `merchant_raw`/`place`/`counterparty_name` are single-line parsed
-/// fields; the multiline `raw_block` is never passed through `csv_quote`).
+/// list also names a leading line feed. `merchant_raw`/`place`/
+/// `counterparty_name` are single-line parsed fields that can never carry
+/// one, and the multiline `raw_block` is never passed through `csv_quote`.
+/// The user-typed `note` field (0.1.2) IS multiline and reaches this
+/// function directly (`csv_line` below), so `\n` is in `DANGEROUS_LEADING`
+/// too, not just `\r`.
 /// And this defusing prefix is not proof against every spreadsheet forever:
 /// a save/reopen cycle in some tools can drop the escaping it relies on.
 /// This function only covers the leading-character injection vector; it
 /// makes no claim about anything downstream of the user's own spreadsheet
 /// software.
 fn csv_quote(s: &str) -> String {
-    const DANGEROUS_LEADING: [char; 10] = ['=', '+', '-', '@', '\t', '\r', '\u{FF1D}', '\u{FF0B}', '\u{FF0D}', '\u{FF20}'];
+    const DANGEROUS_LEADING: [char; 11] = ['=', '+', '-', '@', '\t', '\r', '\n', '\u{FF1D}', '\u{FF0B}', '\u{FF0D}', '\u{FF20}'];
     let defused = match s.chars().next() {
         Some(c) if DANGEROUS_LEADING.contains(&c) => format!("'{s}"),
         _ => s.to_string(),
@@ -146,7 +149,7 @@ fn csv_line(r: &crate::TxRow) -> String {
         _ => (String::new(), String::new()),
     };
     format!(
-        "{};{};{};{};{};{};{};{}\n",
+        "{};{};{};{};{};{};{};{};{}\n",
         r.tx_date,
         if r.account_kind == parser::AccountKind::Business { "firemny" } else { "osobny" },
         csv_quote(&r.merchant_raw),
@@ -155,6 +158,7 @@ fn csv_line(r: &crate::TxRow) -> String {
         csv_quote(&cat),
         csv_quote(&sub),
         crate::import::status_str(r.status),
+        csv_quote(&r.note),
     )
 }
 
@@ -177,6 +181,14 @@ mod csv_quote_tests {
             let s = format!("{c}cmd");
             assert_eq!(csv_quote(&s), format!("\"'{s}\""), "must defuse a leading {c:?}");
         }
+    }
+
+    /// 0.1.2: `note` is the first multiline field this function ever sees, so
+    /// a leading line feed (OWASP's list, previously unreachable per the doc
+    /// comment above) is now a real input, not a hypothetical one.
+    #[test]
+    fn defuses_a_leading_line_feed_now_that_a_multiline_field_reaches_this_function() {
+        assert_eq!(csv_quote("\n=cmd('calc')"), "\"'\n=cmd('calc')\"");
     }
 
     #[test]

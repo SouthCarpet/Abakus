@@ -1,12 +1,15 @@
 //! SQLite store: accounts, statements, transactions, categories, rules, summaries.
 pub mod accounts;
 pub mod assign;
+pub mod backup;
 pub mod categories;
 pub mod delete_account;
 pub mod delete_statement;
+pub mod history;
 pub mod import;
 pub mod migrate;
 pub mod net_log;
+pub mod notes;
 pub mod query;
 pub mod rules_repo;
 pub mod seed_categories;
@@ -15,11 +18,14 @@ pub mod summary;
 
 pub use accounts::Account;
 pub use assign::AssignOutcome;
+pub use backup::BackupOutcome;
 pub use categories::{Category, CategoryKind};
 pub use delete_account::{AccountDeleteOutcome, AccountDeletePreview};
 pub use delete_statement::{StatementDeleteOutcome, StatementDeletePreview};
+pub use history::StatementHistoryRow;
 pub use import::ImportOutcome;
 pub use net_log::NetLogRow;
+pub use notes::NOTE_MAX_CHARS;
 pub use query::{RecentStatement, TxFilter, TxRow};
 pub use rules_repo::RuleView;
 pub use summary::*;
@@ -43,6 +49,14 @@ pub enum StoreError {
     /// the command layer can say what exactly would be recast.
     #[error("Účet {iban} už obsahuje výpisy: {statements}. Transakcie: {transactions}. Zmena typu účtu vyžaduje potvrdenie.")]
     AccountKindLocked { iban: String, statements: i64, transactions: i64 },
+    #[error("Transakcia s id {id} neexistuje.")]
+    UnknownTransaction { id: i64 },
+    #[error("Poznámka nesmie obsahovať znak NUL.")]
+    NoteContainsNul,
+    #[error("Poznámka je príliš dlhá. Limit je {max} znakov, poznámka má {actual}.")]
+    NoteTooLong { max: usize, actual: usize },
+    #[error("Cieľový súbor už existuje: {path}. Zvoľte iný názov.")]
+    BackupTargetExists { path: String },
     #[error("{0}")]
     Parse(String),
 }

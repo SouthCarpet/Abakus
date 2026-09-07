@@ -2,6 +2,7 @@
 use crate::import::{checksum_from_cols, status_parse};
 use crate::{Result, Store};
 use chrono::NaiveDate;
+use parser::fold::fold;
 use parser::{AccountKind, Checksum};
 use rules::Status;
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,7 @@ pub struct TxRow {
     pub status: Status,
     pub source: String,
     pub raw_block: String,
+    pub note: String,
 }
 
 /// Row for the Import screen's "Posledné importy" list (spec: newest first).
@@ -56,7 +58,7 @@ pub struct RecentStatement {
     pub checksum: Checksum,
 }
 
-pub(crate) const BASE_SELECT: &str = "SELECT t.id, t.account_id, a.kind, s.number, t.posted_date, t.tx_date, t.kind, t.amount_cents, t.orig_amount_cents, t.orig_currency, t.merchant_raw, t.place, t.counterparty_name, t.counterparty_iban, t.category_id, c.name, p.name, t.status, t.source, t.raw_block FROM transactions t JOIN accounts a ON a.id = t.account_id JOIN statements s ON s.id = t.statement_id LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN categories p ON p.id = c.parent_id";
+pub(crate) const BASE_SELECT: &str = "SELECT t.id, t.account_id, a.kind, s.number, t.posted_date, t.tx_date, t.kind, t.amount_cents, t.orig_amount_cents, t.orig_currency, t.merchant_raw, t.place, t.counterparty_name, t.counterparty_iban, t.category_id, c.name, p.name, t.status, t.source, t.raw_block, t.note FROM transactions t JOIN accounts a ON a.id = t.account_id JOIN statements s ON s.id = t.statement_id LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN categories p ON p.id = c.parent_id";
 
 fn push_param(params: &mut Vec<Box<dyn rusqlite::ToSql>>, p: Box<dyn rusqlite::ToSql>) -> usize {
     params.push(p);
@@ -99,10 +101,12 @@ pub(crate) fn where_clause(f: &TxFilter) -> (String, Vec<Box<dyn rusqlite::ToSql
         let k = push_param(&mut params, Box::new(crate::import::status_str(s).to_string()));
         conds.push(format!("t.status = ?{k}"));
     }
-    if let Some(t) = &f.text {
-        let k = push_param(&mut params, Box::new(t.clone()));
-        conds.push(format!("(t.merchant_raw LIKE '%' || ?{k} || '%' OR t.counterparty_name LIKE '%' || ?{k} || '%' OR t.place LIKE '%' || ?{k} || '%')"));
-    }
+    // `text` is deliberately NOT a SQL condition here: 0.1.2 extends the
+    // search to `note`, and the contract wants fold()-based (diacritic- and
+    // case-insensitive) LITERAL substring matching, where `%`/`_` are plain
+    // characters, not SQL wildcards. SQLite's own LOWER()/LIKE cannot do
+    // Unicode folding without an ICU build, so `filter_by_text` does this
+    // match in Rust after the other conditions have narrowed the rows.
     let sql = if conds.is_empty() { String::new() } else { format!(" WHERE {}", conds.join(" AND ")) };
     (sql, params)
 }
@@ -113,7 +117,11 @@ impl Store {
         let mut st = self.conn.prepare(&format!("{BASE_SELECT}{w} ORDER BY t.tx_date DESC, t.id DESC"))?;
         let refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|p| p.as_ref()).collect();
         let rows = st.query_map(refs.as_slice(), row_to_tx)?;
-        Ok(rows.collect::<std::result::Result<_, _>>()?)
+        let rows: Vec<TxRow> = rows.collect::<std::result::Result<_, _>>()?;
+        Ok(match &f.text {
+            Some(needle) => filter_by_text(rows, needle),
+            None => rows,
+        })
     }
 
     /// Newest-first statements for the Import screen's history section, with
@@ -148,6 +156,25 @@ impl Store {
     }
 }
 
+/// Literal substring on `fold()`ed text: no SQL wildcards, no diacritics, no
+/// case. Empty search text matches everything (same as the old `LIKE
+/// '%'||''||'%'` it replaces), so the early return is a fast path, not a
+/// behaviour change.
+fn filter_by_text(rows: Vec<TxRow>, needle: &str) -> Vec<TxRow> {
+    let needle = fold(needle);
+    if needle.is_empty() {
+        return rows;
+    }
+    rows.into_iter().filter(|r| row_matches_text(r, &needle)).collect()
+}
+
+fn row_matches_text(r: &TxRow, folded_needle: &str) -> bool {
+    fold(&r.merchant_raw).contains(folded_needle)
+        || fold(&r.note).contains(folded_needle)
+        || r.place.as_deref().is_some_and(|s| fold(s).contains(folded_needle))
+        || r.counterparty_name.as_deref().is_some_and(|s| fold(s).contains(folded_needle))
+}
+
 // A defaulted 1970 date would hide a corrupt row behind a plausible-looking
 // date (adjudicated review finding); surface the parse failure as a real
 // SQLite error instead.
@@ -176,9 +203,9 @@ fn row_identity(r: &rusqlite::Row) -> rusqlite::Result<TxIdentity> {
     ))
 }
 
-/// `(merchant_raw, place, counterparty_name, counterparty_iban, category_id, category_name, parent_name, status, source, raw_block)`,
-/// columns 10-19 of `BASE_SELECT`.
-type TxDetail = (String, Option<String>, Option<String>, Option<String>, Option<i64>, Option<String>, Option<String>, Status, String, String);
+/// `(merchant_raw, place, counterparty_name, counterparty_iban, category_id, category_name, parent_name, status, source, raw_block, note)`,
+/// columns 10-20 of `BASE_SELECT`.
+type TxDetail = (String, Option<String>, Option<String>, Option<String>, Option<i64>, Option<String>, Option<String>, Status, String, String, String);
 
 fn row_detail(r: &rusqlite::Row) -> rusqlite::Result<TxDetail> {
     Ok((
@@ -192,6 +219,7 @@ fn row_detail(r: &rusqlite::Row) -> rusqlite::Result<TxDetail> {
         status_parse(&r.get::<_, String>(17)?),
         r.get(18)?,
         r.get(19)?,
+        r.get(20)?,
     ))
 }
 
@@ -201,7 +229,7 @@ fn row_detail(r: &rusqlite::Row) -> rusqlite::Result<TxDetail> {
 /// function over all 20 `BASE_SELECT` columns measured 23.
 fn row_to_tx(r: &rusqlite::Row) -> rusqlite::Result<TxRow> {
     let (id, account_id, account_kind, statement_number, posted_date, tx_date, kind, amount_cents, orig_amount_cents, orig_currency) = row_identity(r)?;
-    let (merchant_raw, place, counterparty_name, counterparty_iban, category_id, category_name, parent_name, status, source, raw_block) = row_detail(r)?;
+    let (merchant_raw, place, counterparty_name, counterparty_iban, category_id, category_name, parent_name, status, source, raw_block, note) = row_detail(r)?;
     Ok(TxRow {
         id,
         account_id,
@@ -223,5 +251,6 @@ fn row_to_tx(r: &rusqlite::Row) -> rusqlite::Result<TxRow> {
         status,
         source,
         raw_block,
+        note,
     })
 }

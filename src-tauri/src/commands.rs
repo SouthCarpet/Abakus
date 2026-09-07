@@ -214,6 +214,30 @@ pub fn recent_statements(state: State<AppState>, limit: usize) -> Result<Vec<sto
     lock(&state)?.recent_statements(limit).map_err(|e| e.to_string())
 }
 
+/// 0.1.2: every statement matching BOTH optional filters, oldest first per
+/// account. Distinct from `recent_statements` (newest-first, capped, for the
+/// Import screen's own history section).
+#[tauri::command]
+pub fn statement_history(state: State<AppState>, account_id: Option<i64>, account_kind: Option<parser::AccountKind>) -> Result<Vec<store::StatementHistoryRow>, String> {
+    lock(&state)?.statement_history(account_id, account_kind).map_err(|e| e.to_string())
+}
+
+/// 0.1.2: exact text including newlines, up to `store::NOTE_MAX_CHARS`
+/// Unicode code points; an empty string clears the note. No learning,
+/// category or fingerprint change.
+#[tauri::command]
+pub fn save_transaction_note(state: State<AppState>, id: i64, note: String) -> Result<(), String> {
+    lock(&state)?.save_transaction_note(id, &note).map_err(|e| e.to_string())
+}
+
+/// 0.1.2: a consistent snapshot of the live database at a user-chosen local
+/// path. Never touches `secrets`/the OS keyring: the store alone decides
+/// what a backup contains.
+#[tauri::command]
+pub fn backup_database(state: State<AppState>, path: String) -> Result<store::BackupOutcome, String> {
+    lock(&state)?.backup_to(std::path::Path::new(&path)).map_err(|e| e.to_string())
+}
+
 /// A17/F1: what a delete of this statement would remove, for the confirmation
 /// text. It runs the same rule query the delete runs, so the numbers the user
 /// confirms are the numbers the delete produces.

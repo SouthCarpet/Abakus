@@ -106,7 +106,7 @@ fn fixture_from(text: &str) -> parser::Statement { parse_text(text).unwrap() }
 }
 #[test] fn csv_has_header_and_one_line_per_row() {
     let csv = loaded().export_csv(&TxFilter::default()).unwrap();
-    assert!(csv.starts_with("datum;ucet;obchodnik;miesto;suma_eur;kategoria;podkategoria;stav\n")); assert_eq!(csv.lines().count(), 13);
+    assert!(csv.starts_with("datum;ucet;obchodnik;miesto;suma_eur;kategoria;podkategoria;stav;poznamka\n")); assert_eq!(csv.lines().count(), 13);
 }
 
 /// 078 audit: `merchant_raw` and `place` come from parsed PDF text, not from
