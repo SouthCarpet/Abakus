@@ -138,11 +138,12 @@ impl Store {
 }
 
 pub(crate) struct TargetTx {
-    pub id: i64,
     pub account_id: i64,
     pub fingerprint: String,
     pub group_key: String,
     pub identity: IdentitySnapshot,
+    pub identity_kind: super::key::Identity,
+    pub currency_basis: CurrencyBasis,
 }
 
 /// `(id, account_id, fingerprint, amount_cents, orig_amount_cents,
@@ -181,20 +182,38 @@ pub(crate) fn load_target(conn: &rusqlite::Connection, transaction_id: i64) -> R
     }
     let direction = super::key::direction_of(amount_cents);
     let currency_basis = CurrencyBasis::resolve(orig_currency.as_deref(), orig_amount_cents);
-    let identity_kind = resolve_identity(counterparty_iban.as_deref(), counterparty_name.as_deref(), &merchant_norm);
+    let identity_kind = resolve_identity(&kind, counterparty_iban.as_deref(), counterparty_name.as_deref(), &merchant_norm);
     let key = group_key(&super::key::KeyInput { account_id, direction, currency_basis: &currency_basis, identity: &identity_kind, place_norm: place_norm.as_deref(), card_last4: card_last4.as_deref(), fingerprint: &fingerprint });
     let currency = currency_of(&currency_basis);
-    Ok(TargetTx { id, account_id, fingerprint, group_key: key, identity: IdentitySnapshot { direction, currency, name: merchant_raw } })
+    Ok(TargetTx {
+        account_id,
+        fingerprint,
+        group_key: key,
+        identity: IdentitySnapshot { direction, currency, name: merchant_raw },
+        identity_kind,
+        currency_basis,
+    })
 }
 
-/// `a`/`b` are compatible manual-selection members when they share account,
-/// cash direction and currency basis, even with different identities
-/// (recurring-contract.md §3's blank-identity/multi-contract escape path).
-/// Approximated here by comparing `group_key`'s account/direction/currency
-/// components indirectly through a fresh identity-free key: two full
-/// `group_key`s already differ only by identity/place/card when everything
-/// else matches, so this recomputes a reduced key ignoring those three.
-fn compatible(a: &TargetTx, b: &TargetTx) -> bool { a.account_id == b.account_id && a.identity.direction == b.identity.direction && a.identity.currency == b.identity.currency }
+/// Manual members share the exact nonblank group. Blank rows are compatible
+/// only with other blank rows on the same account, direction and currency.
+pub(crate) fn compatible(a: &TargetTx, b: &TargetTx) -> bool {
+    let same_basis = a.account_id == b.account_id
+        && a.identity.direction == b.identity.direction
+        && a.currency_basis == b.currency_basis;
+    same_basis
+        && (a.group_key == b.group_key
+            || matches!((&a.identity_kind, &b.identity_kind), (super::key::Identity::Blank, super::key::Identity::Blank)))
+}
+
+pub(crate) fn compatible_evidence(target: &TargetTx, evidence: &super::detect::Evidence) -> bool {
+    let same_basis = target.account_id == evidence.account_id
+        && target.identity.direction == evidence.direction
+        && target.currency_basis == evidence.currency_basis;
+    same_basis
+        && (target.group_key == evidence.group_key
+            || matches!((&target.identity_kind, &evidence.identity), (super::key::Identity::Blank, super::key::Identity::Blank)))
+}
 
 fn validate_selection_targets(targets: &[TargetTx]) -> Result<()> {
     let Some(first) = targets.first() else {
@@ -251,16 +270,37 @@ fn scope_of(selection: &RecurringSelection) -> RecurringScope {
     }
 }
 
-fn check_existing_compatible(existing: &Option<DecisionRow>, account_id: i64, scope: RecurringScope) -> Result<()> {
+fn existing_selected_reference(tx: &rusqlite::Transaction, existing: &DecisionRow) -> Result<Option<TargetTx>> {
+    if existing.scope != RecurringScope::Selected {
+        return Ok(None);
+    }
+    let id: Option<i64> = tx
+        .query_row(
+            "SELECT t.id FROM recurring_members m JOIN transactions t ON t.fingerprint = m.fingerprint WHERE m.decision_id = ?1 ORDER BY m.fingerprint LIMIT 1",
+            [existing.id],
+            |row| row.get(0),
+        )
+        .ok();
+    id.map(|id| load_target(tx, id)).transpose()
+}
+
+fn check_existing_compatible(tx: &rusqlite::Transaction, existing: &Option<DecisionRow>, targets: &[TargetTx]) -> Result<()> {
     let Some(existing) = existing else { return Ok(()) };
-    if existing.account_id != account_id || existing.scope != scope {
-        return Err(StoreError::Parse("Úprava nesmie zmeniť účet ani rozsah existujúceho rozhodnutia.".into()));
+    if existing.account_id != targets[0].account_id {
+        return Err(StoreError::Parse("Úprava nesmie zmeniť účet existujúceho rozhodnutia.".into()));
+    }
+    let compatible_group = match existing_selected_reference(tx, existing)? {
+        Some(reference) => targets.iter().all(|target| compatible(&reference, target)),
+        None => targets.iter().all(|target| target.group_key == existing.group_key),
+    };
+    if !compatible_group {
+        return Err(StoreError::Parse("Úprava nesmie zmeniť skupinovú identitu existujúceho rozhodnutia.".into()));
     }
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-fn upsert_by_scope(
+fn write_decision(
     tx: &rusqlite::Transaction,
     scope: RecurringScope,
     decision_id: Option<i64>,
@@ -272,16 +312,55 @@ fn upsert_by_scope(
     identity_json: &str,
     targets: &[TargetTx],
 ) -> Result<i64> {
-    match scope {
-        RecurringScope::Group => upsert_group_decision(tx, group_key_value, account_id, mode, cadence, anchor_date, identity_json),
-        RecurringScope::Selected => {
-            let others = other_selected_fingerprints(tx, decision_id)?;
-            if targets.iter().any(|t| others.contains(&t.fingerprint)) {
-                return Err(StoreError::Parse("Transakcia je už súčasťou iného ručného výberu.".into()));
-            }
-            upsert_selected_decision(tx, decision_id, group_key_value, account_id, mode, cadence, anchor_date, identity_json, targets)
+    validate_member_collisions(tx, scope, decision_id, targets)?;
+    let id = decision_row_id(tx, scope, decision_id, group_key_value, account_id, mode, cadence, anchor_date, identity_json)?;
+    replace_members(tx, id, scope, targets)?;
+    Ok(id)
+}
+
+fn validate_member_collisions(tx: &rusqlite::Transaction, scope: RecurringScope, decision_id: Option<i64>, targets: &[TargetTx]) -> Result<()> {
+    if scope == RecurringScope::Selected {
+        let others = other_selected_fingerprints(tx, decision_id)?;
+        if targets.iter().any(|t| others.contains(&t.fingerprint)) {
+            return Err(StoreError::Parse("Transakcia je už súčasťou iného ručného výberu.".into()));
         }
     }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn decision_row_id(
+    tx: &rusqlite::Transaction,
+    scope: RecurringScope,
+    decision_id: Option<i64>,
+    group_key_value: &str,
+    account_id: i64,
+    mode: RecurringDecisionMode,
+    cadence: Option<Cadence>,
+    anchor_date: Option<NaiveDate>,
+    identity_json: &str,
+) -> Result<i64> {
+    let id = match decision_id {
+        Some(id) => update_decision(tx, id, scope, mode, cadence, anchor_date, identity_json)?,
+        None if scope == RecurringScope::Group => {
+            upsert_group_decision(tx, group_key_value, account_id, mode, cadence, anchor_date, identity_json)?
+        }
+        None => insert_selected_decision(tx, group_key_value, account_id, mode, cadence, anchor_date, identity_json)?,
+    };
+    Ok(id)
+}
+
+fn replace_members(tx: &rusqlite::Transaction, id: i64, scope: RecurringScope, targets: &[TargetTx]) -> Result<()> {
+    tx.execute("DELETE FROM recurring_members WHERE decision_id = ?1", [id])?;
+    if scope == RecurringScope::Selected {
+        for target in targets {
+            tx.execute(
+                "INSERT INTO recurring_members (decision_id, fingerprint) VALUES (?1, ?2)",
+                rusqlite::params![id, target.fingerprint],
+            )?;
+        }
+    }
+    Ok(())
 }
 
 fn save_recurring_tx(tx: &rusqlite::Transaction, request: &SaveRecurringRequest) -> Result<RecurringDecision> {
@@ -290,12 +369,15 @@ fn save_recurring_tx(tx: &rusqlite::Transaction, request: &SaveRecurringRequest)
     validate_selection_targets(&targets)?;
     let account_id = targets[0].account_id;
     let scope = scope_of(&request.selection);
-    check_existing_compatible(&existing, account_id, scope)?;
+    if scope == RecurringScope::Group && matches!(&targets[0].identity_kind, super::key::Identity::Blank) {
+        return Err(StoreError::Parse("Transakcia bez obchodníka vyžaduje ručný výber.".into()));
+    }
+    check_existing_compatible(tx, &existing, &targets)?;
 
     let (mode, cadence, anchor_date) = decision_input_parts(&request.decision)?;
-    let group_key_value = targets[0].group_key.clone();
+    let group_key_value = existing.as_ref().map(|row| row.group_key.clone()).unwrap_or_else(|| targets[0].group_key.clone());
     let identity_json = serde_json::to_string(&targets[0].identity).map_err(|e| StoreError::Parse(e.to_string()))?;
-    let id = upsert_by_scope(tx, scope, request.decision_id, &group_key_value, account_id, mode, cadence, anchor_date, &identity_json, &targets)?;
+    let id = write_decision(tx, scope, request.decision_id, &group_key_value, account_id, mode, cadence, anchor_date, &identity_json, &targets)?;
 
     let row = tx
         .query_row(&format!("{SELECT_DECISION} WHERE id = ?1"), [id], row_to_decision)
@@ -313,36 +395,38 @@ fn upsert_group_decision(tx: &rusqlite::Transaction, group_key: &str, account_id
 }
 
 #[allow(clippy::too_many_arguments)]
-fn upsert_selected_decision(
+fn insert_selected_decision(
     tx: &rusqlite::Transaction,
-    decision_id: Option<i64>,
     group_key: &str,
     account_id: i64,
     mode: RecurringDecisionMode,
     cadence: Option<Cadence>,
     anchor_date: Option<NaiveDate>,
     identity_json: &str,
-    targets: &[TargetTx],
 ) -> Result<i64> {
-    let id = match decision_id {
-        Some(id) => {
-            tx.execute(
-                "UPDATE recurring_decisions SET group_key = ?2, mode = ?3, cadence = ?4, anchor_date = ?5, identity_json = ?6, updated_at = datetime('now') WHERE id = ?1",
-                rusqlite::params![id, group_key, mode_str(mode), cadence.map(cadence_str), anchor_date.map(|d| d.to_string()), identity_json],
-            )?;
-            id
-        }
-        None => {
-            tx.execute(
-                "INSERT INTO recurring_decisions (account_id, group_key, scope, mode, cadence, anchor_date, identity_json, updated_at) VALUES (?1, ?2, 'selected', ?3, ?4, ?5, ?6, datetime('now'))",
-                rusqlite::params![account_id, group_key, mode_str(mode), cadence.map(cadence_str), anchor_date.map(|d| d.to_string()), identity_json],
-            )?;
-            tx.last_insert_rowid()
-        }
-    };
-    tx.execute("DELETE FROM recurring_members WHERE decision_id = ?1", [id])?;
-    for t in targets {
-        tx.execute("INSERT INTO recurring_members (decision_id, fingerprint) VALUES (?1, ?2)", rusqlite::params![id, t.fingerprint])?;
+    tx.execute(
+        "INSERT INTO recurring_decisions (account_id, group_key, scope, mode, cadence, anchor_date, identity_json, updated_at) VALUES (?1, ?2, 'selected', ?3, ?4, ?5, ?6, datetime('now'))",
+        rusqlite::params![account_id, group_key, mode_str(mode), cadence.map(cadence_str), anchor_date.map(|d| d.to_string()), identity_json],
+    )?;
+    Ok(tx.last_insert_rowid())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn update_decision(
+    tx: &rusqlite::Transaction,
+    id: i64,
+    scope: RecurringScope,
+    mode: RecurringDecisionMode,
+    cadence: Option<Cadence>,
+    anchor_date: Option<NaiveDate>,
+    identity_json: &str,
+) -> Result<i64> {
+    let n = tx.execute(
+        "UPDATE recurring_decisions SET scope = ?2, mode = ?3, cadence = ?4, anchor_date = ?5, identity_json = ?6, updated_at = datetime('now') WHERE id = ?1",
+        rusqlite::params![id, scope_str(scope), mode_str(mode), cadence.map(cadence_str), anchor_date.map(|d| d.to_string()), identity_json],
+    )?;
+    if n != 1 {
+        return Err(StoreError::Parse(format!("Rozhodnutie s id {id} neexistuje.")));
     }
     Ok(id)
 }

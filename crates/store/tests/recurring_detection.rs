@@ -25,7 +25,7 @@ impl Drop for TempDb {
 
 /// `(tx_date, amount_cents)` rows for one account, one statement covering
 /// `stmt_start..stmt_end`, `checksum_status='ok'`.
-fn seed(db: &TempDb, account_id: i64, iban: &str, stmt_number: i64, stmt_start: &str, stmt_end: &str, hash: &str, rows: &[(&str, i64)]) {
+fn seed(db: &TempDb, account_id: i64, iban: &str, stmt_number: i64, period: (&str, &str), hash: &str, rows: &[(&str, i64)]) {
     { let _ = Store::open(&db.0).unwrap(); } // creates the schema (and seeds categories) before the raw connection writes into it
     let conn = db.raw();
     conn.execute(
@@ -35,7 +35,7 @@ fn seed(db: &TempDb, account_id: i64, iban: &str, stmt_number: i64, stmt_start: 
     .unwrap();
     conn.execute(
         "INSERT INTO statements (account_id, number, period_start, period_end, checksum_status, file_hash) VALUES (?1, ?2, ?3, ?4, 'ok', ?5)",
-        rusqlite::params![account_id, stmt_number, stmt_start, stmt_end, hash],
+        rusqlite::params![account_id, stmt_number, period.0, period.1, hash],
     )
     .unwrap();
     let statement_id: i64 = conn.query_row("SELECT id FROM statements WHERE file_hash = ?1", [hash], |r| r.get(0)).unwrap();
@@ -65,7 +65,7 @@ fn q(from: Option<&str>, to: Option<&str>, today: &str) -> RecurringQuery {
 #[test]
 fn r01_three_monthly_observations_qualify_and_two_do_not() {
     let db = TempDb::new("r01");
-    seed(&db, 1, "SK4411000000000012345678", 1, "2026-01-01", "2026-04-30", "r01", &[("2026-01-31", -1200), ("2026-02-28", -1200), ("2026-03-31", -1200)]);
+    seed(&db, 1, "SK4411000000000012345678", 1, ("2026-01-01", "2026-04-30"), "r01", &[("2026-01-31", -1200), ("2026-02-28", -1200), ("2026-03-31", -1200)]);
     let s = Store::open(&db.0).unwrap();
 
     let overview = s.recurring_overview(&q(None, None, "2026-04-15")).unwrap();
@@ -76,6 +76,10 @@ fn r01_three_monthly_observations_qualify_and_two_do_not() {
     assert_eq!(row.next_due, Some(NaiveDate::from_ymd_opt(2026, 4, 30).unwrap()));
     assert_eq!(row.state, RecurringState::Upcoming);
     assert_eq!(row.direction, RecurringDirection::Expense);
+
+    let partial = s.recurring_overview(&q(Some("2026-01-15"), Some("2026-03-31"), "2026-04-01")).unwrap();
+    assert_eq!(partial.average_months, vec!["2026-02"], "a finite range that starts mid-January must exclude that partial month");
+    assert_eq!(partial.average_expense_cents, Some(1_200));
 
     // Mutation: drop to two observations (delete the March row) and the
     // candidate must disappear entirely, not just lose its cadence label.
@@ -92,14 +96,14 @@ fn r01_three_monthly_observations_qualify_and_two_do_not() {
 fn r03_day_gap_and_amount_boundaries() {
     let db = TempDb::new("r03");
     // 33-day gaps: Jan1 -> Feb3 (33d) -> Mar8 (33d): both inside the inclusive window.
-    seed(&db, 1, "SK4411000000000012345678", 1, "2026-01-01", "2026-04-30", "r03-ok", &[("2026-01-01", -1000), ("2026-02-03", -1000), ("2026-03-08", -1000)]);
+    seed(&db, 1, "SK4411000000000012345678", 1, ("2026-01-01", "2026-04-30"), "r03-ok", &[("2026-01-01", -1000), ("2026-02-03", -1000), ("2026-03-08", -1000)]);
     let s = Store::open(&db.0).unwrap();
     let overview = s.recurring_overview(&q(None, None, "2026-03-20")).unwrap();
     assert!(overview.rows.iter().any(|r| r.name.to_lowercase().contains("netflix")), "a 33-day gap is inside the inclusive 28-33 window");
 
     let db2 = TempDb::new("r03-bad");
     // 34-day gap: just outside.
-    seed(&db2, 1, "SK4411000000000012345678", 1, "2026-01-01", "2026-05-31", "r03-bad", &[("2026-01-01", -1000), ("2026-02-04", -1000), ("2026-03-10", -1000)]);
+    seed(&db2, 1, "SK4411000000000012345678", 1, ("2026-01-01", "2026-05-31"), "r03-bad", &[("2026-01-01", -1000), ("2026-02-04", -1000), ("2026-03-10", -1000)]);
     let s2 = Store::open(&db2.0).unwrap();
     let overview2 = s2.recurring_overview(&q(None, None, "2026-03-20")).unwrap();
     assert!(!overview2.rows.iter().any(|r| r.name.to_lowercase().contains("netflix")), "a 34-day gap must fail the monthly window");
@@ -111,8 +115,8 @@ fn r03_day_gap_and_amount_boundaries() {
 #[test]
 fn r04_same_merchant_different_accounts_and_signs_never_group() {
     let db = TempDb::new("r04");
-    seed(&db, 1, "SK4411000000000012345678", 1, "2026-01-01", "2026-04-30", "r04-a", &[("2026-01-31", -1200), ("2026-02-28", -1200)]);
-    seed(&db, 2, "SK3711000000000098765432", 1, "2026-01-01", "2026-04-30", "r04-b", &[("2026-01-31", 1200), ("2026-02-28", 1200)]);
+    seed(&db, 1, "SK4411000000000012345678", 1, ("2026-01-01", "2026-04-30"), "r04-a", &[("2026-01-31", -1200), ("2026-02-28", -1200)]);
+    seed(&db, 2, "SK3711000000000098765432", 1, ("2026-01-01", "2026-04-30"), "r04-b", &[("2026-01-31", 1200), ("2026-02-28", 1200)]);
     let s = Store::open(&db.0).unwrap();
     let overview = s.recurring_overview(&q(None, None, "2026-03-01")).unwrap();
     // Neither side alone reaches the 3-observation monthly minimum, so
@@ -126,7 +130,7 @@ fn r04_same_merchant_different_accounts_and_signs_never_group() {
 #[test]
 fn r09_historical_as_of_ignores_future_evidence() {
     let db = TempDb::new("r09");
-    seed(&db, 1, "SK4411000000000012345678", 1, "2026-01-01", "2026-09-30", "r09", &[("2026-01-31", -1200), ("2026-02-28", -1200), ("2026-03-31", -1200), ("2026-09-05", -1200)]);
+    seed(&db, 1, "SK4411000000000012345678", 1, ("2026-01-01", "2026-09-30"), "r09", &[("2026-01-31", -1200), ("2026-02-28", -1200), ("2026-03-31", -1200), ("2026-09-05", -1200)]);
     let s = Store::open(&db.0).unwrap();
 
     let historical = s.recurring_overview(&q(Some("2026-01-01"), Some("2026-03-31"), "2026-09-07")).unwrap();
@@ -148,8 +152,7 @@ fn r12_price_change_badge_and_one_off_stability() {
         1,
         "SK4411000000000012345678",
         1,
-        "2026-01-01",
-        "2026-07-31",
+        ("2026-01-01", "2026-07-31"),
         "r12",
         &[("2026-01-31", -1000), ("2026-02-28", -1000), ("2026-03-31", -1200), ("2026-04-30", -1200), ("2026-05-31", -1200), ("2026-06-30", -1300)],
     );

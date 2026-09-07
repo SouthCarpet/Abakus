@@ -1,4 +1,5 @@
-use parser::{parse_text, AccountKind};
+use chrono::NaiveDate;
+use parser::{parse_text, AccountKind, Statement, Transaction, TxKind};
 use rules::{RuleKind, Status};
 use store::{Store, TxFilter};
 
@@ -12,6 +13,20 @@ fn loaded() -> Store {
     s
 }
 fn id_of(s: &Store, merchant: &str) -> i64 { s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.merchant_raw == merchant).unwrap().id }
+
+fn blank_statement(number: u32, rows: Vec<Transaction>) -> Statement {
+    Statement {
+        iban: "SK4411000000000012345678".into(),
+        account_kind: AccountKind::Personal,
+        number,
+        period_start: NaiveDate::from_ymd_opt(2026, 7, 1).unwrap(),
+        period_end: NaiveDate::from_ymd_opt(2026, 7, 31).unwrap(),
+        opening_cents: None,
+        closing_cents: None,
+        transactions: rows,
+        warnings: Vec::new(),
+    }
+}
 
 #[test] fn totals_exclude_transfers_and_net_refunds() {
     let sm = loaded().summary(None, None, None).unwrap();
@@ -38,6 +53,51 @@ fn id_of(s: &Store, merchant: &str) -> i64 { s.list_transactions(&TxFilter::defa
     assert!(rules.iter().any(|r| r.kind == RuleKind::Merchant && r.key == "of" && r.category_id == cat));
     let row = s.list_transactions(&TxFilter { text: Some("OF".into()), ..Default::default() }).unwrap().into_iter().find(|r| r.merchant_raw == "OF").unwrap();
     assert_eq!((row.status, row.category_id), (Status::Confirmed, Some(cat)));
+}
+
+#[test]
+fn blank_merchants_never_learn_match_or_sweep_other_blank_rows() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    let category = s.category_by_path("Nákupy/domácnosť").unwrap().unwrap();
+    s.insert_rule(RuleKind::Exact, "", None, category).unwrap();
+    s.insert_rule(RuleKind::Merchant, "", None, category).unwrap();
+    let july_1 = NaiveDate::from_ymd_opt(2026, 7, 1).unwrap();
+    let july_2 = NaiveDate::from_ymd_opt(2026, 7, 2).unwrap();
+    s.import_statement(
+        &blank_statement(
+            7,
+            vec![
+                Transaction::blank(july_1, -1_000, TxKind::Other, "blank purchase one".into()),
+                Transaction::blank(july_2, -2_000, TxKind::Other, "blank purchase two".into()),
+            ],
+        ),
+        "blank-july",
+    )
+    .unwrap();
+
+    let before = s.list_transactions(&TxFilter::default()).unwrap();
+    assert_eq!(before.len(), 2);
+    assert!(before.iter().all(|row| row.status == Status::Unassigned));
+    let first_id = before.iter().find(|row| row.amount_cents == -1_000).unwrap().id;
+
+    let outcome = s.assign(&[first_id], category, true).unwrap();
+    assert_eq!((outcome.updated, outcome.rules_created), (1, 0));
+    let after = s.list_transactions(&TxFilter::default()).unwrap();
+    let assigned = after.iter().find(|row| row.id == first_id).unwrap();
+    let unrelated = after.iter().find(|row| row.amount_cents == -2_000).unwrap();
+    assert_eq!((assigned.status, assigned.category_id), (Status::Confirmed, Some(category)));
+    assert_eq!((unrelated.status, unrelated.category_id), (Status::Unassigned, None));
+
+    let july_3 = NaiveDate::from_ymd_opt(2026, 7, 3).unwrap();
+    s.import_statement(
+        &blank_statement(8, vec![Transaction::blank(july_3, 1_000, TxKind::Refund, "blank refund".into())]),
+        "blank-refund",
+    )
+    .unwrap();
+    let refund = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|row| row.amount_cents == 1_000).unwrap();
+    assert_eq!((refund.status, refund.category_id), (Status::Unassigned, None));
+    assert_eq!(s.list_rules().unwrap().iter().filter(|rule| rule.key.is_empty()).count(), 2, "assignment must not add another blank rule");
 }
 /// N1: pins the full effect, not just the status flip, so a regression that
 /// drops the exact-rule write (merchant + place) or leaves the row

@@ -108,6 +108,38 @@ fn c01_self_descendant_missing_archived_and_system_parent_targets_are_all_refuse
 }
 
 #[test]
+fn create_enforces_a_two_level_tree_and_the_parent_kind() {
+    let mut s = Store::open_in_memory().unwrap();
+    let cats = s.list_categories().unwrap();
+    let income_root = find(&cats, "Faktúry").id;
+    let expense_child = find(&cats, "potraviny").id;
+    let system_root = find(&cats, "Hotovosť").id;
+
+    let child = s.save_category(None, Some(income_root), "bonus", CategoryKind::Expense).unwrap();
+    assert_eq!(child.kind, CategoryKind::Income, "a child must inherit its parent kind");
+    assert!(s.save_category(None, Some(expense_child), "third level", CategoryKind::Expense).is_err());
+    assert!(s.save_category(None, Some(system_root), "system child", CategoryKind::Expense).is_err());
+}
+
+#[test]
+fn an_archived_category_cannot_be_edited() {
+    let mut s = Store::open_in_memory().unwrap();
+    let category = find(&s.list_categories().unwrap(), "Faktúry");
+    s.archive_category(category.id).unwrap();
+
+    let result = s.update_category(&CategoryUpdateRequest {
+        id: category.id,
+        parent_id: None,
+        name: "Faktúry nové".into(),
+        kind: CategoryKind::Expense,
+        acknowledge_kind_change: false,
+    });
+
+    assert!(result.is_err());
+    assert!(find(&s.list_categories().unwrap(), "Faktúry").archived);
+}
+
+#[test]
 fn c01_the_protected_hotovost_subtree_keeps_rename_but_refuses_move_and_kind_change() {
     let mut s = Store::open_in_memory().unwrap();
     let cats = s.list_categories().unwrap();

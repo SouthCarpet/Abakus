@@ -4,13 +4,8 @@
 //! migration transaction: no BEGIN/COMMIT of its own (contract §1/§8: no
 //! nested transactions in seed or repair helpers).
 //!
-//! `repair_spotify_seed_tx` is `pub(crate)` by contract and has no caller
-//! yet in this isolated worktree: A wires the one call site into `migrate.rs`
-//! during the final selective merge. Until then the plain (non-test) build
-//! sees it as unreachable, so this module is exempted from `dead_code`; the
-//! `#[cfg(test)]` block below exercises it directly and exhaustively.
-#![allow(dead_code)]
 use crate::{Result, Store};
+use rusqlite::OptionalExtension;
 
 struct LegacySignature { rule_id: i64, predplatne_id: i64 }
 enum SiblingLookup { Found(i64), None, Ambiguous }
@@ -63,20 +58,19 @@ impl Store {
                     ))
                 },
             )
-            .ok();
+            .optional()?;
         Ok(row.and_then(is_legacy_signature))
     }
 
     fn active_spotify_sibling(&self, predplatne_id: i64) -> Result<SiblingLookup> {
-        let matches: Vec<i64> = self
+        let matches: Vec<_> = self
             .children_of(predplatne_id)?
             .into_iter()
-            .filter(|c| !c.archived && !c.system && parser::fold::fold(&c.name) == parser::fold::fold("Spotify"))
-            .map(|c| c.id)
+            .filter(|c| parser::fold::fold(&c.name) == parser::fold::fold("Spotify"))
             .collect();
         Ok(match matches.as_slice() {
             [] => SiblingLookup::None,
-            [id] => SiblingLookup::Found(*id),
+            [category] if !category.archived && !category.system && category.kind == crate::CategoryKind::Expense => SiblingLookup::Found(category.id),
             _ => SiblingLookup::Ambiguous,
         })
     }

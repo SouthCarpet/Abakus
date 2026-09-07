@@ -65,15 +65,23 @@ impl Store {
             return Ok(None);
         }
         let (exact, merchant_rule, created) = self.learn_rules_for(&merchant, place.as_deref(), category_id)?;
+        self.confirm_assignment(id, category_id, exact, merchant_rule)?;
+        Ok(Some(Learned { merchant, merchant_rule, created }))
+    }
+
+    fn confirm_assignment(&mut self, id: i64, category_id: i64, exact: Option<i64>, merchant_rule: Option<i64>) -> Result<()> {
+        let source = if exact.is_some() { "exact_rule" } else { "none" };
         self.conn.execute(
-            "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = ?3, source = 'exact_rule' WHERE id = ?1 AND status <> 'transfer'",
-            rusqlite::params![id, category_id, exact],
+            "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = ?3, source = ?4 WHERE id = ?1 AND status <> 'transfer'",
+            rusqlite::params![id, category_id, exact, source],
         )?;
-        self.record_rule_source(exact, id)?;
+        if let Some(rule) = exact {
+            self.record_rule_source(rule, id)?;
+        }
         if let Some(rule) = merchant_rule {
             self.record_rule_source(rule, id)?;
         }
-        Ok(Some(Learned { merchant, merchant_rule, created }))
+        Ok(())
     }
 
     /// The exact rule this row itself teaches, plus the broader merchant
@@ -81,13 +89,13 @@ impl Store {
     /// two were genuinely new rather than reused. Split out of `assign_one`
     /// so each function's cyclomatic complexity (every `?` here counts as a
     /// branch under the project's Lizard budget) stays within the limit.
-    fn learn_rules_for(&mut self, merchant: &str, place: Option<&str>, category_id: i64) -> Result<(i64, Option<i64>, usize)> {
+    fn learn_rules_for(&mut self, merchant: &str, place: Option<&str>, category_id: i64) -> Result<(Option<i64>, Option<i64>, usize)> {
+        if merchant.is_empty() {
+            return Ok((None, None, 0));
+        }
         let before = self.list_rules()?.len();
-        let exact = self.insert_rule(RuleKind::Exact, merchant, place, category_id)?;
-        let merchant_rule = match merchant.is_empty() {
-            true => None,
-            false => Some(self.insert_rule(RuleKind::Merchant, merchant, None, category_id)?),
-        };
+        let exact = Some(self.insert_rule(RuleKind::Exact, merchant, place, category_id)?);
+        let merchant_rule = Some(self.insert_rule(RuleKind::Merchant, merchant, None, category_id)?);
         let created = self.list_rules()?.len() - before;
         Ok((exact, merchant_rule, created))
     }
@@ -105,6 +113,9 @@ impl Store {
     /// once the teacher is gone, the swept row's statement has no provenance
     /// of its own to hand `delete_statement` when its turn comes.
     fn apply_merchant_rule(&mut self, merchant: &str, rule_id: Option<i64>, category_id: i64) -> Result<()> {
+        if merchant.is_empty() {
+            return Ok(());
+        }
         let swept: Vec<i64> = {
             let mut st = self.conn.prepare("SELECT id FROM transactions WHERE merchant_norm = ?1 AND status IN ('suggested', 'unassigned')")?;
             let rows = st.query_map([merchant], |r| r.get(0))?;

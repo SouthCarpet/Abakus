@@ -22,9 +22,9 @@ pub(crate) enum CurrencyBasis {
 impl CurrencyBasis {
     pub(crate) fn resolve(orig_currency: Option<&str>, orig_amount_cents: Option<i64>) -> Self {
         match (orig_currency, orig_amount_cents) {
-            (None, _) => Self::Eur,
-            (Some(c), Some(_)) => Self::Original(c.trim().to_uppercase()),
-            (Some(_), None) => Self::ForeignUnknown,
+            (None, None) => Self::Eur,
+            (Some(c), Some(_)) if !c.trim().is_empty() => Self::Original(c.trim().to_uppercase()),
+            _ => Self::ForeignUnknown,
         }
     }
     fn code(&self) -> String {
@@ -50,11 +50,14 @@ pub(crate) enum Identity {
     Blank,
 }
 
-pub(crate) fn resolve_identity(counterparty_iban: Option<&str>, counterparty_name: Option<&str>, merchant_norm: &str) -> Identity {
+pub(crate) fn resolve_identity(kind: &str, counterparty_iban: Option<&str>, counterparty_name: Option<&str>, merchant_norm: &str) -> Identity {
     let iban = counterparty_iban.map(str::trim).filter(|s| !s.is_empty());
     let name = counterparty_name.map(str::trim).filter(|s| !s.is_empty());
-    if let (Some(iban), Some(name)) = (iban, name) {
-        return Identity::Iban(parser::iban::normalize(iban), fold(name));
+    let supports_iban_identity = matches!(kind, "transfer_in" | "transfer_out" | "standing_order");
+    if supports_iban_identity {
+        if let (Some(iban), Some(name)) = (iban, name) {
+            return Identity::Iban(parser::iban::normalize(iban), fold(name));
+        }
     }
     let merchant = merchant_norm.trim();
     if merchant.is_empty() { Identity::Blank } else { Identity::Merchant(merchant.to_string()) }
@@ -171,20 +174,26 @@ mod tests {
     fn iban_identity_requires_both_iban_and_a_nonblank_name_or_it_falls_back() {
         // IBAN present but blank name: falls back to merchant_norm, not a
         // silently blank-name IBAN identity.
-        let identity = resolve_identity(Some("SK4411000000000012345678"), Some("  "), "acme");
+        let identity = resolve_identity("transfer_in", Some("SK4411000000000012345678"), Some("  "), "acme");
         assert_eq!(identity, Identity::Merchant("acme".to_string()));
     }
 
     #[test]
     fn iban_and_name_together_form_an_iban_identity_distinct_from_a_merchant_with_the_same_name() {
-        let iban_identity = resolve_identity(Some("SK44 1100 0000 0000 1234 5678"), Some("Ján Novák"), "");
+        let iban_identity = resolve_identity("standing_order", Some("SK44 1100 0000 0000 1234 5678"), Some("Ján Novák"), "");
         assert_eq!(iban_identity, Identity::Iban("SK4411000000000012345678".to_string(), "jan novak".to_string()));
     }
 
     #[test]
+    fn a_card_row_never_uses_an_incidental_counterparty_iban_as_identity() {
+        let identity = resolve_identity("card", Some("SK44 1100 0000 0000 1234 5678"), Some("Ján Novák"), "obchod");
+        assert_eq!(identity, Identity::Merchant("obchod".to_string()));
+    }
+
+    #[test]
     fn no_iban_and_no_merchant_is_blank() {
-        assert_eq!(resolve_identity(None, None, ""), Identity::Blank);
-        assert_eq!(resolve_identity(Some(""), Some(""), "  "), Identity::Blank);
+        assert_eq!(resolve_identity("other", None, None, ""), Identity::Blank);
+        assert_eq!(resolve_identity("other", Some(""), Some(""), "  "), Identity::Blank);
     }
 
     #[test]
@@ -192,6 +201,8 @@ mod tests {
         assert_eq!(CurrencyBasis::resolve(None, None), CurrencyBasis::Eur);
         assert_eq!(CurrencyBasis::resolve(Some("usd"), Some(1000)), CurrencyBasis::Original("USD".to_string()));
         assert_eq!(CurrencyBasis::resolve(Some("USD"), None), CurrencyBasis::ForeignUnknown);
+        assert_eq!(CurrencyBasis::resolve(None, Some(1000)), CurrencyBasis::ForeignUnknown);
+        assert_eq!(CurrencyBasis::resolve(Some("  "), Some(1000)), CurrencyBasis::ForeignUnknown);
         assert!(CurrencyBasis::resolve(Some("USD"), None).is_foreign_unknown());
     }
 }

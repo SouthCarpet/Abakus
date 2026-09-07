@@ -40,17 +40,7 @@ fn validate_name(name: &str) -> Result<String> {
 impl CategoryKind { pub fn as_str(self) -> &'static str { match self { Self::Expense => "expense", Self::Income => "income" } } pub fn parse(s: &str) -> Self { if s == "income" { Self::Income } else { Self::Expense } } }
 
 impl Store {
-    pub(crate) fn seed_categories(&mut self) -> Result<()> {
-        self.conn.execute_batch("BEGIN IMMEDIATE")?;
-        match self.seed_categories_tx() {
-            Ok(()) => { self.conn.execute_batch("COMMIT")?; Ok(()) }
-            Err(e) => { let _ = self.conn.execute_batch("ROLLBACK"); Err(e) }
-        }
-    }
-
-    /// Section 9 contract: no BEGIN/COMMIT of its own, so A's v4 migration can
-    /// call this inside its own open transaction. `seed_categories` above is
-    /// the legacy standalone entry point, kept for `Store::init`'s fresh-db path.
+    /// Fresh-only initialization helper. The caller owns BEGIN/COMMIT.
     pub(crate) fn seed_categories_tx(&mut self) -> Result<()> {
         for (i, c) in crate::seed_categories::SEED.iter().enumerate() {
             self.conn.execute("INSERT INTO categories (parent_id, name, kind, sort, system) VALUES (NULL, ?1, ?2, ?3, ?4)", rusqlite::params![c.name, c.kind, i as i64, c.system])?;
@@ -91,14 +81,34 @@ impl Store {
 
     fn create_category(&mut self, parent_id: Option<i64>, name: &str, kind: CategoryKind) -> Result<Category> {
         let name = validate_name(name)?;
-        if let Some(pid) = parent_id {
-            let parent = self.category_row(pid)?.ok_or(StoreError::UnknownCategory { id: pid })?;
-            if parent.archived { return Err(StoreError::Parse("Archivovaná kategória nemôže byť rodičom.".into())); }
-        }
-        self.check_duplicate_name_for_create(parent_id, &name)?;
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        let result = self.create_category_tx(parent_id, &name, kind);
+        finish_write(&self.conn, result)
+    }
+
+    fn create_category_tx(&mut self, parent_id: Option<i64>, name: &str, requested_kind: CategoryKind) -> Result<Category> {
+        let kind = match parent_id {
+            Some(pid) => self.validated_create_parent(pid)?.kind,
+            None => requested_kind,
+        };
+        self.check_duplicate_name_for_create(parent_id, name)?;
         self.conn.execute("INSERT INTO categories (parent_id, name, kind, sort) VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(sort),0)+1 FROM categories WHERE parent_id IS ?1))", rusqlite::params![parent_id, name, kind.as_str()])?;
         let id = self.conn.last_insert_rowid();
         self.category_row(id)?.ok_or_else(|| StoreError::Db("category vanished".into()))
+    }
+
+    fn validated_create_parent(&self, parent_id: i64) -> Result<Category> {
+        let parent = self.category_row(parent_id)?.ok_or(StoreError::UnknownCategory { id: parent_id })?;
+        if parent.archived {
+            return Err(StoreError::Parse("Archivovaná kategória nemôže byť rodičom.".into()));
+        }
+        if parent.system {
+            return Err(StoreError::Parse("Systémová kategória nemôže byť rodičom.".into()));
+        }
+        if parent.parent_id.is_some() {
+            return Err(StoreError::Parse("Nadradená kategória musí byť najvyššej úrovne.".into()));
+        }
+        Ok(parent)
     }
 
     fn check_duplicate_name_for_create(&self, parent_id: Option<i64>, name: &str) -> Result<()> {
@@ -131,8 +141,15 @@ impl Store {
     /// requires `acknowledge_kind_change`, revalidated here (not trusted from
     /// a stale client-side preview).
     pub fn update_category(&mut self, req: &CategoryUpdateRequest) -> Result<Category> {
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        let result = self.update_category_tx(req);
+        finish_write(&self.conn, result)
+    }
+
+    fn update_category_tx(&mut self, req: &CategoryUpdateRequest) -> Result<Category> {
         let target = self.category_row(req.id)?.ok_or(StoreError::UnknownCategory { id: req.id })?;
         if target.system { return Err(StoreError::Parse("systémovú kategóriu nemožno premenovať".into())); }
+        if target.archived { return Err(StoreError::Parse("Archivovanú kategóriu nemožno upraviť.".into())); }
         let name = validate_name(&req.name)?;
         let (new_parent_id, new_kind) = self.resolve_parent_and_kind(&target, req)?;
         self.check_protected_subtree(&target, new_parent_id, new_kind)?;
@@ -141,7 +158,7 @@ impl Store {
             return Err(StoreError::Parse("Zmena druhu kategórie ovplyvní históriu transakcií a vyžaduje potvrdenie.".into()));
         }
         self.check_duplicate_name(&target, new_parent_id, &name)?;
-        self.apply_category_update(&target, new_parent_id, &name, new_kind)
+        self.apply_category_update_tx(&target, new_parent_id, &name, new_kind)
     }
 
     /// Parent kind wins for a child; a root (staying or becoming one) keeps
@@ -220,14 +237,6 @@ impl Store {
         Ok(())
     }
 
-    fn apply_category_update(&mut self, target: &Category, new_parent_id: Option<i64>, name: &str, new_kind: CategoryKind) -> Result<Category> {
-        self.conn.execute_batch("BEGIN IMMEDIATE")?;
-        match self.apply_category_update_tx(target, new_parent_id, name, new_kind) {
-            Ok(cat) => { self.conn.execute_batch("COMMIT")?; Ok(cat) }
-            Err(e) => { let _ = self.conn.execute_batch("ROLLBACK"); Err(e) }
-        }
-    }
-
     /// Sort is preserved unless the category actually moves, in which case it
     /// is appended after its new siblings. A root's kind change propagates to
     /// every child, including archived ones, in the same transaction.
@@ -244,4 +253,19 @@ impl Store {
         }
         self.category_row(target.id)?.ok_or_else(|| StoreError::Db("category vanished".into()))
     }
+}
+
+fn finish_write<T>(conn: &rusqlite::Connection, result: Result<T>) -> Result<T> {
+    let value = match result {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(error);
+        }
+    };
+    if let Err(error) = conn.execute_batch("COMMIT") {
+        let _ = conn.execute_batch("ROLLBACK");
+        return Err(error.into());
+    }
+    Ok(value)
 }

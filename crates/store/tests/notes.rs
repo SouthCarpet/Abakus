@@ -3,6 +3,7 @@
 //! persistent SQLite file (not `open_in_memory`), the shape the desktop app
 //! actually runs in.
 use parser::AccountKind;
+use rusqlite::Connection;
 use store::{Store, TxFilter};
 
 struct TempDb(std::path::PathBuf);
@@ -102,6 +103,37 @@ fn csv_export_defuses_and_quotes_a_multiline_note_and_adds_the_poznamka_column()
     let expected_field = "\"'\n=cmd|'/c calc'!A1\nobsahuje \"\"úvodzovky\"\" aj koniec riadku\"";
     assert!(csv.contains(expected_field), "note must be defused (leading LF), quote-doubled and kept multiline:\n{csv}");
     assert_eq!(s.list_transactions(&TxFilter { text: Some("ALDI".into()), ..Default::default() }).unwrap().len(), 1, "exactly one record must have been exported despite the embedded newlines");
+}
+
+#[test]
+fn csv_export_escapes_a_legacy_multiline_category_loaded_from_disk() {
+    let db = TempDb::new("legacy-category-csv");
+    let s = loaded(&db);
+    let id = id_of(&s, "ALDI SUED");
+    drop(s);
+
+    let legacy_name = "\n=SUM(A1)\n\"Legacy\"";
+    let raw = Connection::open(&db.0).unwrap();
+    raw.execute(
+        "INSERT INTO categories (name, kind, sort) VALUES (?1, 'expense', 999)",
+        [legacy_name],
+    )
+    .unwrap();
+    let category_id = raw.last_insert_rowid();
+    raw.execute(
+        "UPDATE transactions SET category_id = ?2, status = 'confirmed' WHERE id = ?1",
+        rusqlite::params![id, category_id],
+    )
+    .unwrap();
+    drop(raw);
+
+    let reopened = Store::open(&db.0).unwrap();
+    let csv = reopened.export_csv(&TxFilter { text: Some("ALDI".into()), ..Default::default() }).unwrap();
+
+    let expected_category = "\"'\n=SUM(A1)\n\"\"Legacy\"\"\"";
+    assert!(csv.contains(expected_category), "legacy category must be defused, quote-doubled and kept multiline:\n{csv}");
+    let row = reopened.list_transactions(&TxFilter { text: Some("ALDI".into()), ..Default::default() }).unwrap();
+    assert_eq!(row.len(), 1);
 }
 
 #[test]

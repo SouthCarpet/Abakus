@@ -3,7 +3,7 @@
 //! transaction. Off-by/unverifiable statements remain visible evidence
 //! elsewhere but never close a coverage gap here.
 use crate::{Result, Store};
-use chrono::{Duration, NaiveDate};
+use chrono::NaiveDate;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Range {
@@ -20,7 +20,7 @@ pub(crate) fn merge_ranges(mut ranges: Vec<Range>) -> Vec<Range> {
     let mut merged: Vec<Range> = Vec::new();
     for r in ranges {
         match merged.last_mut() {
-            Some(last) if r.start <= last.end + Duration::days(1) => {
+            Some(last) if r.start <= last.end.succ_opt().unwrap_or(last.end) => {
                 if r.end > last.end {
                     last.end = r.end;
                 }

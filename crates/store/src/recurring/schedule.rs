@@ -17,7 +17,14 @@ pub(crate) fn cadence_months(c: Cadence) -> i64 {
 fn out_of_range() -> StoreError { StoreError::Parse("recurring: dátum mimo podporovaného rozsahu 0001-9999".into()) }
 
 fn days_in_month(year: i32, month: u32) -> Result<u32> {
-    let (ny, nm) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
+    if year == 9999 && month == 12 {
+        return Ok(31);
+    }
+    let (ny, nm) = if month == 12 {
+        (year.checked_add(1).ok_or_else(out_of_range)?, 1)
+    } else {
+        (year, month.checked_add(1).ok_or_else(out_of_range)?)
+    };
     let first_of_next = NaiveDate::from_ymd_opt(ny, nm, 1).ok_or_else(out_of_range)?;
     Ok(first_of_next.pred_opt().ok_or_else(out_of_range)?.day())
 }
@@ -94,5 +101,11 @@ mod tests {
         assert_eq!(calendar_months_between(a, b), 1);
         let c = NaiveDate::from_ymd_opt(2026, 4, 30).unwrap();
         assert_eq!(calendar_months_between(a, c), 3);
+    }
+
+    #[test]
+    fn december_9999_has_a_valid_month_end() {
+        let date = NaiveDate::from_ymd_opt(9999, 12, 1).unwrap();
+        assert_eq!(month_end(date).unwrap(), NaiveDate::from_ymd_opt(9999, 12, 31).unwrap());
     }
 }

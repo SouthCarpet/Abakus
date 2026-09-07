@@ -20,12 +20,31 @@ pub fn classify(f: &Facts, ctx: &Context) -> Assignment {
     if let Some(iban) = f.counterparty_iban { if ctx.own_ibans.contains(iban) { return Assignment { status: Status::Transfer, category_id: None, rule_id: None, source: Source::OwnAccount }; } }
     let by = |k: RuleKind, pred: &dyn Fn(&Rule) -> bool| ctx.rules.iter().find(|r| r.kind == k && pred(r));
     if let Some(r) = f.counterparty_iban.and_then(|i| by(RuleKind::CounterpartyAccount, &|r| r.key == i)) { return hit(Status::Confirmed, r, Source::AccountRule); }
-    if let Some(r) = by(RuleKind::Exact, &|r| r.key == f.merchant_norm && r.place.as_deref() == f.place_norm) { return hit(Status::Confirmed, r, Source::ExactRule); }
-    if let Some(r) = by(RuleKind::Merchant, &|r| r.key == f.merchant_norm) { return hit(Status::Suggested, r, Source::MerchantRule); }
-    if let Some(r) = most_similar(f.merchant_norm, ctx.rules) { return hit(Status::Suggested, r, Source::Similar); }
-    // Single-word seed keys match by whole token only (a `contains` on `dm` or `of` would hit random merchants); multi-word keys use contains.
-    if let Some(r) = by(RuleKind::Seed, &|r| if r.key.contains(' ') { f.merchant_norm.contains(&r.key) } else { f.merchant_norm.split(' ').any(|t| t == r.key) }) { return hit(Status::Suggested, r, Source::Seed); }
+    if let Some(assignment) = named_rule_match(f, ctx) { return assignment; }
     kind_rule(f, ctx).unwrap_or(Assignment { status: Status::Unassigned, category_id: None, rule_id: None, source: Source::None })
+}
+
+/// A blank normalized merchant is not a recognizable identity. Historical
+/// blank Exact/Merchant rules remain stored, but must never classify every
+/// other unnamed transaction. Counterparty-account rules are handled before
+/// this guard and remain valid for explicit IBAN identities.
+fn named_rule_match(f: &Facts, ctx: &Context) -> Option<Assignment> {
+    if f.merchant_norm.is_empty() { return None; }
+    let by = |kind: RuleKind, pred: &dyn Fn(&Rule) -> bool| ctx.rules.iter().find(|rule| rule.kind == kind && pred(rule));
+    if let Some(rule) = by(RuleKind::Exact, &|rule| rule.key == f.merchant_norm && rule.place.as_deref() == f.place_norm) {
+        return Some(hit(Status::Confirmed, rule, Source::ExactRule));
+    }
+    if let Some(rule) = by(RuleKind::Merchant, &|rule| rule.key == f.merchant_norm) {
+        return Some(hit(Status::Suggested, rule, Source::MerchantRule));
+    }
+    if let Some(rule) = most_similar(f.merchant_norm, ctx.rules) {
+        return Some(hit(Status::Suggested, rule, Source::Similar));
+    }
+    // Single-word seed keys match by whole token only. A substring match on
+    // `dm` or `of` would hit unrelated merchants.
+    by(RuleKind::Seed, &|rule| {
+        if rule.key.contains(' ') { f.merchant_norm.contains(&rule.key) } else { f.merchant_norm.split(' ').any(|token| token == rule.key) }
+    }).map(|rule| hit(Status::Suggested, rule, Source::Seed))
 }
 
 fn most_similar<'a>(merchant: &str, rules: &'a [Rule]) -> Option<&'a Rule> {
@@ -36,7 +55,11 @@ fn most_similar<'a>(merchant: &str, rules: &'a [Rule]) -> Option<&'a Rule> {
 }
 
 fn kind_rule(f: &Facts, ctx: &Context) -> Option<Assignment> {
-    match f.kind { TxKind::Atm => kind_hit(ctx.cash_category), TxKind::Refund => kind_hit((ctx.refund_lookup)(f.merchant_norm)), _ => None }
+    match f.kind {
+        TxKind::Atm => kind_hit(ctx.cash_category),
+        TxKind::Refund if !f.merchant_norm.is_empty() => kind_hit((ctx.refund_lookup)(f.merchant_norm)),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -96,5 +119,27 @@ mod tests {
         let lookup = |m: &str| (m == "amazon").then_some(11);
         let a = classify(&facts(TxKind::Refund, "amazon", None, None), &ctx(&own, &rules, &lookup));
         assert_eq!((a.status, a.category_id, a.source), (Status::Suggested, Some(11), Source::KindRule));
+    }
+    #[test]
+    fn blank_merchant_never_matches_historical_blank_exact_or_merchant_rules() {
+        let own = HashSet::new();
+        let rules = [rule(1, RuleKind::Exact, "", None, 7), rule(2, RuleKind::Merchant, "", None, 8)];
+        let a = classify(&facts(TxKind::Card, "", None, None), &ctx(&own, &rules, &none));
+        assert_eq!((a.status, a.category_id, a.rule_id, a.source), (Status::Unassigned, None, None, Source::None));
+    }
+    #[test]
+    fn blank_refund_does_not_reuse_an_unrelated_blank_purchase() {
+        let own = HashSet::new();
+        let rules: [Rule; 0] = [];
+        let lookup = |_: &str| Some(11);
+        let a = classify(&facts(TxKind::Refund, "", None, None), &ctx(&own, &rules, &lookup));
+        assert_eq!((a.status, a.category_id, a.source), (Status::Unassigned, None, Source::None));
+    }
+    #[test]
+    fn explicit_iban_rule_still_matches_when_merchant_is_blank() {
+        let own = HashSet::new();
+        let rules = [rule(4, RuleKind::CounterpartyAccount, "SK0281800000007000000001", None, 12)];
+        let a = classify(&facts(TxKind::StandingOrder, "", None, Some("SK0281800000007000000001")), &ctx(&own, &rules, &none));
+        assert_eq!((a.status, a.category_id, a.rule_id, a.source), (Status::Confirmed, Some(12), Some(4), Source::AccountRule));
     }
 }

@@ -9,7 +9,8 @@ fn kind_str(k: RuleKind) -> &'static str { match k { RuleKind::Exact => "exact",
 fn kind_parse(s: &str) -> RuleKind { match s { "exact" => RuleKind::Exact, "merchant" => RuleKind::Merchant, "counterparty_account" => RuleKind::CounterpartyAccount, _ => RuleKind::Seed } }
 
 impl Store {
-    pub(crate) fn seed_rules(&mut self) -> Result<()> {
+    /// Fresh-only initialization helper. The caller owns BEGIN/COMMIT.
+    pub(crate) fn seed_rules_tx(&mut self) -> Result<()> {
         let file: SeedFile = toml::from_str(include_str!("seed_rules.toml")).map_err(|e| StoreError::Parse(e.to_string()))?;
         for r in file.rule {
             let cat = self.category_by_path(&r.category)?.ok_or_else(|| StoreError::Parse(format!("seed rule {} points at unknown category {}", r.key, r.category)))?;
@@ -87,7 +88,13 @@ impl Store {
         self.check_redirect_target(category_id)?;
         self.conn.execute_batch("BEGIN IMMEDIATE")?;
         match self.update_rule_category_tx(rule_id, category_id) {
-            Ok(updated) => { self.conn.execute_batch("COMMIT")?; Ok(RuleRedirectOutcome { rule_id, category_id, updated }) }
+            Ok(updated) => {
+                if let Err(error) = self.conn.execute_batch("COMMIT") {
+                    let _ = self.conn.execute_batch("ROLLBACK");
+                    return Err(error.into());
+                }
+                Ok(RuleRedirectOutcome { rule_id, category_id, updated })
+            }
             Err(e) => { let _ = self.conn.execute_batch("ROLLBACK"); Err(e) }
         }
     }

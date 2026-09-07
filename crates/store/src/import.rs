@@ -103,6 +103,9 @@ impl Store {
     }
 
     fn last_confirmed_category(&self, merchant_norm: &str) -> Option<i64> {
+        if merchant_norm.is_empty() {
+            return None;
+        }
         self.conn.query_row("SELECT category_id FROM transactions WHERE merchant_norm = ?1 AND status = 'confirmed' AND amount_cents < 0 ORDER BY tx_date DESC LIMIT 1", [merchant_norm], |r| r.get(0)).ok()
     }
 }

@@ -19,8 +19,6 @@ pub(crate) struct Evidence {
     pub orig_amount_cents: Option<i64>,
     pub orig_currency: Option<String>,
     pub merchant_raw: String,
-    pub place_norm: Option<String>,
-    pub card_last4: Option<String>,
     pub category_id: Option<i64>,
     pub subscription_category: bool,
     pub group_key: String,
@@ -48,7 +46,7 @@ pub(crate) fn comparison_currency(e: &Evidence) -> String {
 const LOAD_SQL: &str = "\
 SELECT t.id, t.account_id, a.kind, a.label, t.fingerprint, t.tx_date, t.amount_cents, \
        t.orig_amount_cents, t.orig_currency, t.merchant_raw, t.merchant_norm, t.place_norm, \
-       t.counterparty_name, t.counterparty_iban, t.card_last4, t.category_id, c.name, c.archived, p.name \
+       t.counterparty_name, t.counterparty_iban, t.card_last4, t.category_id, c.name, c.archived, p.name, t.kind \
 FROM transactions t \
 JOIN accounts a ON a.id = t.account_id \
 LEFT JOIN categories c ON c.id = t.category_id \
@@ -98,7 +96,8 @@ fn row_to_evidence(r: &rusqlite::Row) -> rusqlite::Result<Evidence> {
 
     let direction = key::direction_of(amount_cents);
     let currency_basis = CurrencyBasis::resolve(orig_currency.as_deref(), orig_amount_cents);
-    let identity = key::resolve_identity(counterparty_iban.as_deref(), counterparty_name.as_deref(), &merchant_norm);
+    let kind: String = r.get(19)?;
+    let identity = key::resolve_identity(&kind, counterparty_iban.as_deref(), counterparty_name.as_deref(), &merchant_norm);
     let group_key = key::group_key(&key::KeyInput {
         account_id,
         direction,
@@ -120,8 +119,6 @@ fn row_to_evidence(r: &rusqlite::Row) -> rusqlite::Result<Evidence> {
         orig_amount_cents,
         orig_currency,
         merchant_raw,
-        place_norm,
-        card_last4,
         category_id,
         subscription_category,
         group_key,
@@ -145,6 +142,12 @@ impl Store {
             Some(k) => st.query_map(rusqlite::params![as_of.to_string(), crate::accounts::kind_str(k)], row_to_evidence)?.collect::<std::result::Result<Vec<_>, _>>()?,
             None => st.query_map(rusqlite::params![as_of.to_string()], row_to_evidence)?.collect::<std::result::Result<Vec<_>, _>>()?,
         };
+        for row in &rows {
+            super::money::safe_i64(i128::from(row.amount_cents))?;
+            if let Some(original) = row.orig_amount_cents {
+                super::money::safe_i64(i128::from(original))?;
+            }
+        }
         Ok(rows)
     }
 
@@ -196,7 +199,7 @@ fn adjacent_pair_qualifies(a: &Evidence, b: &Evidence, spec: &RunSpec) -> bool {
 }
 
 fn run_amount_ok(window: &[Evidence]) -> bool {
-    let amounts: Vec<i64> = window.iter().map(comparison_amount).collect();
+    let amounts: Vec<i128> = window.iter().map(|e| i128::from(comparison_amount(e))).collect();
     let Some(&min) = amounts.iter().min() else { return false };
     let Some(&max) = amounts.iter().max() else { return false };
     min > 0 && 100 * (max - min) <= 10 * min
@@ -244,8 +247,6 @@ mod tests {
             orig_amount_cents: None,
             orig_currency: None,
             merchant_raw: "MERCHANT".into(),
-            place_norm: None,
-            card_last4: None,
             category_id: None,
             subscription_category: false,
             group_key: "g".into(),

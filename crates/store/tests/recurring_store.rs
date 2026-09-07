@@ -4,7 +4,7 @@
 use chrono::NaiveDate;
 use rusqlite::Connection;
 use parser::AccountKind;
-use store::recurring::{RecurringDecisionInput, RecurringQuery, RecurringScope, RecurringSelection, RecurringState, RowDecision, SaveRecurringRequest, UnknownReason};
+use store::recurring::{Cadence, RecurringDecisionInput, RecurringQuery, RecurringScope, RecurringSelection, RecurringState, RowDecision, SaveRecurringRequest, UnknownReason};
 use store::Store;
 
 struct TempDb(std::path::PathBuf);
@@ -139,12 +139,104 @@ fn r08_deleting_an_account_cascades_its_decisions_and_leaves_others_alone() {
     assert_eq!(kept_row.account_id, kept);
 }
 
+#[test]
+fn selected_scope_rejects_unrelated_nonblank_merchants_without_writing() {
+    let db = TempDb::new("selected-identity");
+    let mut s = Store::open(&db.0).unwrap();
+    let account = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    let alpha = insert_named_tx(&db.0, account, "2026-01-15", -1_000, "alpha", "ALPHA");
+    let beta = insert_named_tx(&db.0, account, "2026-02-15", -1_000, "beta", "BETA");
+
+    let result = s.save_recurring(&SaveRecurringRequest {
+        decision_id: None,
+        selection: RecurringSelection::Selected { transaction_ids: vec![alpha, beta] },
+        decision: RecurringDecisionInput::Confirmed { cadence: Cadence::Monthly, anchor_date: NaiveDate::from_ymd_opt(2026, 1, 15).unwrap() },
+    });
+
+    assert!(result.is_err());
+    assert!(s.recurring_overview(&q("2026-03-01")).unwrap().rows.is_empty());
+}
+
+#[test]
+fn blank_identity_requires_selected_scope_and_accepts_only_compatible_blank_rows() {
+    let db = TempDb::new("blank-selection");
+    let mut s = Store::open(&db.0).unwrap();
+    let account = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    let first = insert_named_tx(&db.0, account, "2026-01-15", -1_000, "blank-a", "");
+    let second = insert_named_tx(&db.0, account, "2026-02-15", -1_000, "blank-b", "");
+    let named = insert_named_tx(&db.0, account, "2026-03-15", -1_000, "named", "NAMED");
+
+    let group = s.save_recurring(&SaveRecurringRequest {
+        decision_id: None,
+        selection: RecurringSelection::Group { transaction_id: first },
+        decision: RecurringDecisionInput::Ignored,
+    });
+    assert!(group.is_err());
+
+    let selected = s
+        .save_recurring(&SaveRecurringRequest {
+            decision_id: None,
+            selection: RecurringSelection::Selected { transaction_ids: vec![first, second] },
+            decision: RecurringDecisionInput::Confirmed { cadence: Cadence::Monthly, anchor_date: NaiveDate::from_ymd_opt(2026, 1, 15).unwrap() },
+        })
+        .unwrap();
+    assert_eq!(selected.scope, RecurringScope::Selected);
+    let incompatible_edit = s.save_recurring(&SaveRecurringRequest {
+        decision_id: Some(selected.id),
+        selection: RecurringSelection::Selected { transaction_ids: vec![first, named] },
+        decision: RecurringDecisionInput::Ignored,
+    });
+    assert!(incompatible_edit.is_err());
+    let row = s.recurring_overview(&q("2026-03-20")).unwrap().rows.into_iter().find(|row| row.decision_id == Some(selected.id)).unwrap();
+    assert_eq!(row.decision, RowDecision::Confirmed, "failed edit must leave the decision unchanged");
+    assert_eq!(row.evidence_count, 2);
+}
+
+#[test]
+fn a_scope_change_within_one_group_retains_the_decision_id() {
+    let db = TempDb::new("scope-change");
+    let mut s = Store::open(&db.0).unwrap();
+    let account = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    let first = insert_named_tx(&db.0, account, "2026-01-15", -1_000, "same-a", "SAME");
+    let second = insert_named_tx(&db.0, account, "2026-02-15", -1_000, "same-b", "SAME");
+    let group = s
+        .save_recurring(&SaveRecurringRequest {
+            decision_id: None,
+            selection: RecurringSelection::Group { transaction_id: first },
+            decision: RecurringDecisionInput::Ignored,
+        })
+        .unwrap();
+
+    let selected = s
+        .save_recurring(&SaveRecurringRequest {
+            decision_id: Some(group.id),
+            selection: RecurringSelection::Selected { transaction_ids: vec![first, second] },
+            decision: RecurringDecisionInput::Confirmed { cadence: Cadence::Monthly, anchor_date: NaiveDate::from_ymd_opt(2026, 1, 15).unwrap() },
+        })
+        .unwrap();
+
+    assert_eq!(selected.id, group.id);
+    assert_eq!(selected.scope, RecurringScope::Selected);
+}
+
+#[test]
+fn incomplete_or_reversed_query_ranges_are_rejected() {
+    let s = Store::open_in_memory().unwrap();
+    let today = NaiveDate::from_ymd_opt(2026, 9, 7).unwrap();
+    assert!(s.recurring_overview(&RecurringQuery { from: Some(today), to: None, account_kind: None, today }).is_err());
+    assert!(s.recurring_overview(&RecurringQuery { from: Some(today), to: Some(NaiveDate::from_ymd_opt(2026, 9, 6).unwrap()), account_kind: None, today }).is_err());
+}
+
 /// Writes one statement plus one transaction directly (same technique as
 /// `recurring_detection.rs`: a second connection on the same on-disk file,
 /// since `Store::conn` is not visible from an external integration test).
 /// Callers are expected to have already opened the `Store` once so the
 /// schema exists.
 fn insert_tx(path: &std::path::Path, account_id: i64, date: &str, amount_cents: i64, key: &str) -> i64 {
+    insert_named_tx(path, account_id, date, amount_cents, key, "INSURANCE CO")
+}
+
+fn insert_named_tx(path: &std::path::Path, account_id: i64, date: &str, amount_cents: i64, key: &str, merchant: &str) -> i64 {
     let conn = Connection::open(path).unwrap();
     let hash = format!("h-{key}");
     conn.execute(
@@ -155,8 +247,8 @@ fn insert_tx(path: &std::path::Path, account_id: i64, date: &str, amount_cents: 
     let statement_id: i64 = conn.query_row("SELECT id FROM statements WHERE file_hash = ?1", [&hash], |r| r.get(0)).unwrap();
     conn.execute(
         "INSERT INTO transactions (statement_id, account_id, fingerprint, posted_date, tx_date, kind, amount_cents, merchant_raw, merchant_norm, raw_block, status, source) \
-         VALUES (?1, ?2, ?3, ?4, ?4, 'card', ?5, 'INSURANCE CO', 'insurance co', 'raw', 'unassigned', 'none')",
-        rusqlite::params![statement_id, account_id, format!("fp-{key}"), date, amount_cents],
+         VALUES (?1, ?2, ?3, ?4, ?4, 'card', ?5, ?6, ?7, 'raw', 'unassigned', 'none')",
+        rusqlite::params![statement_id, account_id, format!("fp-{key}"), date, amount_cents, merchant, rules::normalize(merchant)],
     )
     .unwrap();
     conn.last_insert_rowid()

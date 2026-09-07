@@ -13,7 +13,7 @@ const GRACE_DAYS: i64 = 10;
 /// A generous ceiling on how many occurrences a schedule can generate
 /// between its anchor and `as_of`; real inputs terminate in well under a
 /// few hundred iterations (a monthly cadence run for 1000 years is 12000).
-const MAX_OCCURRENCES: i64 = 20_000;
+const MAX_OCCURRENCES: i64 = 120_000;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ScheduleOutcome {
@@ -41,10 +41,15 @@ struct Scan<'a> {
 }
 
 impl<'a> Scan<'a> {
-    fn candidates(&self, due: NaiveDate) -> Vec<usize> {
-        let start = due - Duration::days(GRACE_DAYS);
-        let end = due + Duration::days(GRACE_DAYS);
-        self.evidence.iter().enumerate().filter(|(i, e)| !self.used[*i] && e.tx_date >= start && e.tx_date <= end).map(|(i, _)| i).collect()
+    fn window(due: NaiveDate) -> Result<(NaiveDate, NaiveDate)> {
+        let start = due.checked_sub_signed(Duration::days(GRACE_DAYS)).ok_or_else(|| crate::StoreError::Parse("recurring: okno je mimo podporovaného rozsahu".into()))?;
+        let end = due.checked_add_signed(Duration::days(GRACE_DAYS)).ok_or_else(|| crate::StoreError::Parse("recurring: okno je mimo podporovaného rozsahu".into()))?;
+        Ok((start, end))
+    }
+
+    fn candidates(&self, due: NaiveDate) -> Result<Vec<usize>> {
+        let (start, end) = Self::window(due)?;
+        Ok(self.evidence.iter().enumerate().filter(|(i, e)| !self.used[*i] && e.tx_date >= start && e.tx_date <= end).map(|(i, _)| i).collect())
     }
 
     fn match_one(&mut self, idx: usize) {
@@ -57,48 +62,63 @@ impl<'a> Scan<'a> {
     /// `true` once nothing further can change the verdict: a future
     /// occurrence (recorded as `next_due` and nothing else) or an
     /// unresolved coverage gap (highest-priority `unknown`).
-    fn step_unmatched(&mut self, due: NaiveDate) -> bool {
+    fn step_unmatched(&mut self, due: NaiveDate) -> Result<bool> {
         if due > self.as_of {
             if self.next_due.is_none() {
                 self.next_due = Some(due);
             }
-            return true;
+            return Ok(true);
         }
-        let elapsed_start = due - Duration::days(GRACE_DAYS);
-        let elapsed_end = self.as_of.min(due + Duration::days(GRACE_DAYS));
+        let (elapsed_start, window_end) = Self::window(due)?;
+        let elapsed_end = self.as_of.min(window_end);
         if !is_covered(self.ranges, elapsed_start, elapsed_end) {
             self.unknown_reason = Some(UnknownReason::MissingCoverage);
-            return true;
+            return Ok(true);
         }
         self.record_proven_absence(due)
     }
 
-    fn record_proven_absence(&mut self, due: NaiveDate) -> bool {
+    fn record_proven_absence(&mut self, due: NaiveDate) -> Result<bool> {
         // Strictly less than: `as_of == due+10` is still the last day of the
         // window (recurring-contract.md §5, "missing only when as_of >
         // due+10"), so it must read as grace/active, not yet proven.
-        if due + Duration::days(GRACE_DAYS) < self.as_of {
+        let window_end = due.checked_add_signed(Duration::days(GRACE_DAYS)).ok_or_else(|| crate::StoreError::Parse("recurring: okno je mimo podporovaného rozsahu".into()))?;
+        if window_end < self.as_of {
             self.consecutive_missed += 1;
             if self.consecutive_missed >= 2 {
                 self.ended = true;
-                return true;
+                return Ok(true);
             }
         } else {
-            self.grace_until = Some(due + Duration::days(GRACE_DAYS));
+            self.grace_until = Some(window_end);
         }
-        false
+        Ok(false)
     }
 
     fn run(&mut self, anchor: NaiveDate, cadence: Cadence) -> Result<()> {
-        for n in 0..MAX_OCCURRENCES {
-            let due = schedule::occurrence(anchor, cadence, n)?;
-            let candidates = self.candidates(due);
+        let first_date = self.evidence.first().map_or(anchor, |item| item.tx_date);
+        let month_offset = schedule::calendar_months_between(anchor, first_date);
+        let mut n = month_offset.div_euclid(schedule::cadence_months(cadence)) - 1;
+        while n < MAX_OCCURRENCES {
+            let due = match schedule::occurrence(anchor, cadence, n) {
+                Err(_) if n < 0 => {
+                    n += 1;
+                    continue;
+                }
+                result => result?,
+            };
+            let (_, window_end) = Self::window(due)?;
+            if self.evidence.first().is_some_and(|first| window_end < first.tx_date) {
+                n += 1;
+                continue;
+            }
+            let candidates = self.candidates(due)?;
             let done = match candidates.len() {
                 1 => {
                     self.match_one(candidates[0]);
                     false
                 }
-                0 => self.step_unmatched(due),
+                0 => self.step_unmatched(due)?,
                 _ => {
                     self.ambiguous = true;
                     true
@@ -107,6 +127,7 @@ impl<'a> Scan<'a> {
             if done {
                 break;
             }
+            n += 1;
         }
         Ok(())
     }
@@ -135,7 +156,10 @@ impl<'a> Scan<'a> {
         due >= self.as_of && due <= end
     }
 
-    fn finish(self) -> ScheduleOutcome {
+    fn finish(mut self) -> ScheduleOutcome {
+        if !self.ambiguous && self.unknown_reason.is_none() && self.used.iter().any(|used| !used) {
+            self.unknown_reason = Some(UnknownReason::UnmatchedHistory);
+        }
         let (state, unknown_reason) = self.final_state();
         let Scan { last_paid, next_due, grace_until, matched_ids, .. } = self;
         ScheduleOutcome { last_paid, next_due, state, unknown_reason, grace_until, matched_transaction_ids: matched_ids }
@@ -245,8 +269,6 @@ mod tests {
             orig_amount_cents: None,
             orig_currency: None,
             merchant_raw: "MERCHANT".into(),
-            place_norm: None,
-            card_last4: None,
             category_id: None,
             subscription_category: false,
             group_key: "g".into(),
@@ -321,6 +343,28 @@ mod tests {
         let out = derive_schedule(&evidence, anchor, Cadence::Monthly, &full_year_coverage(), d("2026-02-01")).unwrap();
         assert_eq!(out.state, RecurringState::Unknown);
         assert_eq!(out.unknown_reason, Some(UnknownReason::AmbiguousMembership));
+    }
+
+    #[test]
+    fn an_extra_observation_between_occurrence_windows_is_unmatched_history() {
+        let evidence = vec![
+            ev("2026-01-31", 1000),
+            ev("2026-02-28", 1000),
+            ev("2026-03-15", 1000),
+            ev("2026-03-31", 1000),
+        ];
+        let out = derive_schedule(&evidence, d("2026-01-31"), Cadence::Monthly, &full_year_coverage(), d("2026-04-01")).unwrap();
+        assert_eq!(out.state, RecurringState::Unknown);
+        assert_eq!(out.unknown_reason, Some(UnknownReason::UnmatchedHistory));
+    }
+
+    #[test]
+    fn a_manual_anchor_before_known_history_does_not_invent_earlier_misses() {
+        let evidence = vec![ev("2026-06-15", 1000)];
+        let out = derive_schedule(&evidence, d("2026-01-15"), Cadence::Monthly, &full_year_coverage(), d("2026-07-01")).unwrap();
+        assert_eq!(out.state, RecurringState::Upcoming);
+        assert_eq!(out.last_paid, Some(d("2026-06-15")));
+        assert_eq!(out.next_due, Some(d("2026-07-15")));
     }
 
     #[test]

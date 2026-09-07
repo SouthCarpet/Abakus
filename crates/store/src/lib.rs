@@ -75,31 +75,48 @@ impl Store {
     pub fn open(path: &Path) -> Result<Self> { Self::init(Connection::open(path)?) }
     pub fn open_in_memory() -> Result<Self> { Self::init(Connection::open_in_memory()?) }
 
-    /// recurring-contract.md §8: base schema creation, the notes migration,
-    /// v4 DDL, the (pending) Spotify repair and the `schema_version` write
-    /// all share ONE transaction, for both a brand-new database and an
-    /// existing one. Category/rule seeding stays outside it, unchanged from
-    /// before: it only ever runs once against an already-committed empty
-    /// `categories` table, has its own transaction
-    /// (`categories::seed_categories`, owned by lane C), and the contract
-    /// does not name it among the steps that must share this transaction.
-    ///
-    /// Mirrors `delete_account`'s rollback shape: a failure inside the body
-    /// OR of `COMMIT` itself rolls back and returns the error, never leaving
-    /// the connection with an open transaction on it.
+    /// Base DDL, every migration, fresh-only category/rule seeding, the exact
+    /// Spotify repair and the final version marker share one transaction.
+    /// A failed body or COMMIT therefore leaves an existing database at its
+    /// original version and never leaves a fresh database half initialized.
     fn init(conn: Connection) -> Result<Self> {
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
         let mut s = Store { conn };
         s.conn.execute_batch("BEGIN IMMEDIATE")?;
-        let init_result = s.conn.execute_batch(include_str!("schema.sql")).map_err(Into::into).and_then(|()| s.migrate_tx());
-        match init_result {
-            Ok(()) => match s.conn.execute_batch("COMMIT") {
-                Ok(()) => {}
-                Err(e) => { let _ = s.conn.execute_batch("ROLLBACK"); return Err(e.into()); }
-            },
-            Err(e) => { let _ = s.conn.execute_batch("ROLLBACK"); return Err(e); }
+        let init_result = s.initialize_tx();
+        if let Err(error) = init_result {
+            let _ = s.conn.execute_batch("ROLLBACK");
+            return Err(error);
         }
-        if s.conn.query_row("SELECT COUNT(*) FROM categories", [], |r| r.get::<_, i64>(0))? == 0 { s.seed_categories()?; s.seed_rules()?; }
+        if let Err(error) = s.conn.execute_batch("COMMIT") {
+            let _ = s.conn.execute_batch("ROLLBACK");
+            return Err(error.into());
+        }
         Ok(s)
+    }
+
+    fn initialize_tx(&mut self) -> Result<()> {
+        self.conn.execute_batch(include_str!("schema.sql"))?;
+        let fresh = self.is_fresh_database()?;
+        self.migrate_tx()?;
+        if fresh {
+            self.seed_categories_tx()?;
+            self.seed_rules_tx()?;
+        }
+        self.mark_schema_current_tx()
+    }
+
+    fn is_fresh_database(&self) -> Result<bool> {
+        let application_rows: i64 = self.conn.query_row(
+            "SELECT (SELECT COUNT(*) FROM accounts)
+                  + (SELECT COUNT(*) FROM statements)
+                  + (SELECT COUNT(*) FROM transactions)
+                  + (SELECT COUNT(*) FROM categories)
+                  + (SELECT COUNT(*) FROM rules)
+                  + (SELECT COUNT(*) FROM settings)",
+            [],
+            |row| row.get(0),
+        )?;
+        Ok(application_rows == 0)
     }
 }

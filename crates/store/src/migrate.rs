@@ -69,14 +69,14 @@ impl Store {
         }
         if from < 4 {
             self.conn.execute_batch(V4_DDL)?;
-            // repair_spotify_seed_tx(&mut self) belongs here, inside this
-            // same transaction (contract recurring-contract.md §8/§9). Not
-            // called: C's crates/store/src/seed_repair.rs does not exist yet
-            // in this isolated worktree. Tracked as the one open integration
-            // seam in docs/recurring-backend-012.md; adding a stub or
-            // referencing a nonexistent module was explicitly disallowed by
-            // the maker brief.
+            self.repair_spotify_seed_tx()?;
         }
+        Ok(())
+    }
+
+    /// The schema marker is the last initialization write. Fresh seeding or
+    /// any migration failure therefore cannot advertise a completed schema.
+    pub(crate) fn mark_schema_current_tx(&mut self) -> Result<()> {
         self.set_setting(VERSION_KEY, &SCHEMA_VERSION.to_string())
     }
 

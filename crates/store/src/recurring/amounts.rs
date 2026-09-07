@@ -4,45 +4,54 @@ use super::coverage::is_covered;
 use super::money::basis_points;
 use super::schedule;
 use super::types::{Cadence, RecurringAmounts, RecurringDirection, RecurringExcluded, RecurringQuery, RecurringRow, RecurringState, RowDecision};
-use crate::{Result, Store};
+use crate::{Result, Store, StoreError};
 use chrono::{Datelike, NaiveDate};
 
 /// Confirmed totals, estimate totals, and the exclusion counts shown beside
 /// them so a zero total is never mistaken for complete knowledge.
-pub(crate) fn aggregate(rows: &[RecurringRow]) -> (RecurringAmounts, RecurringAmounts, RecurringExcluded) {
+pub(crate) fn aggregate(rows: &[RecurringRow]) -> Result<(RecurringAmounts, RecurringAmounts, RecurringExcluded)> {
     let mut confirmed = RecurringAmounts::default();
     let mut estimates = RecurringAmounts::default();
     let mut excluded = RecurringExcluded::default();
     for row in rows {
         match row.state {
-            RecurringState::Missing => excluded.missing += 1,
-            RecurringState::Ended => excluded.ended += 1,
-            RecurringState::Unknown => excluded.unknown += 1,
-            RecurringState::Active | RecurringState::Upcoming => add_row(row, &mut confirmed, &mut estimates),
+            RecurringState::Missing => add(&mut excluded.missing, 1)?,
+            RecurringState::Ended => add(&mut excluded.ended, 1)?,
+            RecurringState::Unknown => add(&mut excluded.unknown, 1)?,
+            RecurringState::Active | RecurringState::Upcoming => add_row(row, &mut confirmed, &mut estimates)?,
         }
     }
-    confirmed.monthly_net_cents = confirmed.monthly_income_cents - confirmed.monthly_expense_cents;
-    confirmed.annual_net_cents = confirmed.annual_income_cents - confirmed.annual_expense_cents;
-    estimates.monthly_net_cents = estimates.monthly_income_cents - estimates.monthly_expense_cents;
-    estimates.annual_net_cents = estimates.annual_income_cents - estimates.annual_expense_cents;
-    (confirmed, estimates, excluded)
+    confirmed.monthly_net_cents = subtract(confirmed.monthly_income_cents, confirmed.monthly_expense_cents)?;
+    confirmed.annual_net_cents = subtract(confirmed.annual_income_cents, confirmed.annual_expense_cents)?;
+    estimates.monthly_net_cents = subtract(estimates.monthly_income_cents, estimates.monthly_expense_cents)?;
+    estimates.annual_net_cents = subtract(estimates.annual_income_cents, estimates.annual_expense_cents)?;
+    Ok((confirmed, estimates, excluded))
 }
 
-fn add_row(row: &RecurringRow, confirmed: &mut RecurringAmounts, estimates: &mut RecurringAmounts) {
+fn overflow() -> StoreError { StoreError::Parse("recurring: súčet je mimo podporovaného rozsahu".into()) }
+
+fn add(total: &mut i64, value: i64) -> Result<()> {
+    *total = total.checked_add(value).ok_or_else(overflow)?;
+    Ok(())
+}
+
+fn subtract(left: i64, right: i64) -> Result<i64> { left.checked_sub(right).ok_or_else(overflow) }
+
+fn add_row(row: &RecurringRow, confirmed: &mut RecurringAmounts, estimates: &mut RecurringAmounts) -> Result<()> {
     let bucket = match row.decision {
         RowDecision::Confirmed => &mut *confirmed,
         RowDecision::Estimate => &mut *estimates,
-        RowDecision::Ignored => return,
+        RowDecision::Ignored => return Ok(()),
     };
     let (monthly, annual, amount) = (row.monthly_cents.unwrap_or(0), row.annual_cents.unwrap_or(0), row.amount_cents.unwrap_or(0));
     match row.direction {
         RecurringDirection::Income => {
-            bucket.monthly_income_cents += monthly;
-            bucket.annual_income_cents += annual;
+            add(&mut bucket.monthly_income_cents, monthly)?;
+            add(&mut bucket.annual_income_cents, annual)?;
         }
         RecurringDirection::Expense => {
-            bucket.monthly_expense_cents += monthly;
-            bucket.annual_expense_cents += annual;
+            add(&mut bucket.monthly_expense_cents, monthly)?;
+            add(&mut bucket.annual_expense_cents, annual)?;
         }
     }
     // Remaining-month: an `Upcoming` row's `next_due` is, by construction of
@@ -51,10 +60,11 @@ fn add_row(row: &RecurringRow, confirmed: &mut RecurringAmounts, estimates: &mut
     // monthly-apportioned figure) is exactly the remaining-month amount.
     if row.state == RecurringState::Upcoming {
         match row.direction {
-            RecurringDirection::Income => bucket.remaining_income_cents += amount,
-            RecurringDirection::Expense => bucket.remaining_expense_cents += amount,
+            RecurringDirection::Income => add(&mut bucket.remaining_income_cents, amount)?,
+            RecurringDirection::Expense => add(&mut bucket.remaining_expense_cents, amount)?,
         }
     }
+    Ok(())
 }
 
 impl Store {
@@ -80,20 +90,9 @@ impl Store {
     fn eligible_expense_months(&self, query: &RecurringQuery, as_of: NaiveDate) -> Result<Vec<(NaiveDate, NaiveDate)>> {
         let account_ids = self.accounts_of_kind(query.account_kind)?;
         let Some(earliest) = self.earliest_trusted_month_start(&account_ids)? else { return Ok(Vec::new()) };
-        let as_of_month_start = NaiveDate::from_ymd_opt(as_of.year(), as_of.month(), 1).unwrap_or(as_of);
-        let range_start = query.from.map(|d| NaiveDate::from_ymd_opt(d.year(), d.month(), 1).unwrap_or(d)).unwrap_or(earliest).max(earliest);
-        let range_end = query.to.unwrap_or(as_of);
+        let (range_start, range_end, as_of_month_start) = expense_window(query, earliest, as_of)?;
         let ranges: Vec<Vec<super::coverage::Range>> = account_ids.iter().map(|id| self.trusted_coverage(*id)).collect::<Result<_>>()?;
-        let mut months = Vec::new();
-        let mut cursor = range_start;
-        while cursor < as_of_month_start {
-            let month_end = schedule::month_end(cursor)?;
-            if month_end <= range_end && ranges.iter().all(|r| is_covered(r, cursor, month_end)) {
-                months.push((cursor, month_end));
-            }
-            cursor = schedule::occurrence(cursor, Cadence::Monthly, 1)?;
-        }
-        Ok(months)
+        covered_months(range_start, range_end, as_of_month_start, &ranges)
     }
 
     /// `(expense_share_basis_points, average_expense_cents, average_months)`.
@@ -117,4 +116,38 @@ impl Store {
         let labels = months.iter().map(|(start, _)| format!("{:04}-{:02}", start.year(), start.month())).collect();
         Ok((bp, Some(avg), labels))
     }
+}
+
+fn expense_window(query: &RecurringQuery, earliest: NaiveDate, as_of: NaiveDate) -> Result<(NaiveDate, NaiveDate, NaiveDate)> {
+    let as_of_month = NaiveDate::from_ymd_opt(as_of.year(), as_of.month(), 1)
+        .ok_or_else(|| StoreError::Parse("recurring: neplatný koniec obdobia".into()))?;
+    let start = match query.from {
+        Some(from) if from.day() == 1 => from,
+        Some(from) => schedule::occurrence(
+            NaiveDate::from_ymd_opt(from.year(), from.month(), 1)
+                .ok_or_else(|| StoreError::Parse("recurring: neplatný začiatok obdobia".into()))?,
+            Cadence::Monthly,
+            1,
+        )?,
+        None => earliest,
+    };
+    Ok((start.max(earliest), query.to.unwrap_or(as_of).min(as_of), as_of_month))
+}
+
+fn covered_months(
+    start: NaiveDate,
+    end: NaiveDate,
+    as_of_month: NaiveDate,
+    ranges: &[Vec<super::coverage::Range>],
+) -> Result<Vec<(NaiveDate, NaiveDate)>> {
+    let mut months = Vec::new();
+    let mut cursor = start;
+    while cursor < as_of_month {
+        let month_end = schedule::month_end(cursor)?;
+        if month_end <= end && ranges.iter().all(|range| is_covered(range, cursor, month_end)) {
+            months.push((cursor, month_end));
+        }
+        cursor = schedule::occurrence(cursor, Cadence::Monthly, 1)?;
+    }
+    Ok(months)
 }

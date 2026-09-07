@@ -22,19 +22,21 @@ use chrono::NaiveDate;
 
 impl Store {
     pub fn recurring_overview(&self, query: &RecurringQuery) -> Result<RecurringOverview> {
+        validate_query(query)?;
         let today = query.today;
         let (as_of, future_period, unfinished_period) = overview_window(query, today);
         if future_period {
             return Ok(empty_overview(as_of));
         }
         let rows = self.build_rows(query, as_of)?;
-        let (confirmed, estimates, excluded) = amounts::aggregate(&rows);
+        let (confirmed, estimates, excluded) = amounts::aggregate(&rows)?;
         let (expense_share_basis_points, average_expense_cents, average_months) = self.recurring_expense_share(query, as_of, confirmed.monthly_expense_cents)?;
         let history_from = self.recurring_earliest_evidence_date(query.account_kind)?;
         Ok(RecurringOverview { as_of, history_from, future_period, unfinished_period, rows, confirmed, estimates, excluded, expense_share_basis_points, average_expense_cents, average_months })
     }
 
     pub fn recurring_detail(&self, request: &RecurringDetailRequest) -> Result<RecurringDetail> {
+        validate_query(&request.query)?;
         let today = request.query.today;
         let (as_of, _, _) = overview_window(&request.query, today);
         let all_evidence = self.recurring_load_evidence(None, as_of)?;
@@ -65,7 +67,7 @@ impl Store {
         let compatible_transactions = self.compatible_by_target(&target, &all_evidence, &selected_fps, &member_ids, &account_tx)?;
         Ok(TransactionRecurringContext {
             transaction_id,
-            group_key: Some(target.group_key),
+            group_key: (!matches!(&target.identity_kind, key::Identity::Blank)).then_some(target.group_key),
             ambiguous,
             decision: decision.as_ref().map(persist::to_public),
             inferred_cadence,
@@ -125,7 +127,7 @@ impl Store {
         let mut rows = self.group_scope_rows(&groups, &decisions, as_of)?;
         rows.extend(self.selected_scope_rows(&all_evidence, &decisions, as_of)?);
         rows.retain(|r| query.account_kind.is_none_or(|k| r.account_kind == k));
-        rows.sort_by(|a, b| row_sort_key(a).cmp(&row_sort_key(b)));
+        rows.sort_by_key(row_sort_key);
         Ok(rows)
     }
 
@@ -168,11 +170,17 @@ impl Store {
         let category_id = uniform_category(evidence);
 
         let schedule = self.row_schedule(&plan, evidence, identity.account_id, as_of)?;
-        let amount = self.row_amount(evidence, &plan)?;
-        let price_change = if plan.decision == RowDecision::Ignored || evidence.first().is_some_and(|e| e.currency_basis.is_foreign_unknown()) {
+        let matched_ids: std::collections::HashSet<i64> = schedule.matched_transaction_ids.iter().copied().collect();
+        let amount_evidence: Vec<Evidence> = evidence
+            .iter()
+            .filter(|item| plan.decision == RowDecision::Ignored || matched_ids.contains(&item.transaction_id))
+            .cloned()
+            .collect();
+        let amount = self.row_amount(&amount_evidence, &plan)?;
+        let price_change = if plan.decision == RowDecision::Ignored || amount_evidence.first().is_some_and(|e| e.currency_basis.is_foreign_unknown()) {
             None
         } else {
-            matching::detect_price_change(evidence)
+            matching::detect_price_change(&amount_evidence)
         };
 
         Ok(Some(RecurringRow {
@@ -190,7 +198,10 @@ impl Store {
             anchor_date: plan.anchor_date,
             subscription_category,
             category_id,
-            evidence_count: evidence.len() as i64,
+            evidence_count: money::safe_i64(
+                i128::try_from(evidence.len())
+                    .map_err(|_| StoreError::Parse("recurring: počet dôkazov je mimo podporovaného rozsahu".into()))?,
+            )?,
             last_paid: schedule.last_paid,
             next_due: schedule.next_due,
             state: schedule.state,
@@ -303,15 +314,18 @@ impl Store {
 
     fn compatible_transactions(
         &self,
-        row: &RecurringRow,
+        _row: &RecurringRow,
         all_evidence: &[Evidence],
         selected_fps: &std::collections::HashSet<String>,
         member_ids: &std::collections::HashSet<i64>,
         account_tx: &[crate::query::TxRow],
     ) -> Result<Vec<crate::query::TxRow>> {
+        let Some(reference) = all_evidence.iter().find(|e| member_ids.contains(&e.transaction_id)) else {
+            return Ok(Vec::new());
+        };
         let candidate_ids: std::collections::HashSet<i64> = all_evidence
             .iter()
-            .filter(|e| e.account_id == row.account_id && e.direction == row.direction && !member_ids.contains(&e.transaction_id) && !selected_fps.contains(&e.fingerprint))
+            .filter(|e| evidence_compatible(reference, e) && !member_ids.contains(&e.transaction_id) && !selected_fps.contains(&e.fingerprint))
             .map(|e| e.transaction_id)
             .collect();
         Ok(account_tx.iter().filter(|t| candidate_ids.contains(&t.id)).cloned().collect())
@@ -327,7 +341,7 @@ impl Store {
     ) -> Result<Vec<crate::query::TxRow>> {
         let candidate_ids: std::collections::HashSet<i64> = all_evidence
             .iter()
-            .filter(|e| e.account_id == target.account_id && e.direction == target.identity.direction && !member_ids.contains(&e.transaction_id) && !selected_fps.contains(&e.fingerprint))
+            .filter(|e| persist::compatible_evidence(target, e) && !member_ids.contains(&e.transaction_id) && !selected_fps.contains(&e.fingerprint))
             .map(|e| e.transaction_id)
             .collect();
         Ok(account_tx.iter().filter(|t| candidate_ids.contains(&t.id)).cloned().collect())
@@ -344,6 +358,23 @@ impl Store {
         };
         Ok(earliest.and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()))
     }
+}
+
+fn validate_query(query: &RecurringQuery) -> Result<()> {
+    match (query.from, query.to) {
+        (None, None) => Ok(()),
+        (Some(from), Some(to)) if from <= to => Ok(()),
+        _ => Err(StoreError::Parse("Obdobie musí mať platný začiatok aj koniec.".into())),
+    }
+}
+
+fn evidence_compatible(first: &Evidence, candidate: &Evidence) -> bool {
+    let same_basis = first.account_id == candidate.account_id
+        && first.direction == candidate.direction
+        && first.currency_basis == candidate.currency_basis;
+    same_basis
+        && (first.group_key == candidate.group_key
+            || matches!((&first.identity, &candidate.identity), (key::Identity::Blank, key::Identity::Blank)))
 }
 
 struct RowIdentity {
