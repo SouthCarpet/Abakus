@@ -70,11 +70,19 @@ pub fn parse_pdf(path: &Path, password: Option<&str>) -> Result<Statement, Parse
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn env_override_wins() { std::env::set_var("ABAKUS_PDFIUM_DIR", "X:/pdfium"); assert_eq!(library_dir(), PathBuf::from("X:/pdfium")); std::env::remove_var("ABAKUS_PDFIUM_DIR"); }
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test] fn env_override_wins() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        std::env::set_var("ABAKUS_PDFIUM_DIR", "X:/pdfium");
+        assert_eq!(library_dir(), PathBuf::from("X:/pdfium"));
+        std::env::remove_var("ABAKUS_PDFIUM_DIR");
+    }
 
     /// A17/F9: without the env var, the bare `cargo test` command must still
     /// find the dll the repo already ships in `src-tauri/resources/pdfium`.
     #[test] fn falls_back_to_the_repo_resource_dir_when_the_env_var_is_absent() {
+        let _lock = ENV_LOCK.lock().unwrap();
         std::env::remove_var("ABAKUS_PDFIUM_DIR");
         let dir = library_dir();
         assert!(dir.join("pdfium.dll").exists(), "expected the repo's src-tauri/resources/pdfium/pdfium.dll, got {dir:?}");

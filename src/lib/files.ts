@@ -4,7 +4,7 @@ function pad(value: number, width = 2): string {
   return value.toString().padStart(width, '0')
 }
 
-/** A dated, unique-per-call default name so a backup never collides with the last one. */
+/** Suggest a dated name. The backend refuses any existing destination. */
 export function defaultBackupFilename(date: Date): string {
   const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}${pad(date.getMilliseconds(), 3)}`
   return `abakus-zaloha-${stamp}.db`
