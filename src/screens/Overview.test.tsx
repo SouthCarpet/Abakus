@@ -25,6 +25,11 @@ vi.mock('../api', async (importOriginal) => {
         top_merchants: [],
       }),
       recentStatements: vi.fn().mockResolvedValue([]),
+      // InsightsPanel (080-insights) fetches these independently of summary;
+      // an empty resolve keeps its cards from rendering in tests that do not
+      // exercise them directly.
+      listAccounts: vi.fn().mockResolvedValue([]),
+      statementHistory: vi.fn().mockResolvedValue([]),
     },
   }
 })
@@ -139,4 +144,23 @@ it('navigates from a negative category to transactions with the selected persona
   fireEvent.click(screen.getByRole('button', { name: 'Osobný' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Jedlo · -50,01 €' }))
   expect(onNavigateToTransactions).toHaveBeenCalledWith({ categoryId: 42, accountKind: 'personal' })
+})
+
+// 080-insights: coverage and balance history must stay visible under the
+// EmptyOverview card, not disappear along with the rest of the transaction
+// summary. Deep insight behaviors (gaps, comparison, async independence) are
+// covered in InsightsPanel.test.tsx; this only checks Overview wires it in
+// and does not gate it behind the summary/hasAnyImports state.
+describe('Overview keeps insights visible when the transaction summary is empty', () => {
+  it('renders statement coverage below the empty-overview card', async () => {
+    vi.mocked(api.summary).mockResolvedValue(emptySummary)
+    vi.mocked(api.recentStatements).mockResolvedValueOnce([])
+    vi.mocked(api.listAccounts).mockResolvedValueOnce([{ id: 1, iban: 'SK00', kind: 'personal', label: 'Osobný', has_password: false }])
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([
+      { statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 3, period_start: '2026-06-01', period_end: '2026-06-30', opening_cents: 1000, closing_cents: 2000, checksum: { status: 'ok' } },
+    ])
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+    expect(await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')).toBeInTheDocument()
+    expect(await screen.findByText('Pokrytie výpismi')).toBeInTheDocument()
+  })
 })

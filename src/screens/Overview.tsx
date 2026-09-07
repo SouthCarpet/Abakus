@@ -6,6 +6,7 @@ import { Card } from '../components/Card'
 import { CategoryBars } from '../components/charts/CategoryBars'
 import { IncomeExpense } from '../components/charts/IncomeExpense'
 import { MonthlyStacked } from '../components/charts/MonthlyStacked'
+import { InsightsPanel } from '../components/insights/InsightsPanel'
 import { Kpi } from '../components/Kpi'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { monthRange, periodRange, validPeriod } from '../lib/period'
@@ -223,6 +224,11 @@ export function Overview({
           />
         )
       ) : null}
+
+      {/* Coverage, balance history and category comparison own their own
+          fetches and stay visible even when the transaction summary above is
+          empty or still loading. */}
+      <InsightsPanel period={period} accountKind={accountKind} summary={summary} />
     </div>
   )
 }
