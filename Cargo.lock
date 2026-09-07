@@ -12,6 +12,8 @@ dependencies = [
  "lopdf",
  "netstat2",
  "parser",
+ "pdfium-render",
+ "png 0.18.1",
  "regex",
  "reqwest",
  "rules",
