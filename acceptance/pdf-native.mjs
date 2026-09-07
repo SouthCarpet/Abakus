@@ -398,8 +398,11 @@ async function fileSafetyCanaries(page, oracle) {
     device: await invokeError(page, 'export_pdf_report', { request, path: '\\\\.\\NUL.pdf' }),
     reserved_nul_leaf: await invokeError(page, 'export_pdf_report', { request, path: path.join(reservedLeafDirectory, 'NUL.pdf') }),
     reserved_con_leaf: await invokeError(page, 'export_pdf_report', { request, path: path.join(reservedLeafDirectory, 'CON.pdf') }),
+    reserved_com_superscript_one_leaf: await invokeError(page, 'export_pdf_report', { request, path: path.join(reservedLeafDirectory, 'COM¹.pdf') }),
+    reserved_lpt_superscript_two_leaf: await invokeError(page, 'export_pdf_report', { request, path: path.join(reservedLeafDirectory, 'LPT².pdf') }),
     database_path: await invokeError(page, 'export_pdf_report', { request, path: oracle.db_path }),
   }
+  const ordinaryCom10 = await saveDirect(page, 'ordinary COM10 leaf', oracle.families.empty, path.join(reservedLeafDirectory, 'COM10.pdf'))
 
   const raceTarget = path.join(RESULTS_DIR, 'two-writers.pdf')
   const race = await Promise.allSettled([
@@ -410,7 +413,7 @@ async function fileSafetyCanaries(page, oracle) {
   assertEqual(race.filter((item) => item.status === 'rejected').length, 1, 'two-writer rejection count')
   assert(fs.statSync(raceTarget).isFile(), 'two-writer winning PDF is missing')
   assertEqual(sha256(oracle.db_path), sourceBefore, 'file safety canaries changed source database')
-  return { source_sha256: sourceBefore, errors, symlink, race: race.map((item) => item.status), winner_sha256: sha256(raceTarget) }
+  return { source_sha256: sourceBefore, errors, allowed: { ordinary_com10_leaf: ordinaryCom10 }, symlink, race: race.map((item) => item.status), winner_sha256: sha256(raceTarget) }
 }
 
 async function openScreen(page, name) {

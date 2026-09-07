@@ -88,8 +88,9 @@ directory.
 - [ ] P13: real 5000-row file plus deterministic arithmetic seams at every
   hard limit.
 - [ ] P14-P15: occupied/source/hardlink/symlink/WAL/SHM/directory/device/ADS,
-  DOS-reserved `NUL.pdf`/`CON.pdf` leaf names, two writers and late
-  write/flush/sync/persist failures.
+  DOS-reserved `NUL.pdf`/`CON.pdf`/`COM¹.pdf`/`LPT².pdf` leaf names,
+  ordinary allowed `COM10.pdf`, two writers and late write/flush/sync/persist
+  failures.
 - [ ] P16: actual dialog cancel and occupied selection, stale preview guard,
   busy control lock and actual capture count after a post-preview commit.
 - [ ] P17: literal v4 decisions/members/notes/category edits/settings survive
