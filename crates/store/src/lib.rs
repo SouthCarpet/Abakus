@@ -12,6 +12,7 @@ pub mod net_log;
 pub mod notes;
 pub mod query;
 pub mod recurring;
+pub mod report;
 pub mod rules_repo;
 pub mod seed_categories;
 pub mod seed_repair;
