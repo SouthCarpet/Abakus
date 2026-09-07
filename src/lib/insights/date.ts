@@ -1,7 +1,5 @@
-// UTC calendar-day arithmetic for inclusive YYYY-MM-DD ranges. Using
-// Date.UTC (never the local constructor) keeps leap years and DST transitions
-// from perturbing day counts: a local Date at midnight can land on the wrong
-// day around a DST change, UTC never does.
+// UTC calendar-day arithmetic for inclusive YYYY-MM-DD ranges keeps day
+// counts stable across leap years and daylight-saving changes.
 export interface DateRange {
   from: string
   to: string
