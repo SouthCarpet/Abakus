@@ -200,7 +200,7 @@ fn inspect(arguments: &Arguments, stage: &Path) -> AnyResult<Manifest> {
     })
 }
 
-fn publish(arguments: &Arguments) -> AnyResult<()> {
+fn create_stage(arguments: &Arguments) -> AnyResult<PathBuf> {
     if !arguments.input.is_file() {
         return Err(format!("input PDF is not a file: {}", arguments.input.display()).into());
     }
@@ -214,26 +214,54 @@ fn publish(arguments: &Arguments) -> AnyResult<()> {
         return Err(format!("refusing existing partial directory: {}", stage.display()).into());
     }
     fs::create_dir(&stage)?;
+    Ok(stage)
+}
 
-    let result = (|| -> AnyResult<()> {
-        let manifest = inspect(arguments, &stage)?;
-        let manifest_path = stage.join("manifest.json");
-        let file = File::create(&manifest_path)?;
-        let mut writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(&mut writer, &manifest)?;
-        writer.write_all(b"\n")?;
-        writer.flush()?;
-        if arguments.output.exists() {
-            return Err(format!("output directory appeared during inspection: {}", arguments.output.display()).into());
-        }
-        fs::rename(&stage, &arguments.output)?;
-        Ok(())
-    })();
+fn write_manifest(arguments: &Arguments, stage: &Path) -> AnyResult<()> {
+    let manifest = inspect(arguments, stage)?;
+    let file = File::create(stage.join("manifest.json"))?;
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(&mut writer, &manifest)?;
+    writer.write_all(b"\n")?;
+    writer.flush()?;
+    Ok(())
+}
 
-    if result.is_err() && stage.exists() {
-        fs::remove_dir_all(&stage)?;
+fn commit_stage(arguments: &Arguments, stage: &Path) -> AnyResult<()> {
+    if arguments.output.exists() {
+        return Err(format!("output directory appeared during inspection: {}", arguments.output.display()).into());
     }
-    result
+    fs::rename(stage, &arguments.output)?;
+    Ok(())
+}
+
+fn remove_stage(stage: &Path, parent: &Path) -> AnyResult<()> {
+    let resolved_stage = stage.canonicalize()?;
+    let resolved_parent = parent.canonicalize()?;
+    if resolved_stage.parent() != Some(resolved_parent.as_path()) {
+        return Err("refusing cleanup outside the output parent".into());
+    }
+    fs::remove_dir_all(resolved_stage)?;
+    Ok(())
+}
+
+fn finish_stage(result: AnyResult<()>, stage: &Path, parent: &Path) -> AnyResult<()> {
+    match result {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            if stage.exists() {
+                remove_stage(stage, parent)?;
+            }
+            Err(error)
+        }
+    }
+}
+
+fn publish(arguments: &Arguments) -> AnyResult<()> {
+    let stage = create_stage(arguments)?;
+    let parent = arguments.output.parent().ok_or("output directory needs a parent")?;
+    let result = write_manifest(arguments, &stage).and_then(|()| commit_stage(arguments, &stage));
+    finish_stage(result, &stage, parent)
 }
 
 fn main() -> AnyResult<()> {
