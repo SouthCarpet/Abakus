@@ -383,20 +383,25 @@ mod tests {
 
     /// The keyring step runs and succeeds; only then does the database
     /// delete run and actually remove the data.
-    /// 078 correction: a category name is only trimmed at the ends
-    /// (`save_category`), so an embedded newline in the middle survives all
-    /// the way to `csv_quote` through the real public API, no raw SQL
-    /// needed. The old `csv.lines().count() - 1` would have reported one
-    /// row too many for this exact case.
+    /// Recurring/category contract §9: category names are now validated
+    /// (trimmed, non-empty, ≤100 scalar values, no control characters), so
+    /// `\n` in a category name is rejected and can no longer stand in for the
+    /// CSV escaping test's multiline field. `note` (0.1.2) is deliberately
+    /// exempt from that validation and already documented in
+    /// `summary::csv_quote` as "the first multiline field this function ever
+    /// sees" (its own `\n`-in-`DANGEROUS_LEADING` addition), so it is the
+    /// real, currently-reachable multiline field and replaces the category
+    /// name here through the real public API, no raw SQL needed. The old
+    /// `csv.lines().count() - 1` would have reported one row too many for
+    /// this exact case.
     #[test]
     fn export_csv_counts_records_not_lines_when_a_field_has_an_embedded_newline() {
         let mut s = Store::open_in_memory().unwrap();
         s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
         s.import_statement(&fixture("personal-2026-06.txt"), "h1").unwrap();
-        let multiline_cat = s.save_category(None, None, "Multi\nline", store::CategoryKind::Expense).unwrap().id;
         let ids: Vec<i64> = s.list_transactions(&store::TxFilter::default()).unwrap().into_iter().map(|r| r.id).collect();
         let expected = ids.len();
-        s.assign(&ids, multiline_cat, false).unwrap();
+        s.save_transaction_note(ids[0], "Multi\nline").unwrap();
         let path = std::env::temp_dir().join(format!("abakus-test-export-{}.csv", std::process::id()));
         let path = path.to_str().unwrap();
 

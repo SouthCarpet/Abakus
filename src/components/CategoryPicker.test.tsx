@@ -63,4 +63,29 @@ describe('category filter choices', () => {
     expect(screen.getByRole('combobox')).toHaveValue('11')
     expect(screen.getByRole('combobox')).toHaveDisplayValue('Potraviny (nedostupná)')
   })
+
+  // Section 9: assignment mode with an onCreate handler offers "Nová
+  // kategória..." and picking it invokes onCreate WITHOUT sending a sentinel
+  // id through onChange.
+  it('offers Nová kategória only in assignment mode with onCreate, and never emits a sentinel id', () => {
+    const onChange = vi.fn()
+    const onCreate = vi.fn()
+    render(<CategoryPicker value={null} categories={[leaf]} onChange={onChange} onCreate={onCreate} />)
+    expect(screen.getByRole('option', { name: 'Nová kategória...' })).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '__create__' } })
+
+    expect(onCreate).toHaveBeenCalledOnce()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('does not offer Nová kategória in filter mode even with onCreate set', () => {
+    render(<CategoryPicker mode="filter" value={null} categories={[leaf]} onChange={vi.fn()} onCreate={vi.fn()} />)
+    expect(screen.queryByRole('option', { name: 'Nová kategória...' })).not.toBeInTheDocument()
+  })
+
+  it('does not offer Nová kategória without an onCreate handler', () => {
+    render(<CategoryPicker value={null} categories={[leaf]} onChange={vi.fn()} />)
+    expect(screen.queryByRole('option', { name: 'Nová kategória...' })).not.toBeInTheDocument()
+  })
 })

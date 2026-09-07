@@ -7,6 +7,7 @@ import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { useAction } from '../lib/useAction'
 import { groupCategories } from '../lib/categories'
+import { categoryApi, type CategoryUpdatePreview } from '../lib/category-api'
 
 const RULE_KIND_LABELS: Record<RuleView['kind'], string> = {
   exact: 'presné',
@@ -61,11 +62,13 @@ function CategoryRow({
   indent,
   onRename,
   onArchive,
+  onEdit,
 }: {
   category: Category
   indent: boolean
   onRename: (id: number, name: string) => void
   onArchive: (category: Category) => void
+  onEdit: (category: Category) => void
 }) {
   const [name, setName] = useState(category.name)
   useEffect(() => setName(category.name), [category.name])
@@ -90,6 +93,11 @@ function CategoryRow({
         }}
       />
       {!category.system ? (
+        <Button variant="secondary" onClick={() => onEdit(category)}>
+          Upraviť
+        </Button>
+      ) : null}
+      {!category.system ? (
         <Button variant="ghost" onClick={() => onArchive(category)}>
           Archivovať
         </Button>
@@ -103,20 +111,22 @@ function CategoryTree({
   onRename,
   onAddSub,
   onArchive,
+  onEdit,
 }: {
   categories: Category[]
   onRename: (id: number, name: string) => void
   onAddSub: (parent: Category) => void
   onArchive: (category: Category) => void
+  onEdit: (category: Category) => void
 }) {
   const groups = groupCategories(categories)
   return (
     <div className="k-section">
       {groups.map(({ parent, subs }) => (
         <div key={parent.id} className="k-section">
-          <CategoryRow category={parent} indent={false} onRename={onRename} onArchive={onArchive} />
+          <CategoryRow category={parent} indent={false} onRename={onRename} onArchive={onArchive} onEdit={onEdit} />
           {subs.map((sub) => (
-            <CategoryRow key={sub.id} category={sub} indent onRename={onRename} onArchive={onArchive} />
+            <CategoryRow key={sub.id} category={sub} indent onRename={onRename} onArchive={onArchive} onEdit={onEdit} />
           ))}
           <div className="k-row" style={{ marginLeft: 'var(--space-6)' }}>
             <Button variant="ghost" onClick={() => onAddSub(parent)}>
@@ -126,6 +136,159 @@ function CategoryTree({
         </div>
       ))}
     </div>
+  )
+}
+
+const CATEGORY_KIND_LABELS_SHORT: Record<CategoryKind, string> = { expense: 'Výdavok', income: 'Príjem' }
+
+// Section 9 C Categories flow: edit -> preview -> show affected/confirmed
+// counts if effective kind changes -> explicit confirm -> atomic update ->
+// caller refreshes tree and rules.
+function CategoryEditDialog({
+  category,
+  categories,
+  onClose,
+  onSaved,
+}: {
+  category: Category | null
+  categories: Category[]
+  onClose: () => void
+  onSaved: () => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [parentId, setParentId] = useState<number | null>(null)
+  const [kind, setKind] = useState<CategoryKind>('expense')
+  const [preview, setPreview] = useState<CategoryUpdatePreview | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!category) return
+    setName(category.name)
+    setParentId(category.parent_id)
+    setKind(category.kind)
+    setPreview(null)
+    setError('')
+  }, [category])
+
+  if (!category) return null
+
+  // A root already carrying children cannot move under another root (the
+  // backend refuses it too, third-level protection); an archived or system
+  // category, or the edited category itself, is never a valid target.
+  const hasChildren = categories.some((c) => c.parent_id === category.id)
+  const parentOptions = categories.filter((c) => c.parent_id === null && c.id !== category.id && !c.system && !c.archived && !(hasChildren && category.parent_id === null))
+  const selectedParent = parentOptions.find((p) => p.id === parentId) ?? null
+  const effectiveKind = selectedParent ? selectedParent.kind : kind
+
+  function request(acknowledge: boolean) {
+    if (!category) throw new Error('no category selected')
+    return { id: category.id, parent_id: parentId, name, kind, acknowledge_kind_change: acknowledge }
+  }
+
+  async function save() {
+    setBusy(true)
+    setError('')
+    try {
+      const p = await categoryApi.preview(request(false))
+      if (p.requires_confirmation) {
+        setPreview(p)
+        return
+      }
+      await categoryApi.update(request(false))
+      await onSaved()
+      onClose()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmKindChange() {
+    setBusy(true)
+    setError('')
+    try {
+      await categoryApi.update(request(true))
+      await onSaved()
+      onClose()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      title={`Upraviť kategóriu ${category.name}`}
+      onClose={() => {
+        if (!busy) onClose()
+      }}
+      actions={
+        preview ? (
+          <>
+            <Button variant="secondary" disabled={busy} onClick={() => setPreview(null)}>
+              Zrušiť
+            </Button>
+            <Button variant="primary" disabled={busy} onClick={() => void confirmKindChange()}>
+              Potvrdiť zmenu druhu
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="secondary" disabled={busy} onClick={onClose}>
+              Zrušiť
+            </Button>
+            <Button variant="primary" disabled={busy || !name.trim()} onClick={() => void save()}>
+              Uložiť
+            </Button>
+          </>
+        )
+      }
+    >
+      {error ? <p role="alert">{error}</p> : null}
+      {preview ? (
+        <div className="k-section">
+          <p>Zmena druhu ovplyvní {preview.affected_categories} kategórií a {preview.transaction_count} transakcií (z toho {preview.confirmed_count} potvrdených).</p>
+          <p>Kategórie a súvisiace transakcie zostanú priradené, mení sa iba význam výdavok/príjem.</p>
+        </div>
+      ) : (
+        <>
+          <Field label="Názov">
+            <input className="k-input k-well" aria-label="Upraviť názov kategórie" value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Nadradená kategória">
+            <select
+              aria-label="Upraviť nadradenú kategóriu"
+              className="k-select k-well"
+              value={parentId ?? ''}
+              onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Hlavná kategória</option>
+              {parentOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Druh">
+            <select
+              aria-label="Upraviť druh kategórie"
+              className="k-select k-well"
+              value={effectiveKind}
+              disabled={selectedParent !== null}
+              onChange={(e) => setKind(e.target.value as CategoryKind)}
+            >
+              <option value="expense">{CATEGORY_KIND_LABELS_SHORT.expense}</option>
+              <option value="income">{CATEGORY_KIND_LABELS_SHORT.income}</option>
+            </select>
+          </Field>
+        </>
+      )}
+    </Dialog>
   )
 }
 
@@ -140,6 +303,7 @@ export function Categories() {
   const [subParent, setSubParent] = useState<Category | null>(null)
   const [subName, setSubName] = useState('')
   const [archiveTarget, setArchiveTarget] = useState<Category | null>(null)
+  const [editTarget, setEditTarget] = useState<Category | null>(null)
 
   async function refresh() {
     const request = ++refreshRequest.current
@@ -223,6 +387,7 @@ export function Categories() {
                 onRename={rename}
                 onAddSub={(parent) => setSubParent(parent)}
                 onArchive={setArchiveTarget}
+                onEdit={setEditTarget}
               />
             </Card>
           </div>
@@ -303,6 +468,8 @@ export function Categories() {
         <p>{archiveTarget?.name}</p>
         <p>{ARCHIVE_CONFIRM_TEXT}</p>
       </Dialog>
+
+      <CategoryEditDialog category={editTarget} categories={categories} onClose={() => setEditTarget(null)} onSaved={refresh} />
     </div>
   )
 }

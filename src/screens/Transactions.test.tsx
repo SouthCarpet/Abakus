@@ -74,7 +74,7 @@ describe('TransactionRow', () => {
     render(
       <table>
         <tbody>
-          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={onConfirm} onNoteSaved={vi.fn()} />
+          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={onConfirm} onNoteSaved={vi.fn()} onCreateCategory={vi.fn()} />
         </tbody>
       </table>,
     )
@@ -86,7 +86,7 @@ describe('TransactionRow', () => {
     render(
       <table>
         <tbody>
-          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={vi.fn()} onNoteSaved={vi.fn()} />
+          <TransactionRow row={row} categories={[]} selected={false} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={vi.fn()} onNoteSaved={vi.fn()} onCreateCategory={vi.fn()} />
         </tbody>
       </table>,
     )
@@ -104,6 +104,7 @@ describe('TransactionRow', () => {
             onAssign={vi.fn()}
             onConfirm={vi.fn()}
             onNoteSaved={vi.fn()}
+            onCreateCategory={vi.fn()}
           />
         </tbody>
       </table>,

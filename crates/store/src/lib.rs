@@ -14,13 +14,14 @@ pub mod query;
 pub mod recurring;
 pub mod rules_repo;
 pub mod seed_categories;
+pub mod seed_repair;
 pub mod settings;
 pub mod summary;
 
 pub use accounts::Account;
 pub use assign::AssignOutcome;
 pub use backup::BackupOutcome;
-pub use categories::{Category, CategoryKind};
+pub use categories::{Category, CategoryKind, CategoryUpdatePreview, CategoryUpdateRequest};
 pub use delete_account::{AccountDeleteOutcome, AccountDeletePreview};
 pub use delete_statement::{StatementDeleteOutcome, StatementDeletePreview};
 pub use history::StatementHistoryRow;
@@ -28,7 +29,7 @@ pub use import::ImportOutcome;
 pub use net_log::NetLogRow;
 pub use notes::NOTE_MAX_CHARS;
 pub use query::{RecentStatement, TxFilter, TxRow};
-pub use rules_repo::RuleView;
+pub use rules_repo::{RuleRedirectOutcome, RuleView};
 pub use summary::*;
 
 use rusqlite::Connection;
@@ -52,6 +53,10 @@ pub enum StoreError {
     AccountKindLocked { iban: String, statements: i64, transactions: i64 },
     #[error("Transakcia s id {id} neexistuje.")]
     UnknownTransaction { id: i64 },
+    #[error("Kategória s id {id} neexistuje.")]
+    UnknownCategory { id: i64 },
+    #[error("Pravidlo s id {id} neexistuje.")]
+    UnknownRule { id: i64 },
     #[error("Poznámka nesmie obsahovať znak NUL.")]
     NoteContainsNul,
     #[error("Poznámka je príliš dlhá. Limit je {max} znakov, poznámka má {actual}.")]

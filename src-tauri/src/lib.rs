@@ -1,4 +1,5 @@
 //! Abakus Tauri shell.
+pub mod category_commands;
 pub mod commands;
 pub mod import_flow;
 pub mod net;
@@ -45,6 +46,10 @@ pub fn run() {
             commands::list_categories,
             commands::save_category,
             commands::archive_category,
+            category_commands::category_update_preview,
+            category_commands::update_category,
+            category_commands::seed_rule_for_transaction,
+            category_commands::update_rule_category,
             commands::list_rules,
             commands::delete_rule,
             commands::list_transactions,

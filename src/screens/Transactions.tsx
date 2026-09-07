@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Account, AccountKind, Category, Status, TxFilter, TxRow } from '../api'
+import type { Account, AccountKind, Category, RuleView, Status, TxFilter, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
+import { CategoryDialog } from '../components/CategoryDialog'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { OperationStatus } from '../components/OperationStatus'
 import { Toast } from '../components/Toast'
 import { NoteEditor } from '../components/NoteEditor'
 import { statusLabel } from '../lib/categories'
+import { categoryApi } from '../lib/category-api'
 import { formatDate } from '../lib/format'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
@@ -92,19 +94,24 @@ function FilterBar({
 function BulkBar({
   count,
   categories,
+  categoryId,
+  onCategoryChange,
+  onCreate,
   onAssign,
 }: {
   count: number
   categories: Category[]
+  categoryId: number | null
+  onCategoryChange: (id: number | null) => void
+  onCreate: () => void
   onAssign: (categoryId: number | null, applyToMatching: boolean) => void
 }) {
-  const [categoryId, setCategoryId] = useState<number | null>(null)
   const [applyToMatching, setApplyToMatching] = useState(false)
   if (count === 0) return null
   return (
     <div className="k-row k-well">
       <span>{count} vybraných</span>
-      <CategoryPicker value={categoryId} onChange={setCategoryId} categories={categories} />
+      <CategoryPicker value={categoryId} onChange={onCategoryChange} categories={categories} onCreate={onCreate} />
       <label className="k-checkbox">
         <input type="checkbox" checked={applyToMatching} onChange={(e) => setApplyToMatching(e.target.checked)} />
         Použiť aj na podobné
@@ -112,6 +119,58 @@ function BulkBar({
       <Button variant="primary" disabled={categoryId === null} onClick={() => onAssign(categoryId, applyToMatching)}>
         Priradiť
       </Button>
+    </div>
+  )
+}
+
+// Section 9 C05: an eligible seed-classified row shows its actual seed rule
+// and a redirect picker; a learned or absent pointer shows nothing (never
+// inferred from merchant text or category name).
+function SeedRuleRedirect({ row, categories, onChanged, onCreate }: { row: TxRow; categories: Category[]; onChanged: () => Promise<void>; onCreate: () => void }) {
+  const [rule, setRule] = useState<RuleView | null>(null)
+  const [loaded, setLoaded] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoaded(false)
+    setError('')
+    void categoryApi
+      .seedRuleForTransaction(row.id)
+      .then((r) => { if (active) { setRule(r); setLoaded(true) } })
+      .catch((e) => { if (active) { setError(String(e)); setLoaded(true) } })
+    return () => { active = false }
+  }, [row.id])
+
+  async function redirect(categoryId: number | null) {
+    if (categoryId === null || !rule) return
+    setBusy(true)
+    setError('')
+    try {
+      await categoryApi.redirectRule(rule.id, categoryId)
+      await onChanged()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!loaded || !rule) return error ? <p role="alert">{error}</p> : null
+  return (
+    <div className="k-row">
+      {error ? <p role="alert">{error}</p> : null}
+      <span>Zaradené podľa slovníka: {rule.parent_name ? `${rule.parent_name} / ${rule.category_name}` : rule.category_name}</span>
+      <CategoryPicker
+        label={`Presmerovať pravidlo transakcie ${row.id}`}
+        value={null}
+        emptyLabel="Presmerovať na..."
+        onChange={(id) => void redirect(id)}
+        categories={categories}
+        disabled={busy}
+        onCreate={onCreate}
+      />
     </div>
   )
 }
@@ -124,6 +183,7 @@ export function TransactionRow({
   onAssign,
   onConfirm,
   onNoteSaved,
+  onCreateCategory,
 }: {
   row: TxRow
   categories: Category[]
@@ -132,6 +192,7 @@ export function TransactionRow({
   onAssign: (id: number, categoryId: number | null) => void
   onConfirm: (id: number) => void
   onNoteSaved: () => Promise<void>
+  onCreateCategory: (rowId: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const isTransfer = row.status === 'transfer'
@@ -157,6 +218,7 @@ export function TransactionRow({
             onChange={(catId) => onAssign(row.id, catId)}
             categories={categories}
             disabled={isTransfer}
+            onCreate={() => onCreateCategory(row.id)}
           />
         </td>
         <td>
@@ -178,6 +240,8 @@ export function TransactionRow({
           <td colSpan={8}>
             <pre className="k-well">{row.raw_block}</pre>
             <NoteEditor txId={row.id} initialNote={row.note} onSaved={onNoteSaved} />
+            {!isTransfer ? <SeedRuleRedirect row={row} categories={categories} onChanged={onNoteSaved} onCreate={() => onCreateCategory(row.id)} /> : null}
+            {/* B's RecurringTransactionAction (recurring-ui, not yet published) mounts here, after NoteEditor, for eligible non-transfer/non-refund/nonzero rows: <RecurringTransactionAction row={row} categories={categories} onChanged={onNoteSaved} /> */}
           </td>
         </tr>
       ) : null}
@@ -216,6 +280,11 @@ export function Transactions({
   const [metadataLoaded, setMetadataLoaded] = useState(false)
   const [revision, setRevision] = useState(0)
   const [drilldown, setDrilldown] = useState({ statementId, accountKind: initialAccountKind })
+  const [bulkCategoryId, setBulkCategoryId] = useState<number | null>(null)
+  // Section 9 U05: which picker asked for "Nová kategória...", so the one
+  // shared CategoryDialog knows where the created category's own explicit
+  // assignment goes: the bulk selection, or straight onto that one row.
+  const [createFor, setCreateFor] = useState<'bulk' | { rowId: number } | null>(null)
   const action = useAction()
   const exportAction = useAction()
   const periodValid = validPeriod(period)
@@ -332,8 +401,23 @@ export function Transactions({
     if (catId === null) return
     const outcome = await api.assign([...selected], catId, applyToMatching)
     setSelected(new Set())
+    setBulkCategoryId(null)
     setToast(outcome.skipped_transfers > 0 ? `Prevody sa nepriraďujú, preskočené: ${outcome.skipped_transfers}` : null)
     reload()
+  }
+
+  // Section 9 U05: creation and assignment stay two distinct, explicit
+  // actions. The category is already persisted once this fires; a bulk
+  // context only preselects it (the existing Priradiť button still assigns),
+  // while a single row's picker create IS itself that row's explicit
+  // assignment choice, so it assigns immediately. Either way, a failed
+  // assignment never re-creates the category: it stays available to retry.
+  async function categoryCreated(category: Category) {
+    setCategories((prev) => (prev.some((c) => c.id === category.id) ? prev : [...prev, category]))
+    const context = createFor
+    setCreateFor(null)
+    if (context === 'bulk') { setBulkCategoryId(category.id); return }
+    if (context) await action.run(() => assignOne(context.rowId, category.id))
   }
 
   const unassignedCount = rows.filter((r) => r.status === 'unassigned').length
@@ -375,6 +459,9 @@ export function Transactions({
         <BulkBar
           count={selected.size}
           categories={categories}
+          categoryId={bulkCategoryId}
+          onCategoryChange={setBulkCategoryId}
+          onCreate={() => setCreateFor('bulk')}
           onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
         />
         <div className="k-table-scroll" role="region" aria-label="Transakcie" tabIndex={0}>
@@ -407,12 +494,14 @@ export function Transactions({
                 onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
                 onConfirm={(id) => void action.run(() => confirmOne(id))}
                 onNoteSaved={refreshRows}
+                onCreateCategory={(rowId) => setCreateFor({ rowId })}
               />
             ))}
           </tbody>
         </table>
         </div>
       </fieldset>
+      <CategoryDialog open={createFor !== null} onClose={() => setCreateFor(null)} onCreated={(category) => void categoryCreated(category)} />
     </div>
   )
 }

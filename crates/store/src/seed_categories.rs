@@ -11,7 +11,7 @@ pub const SEED: &[SeedCat] = &[
     SeedCat { name: "Auto/doprava", kind: "expense", subs: &["tankovanie", "parkovanie", "MHD", "servis", "diaľnica"], system: false },
     SeedCat { name: "Nákupy", kind: "expense", subs: &["obchod", "drogéria", "oblečenie", "domácnosť", "elektronika", "alkohol"], system: false },
     SeedCat { name: "Zdravie", kind: "expense", subs: &["lekáreň", "lekár"], system: false },
-    SeedCat { name: "Predplatné", kind: "expense", subs: &["Netflix", "Max HBO", "Voyo", "YouTube", "Apple"], system: false },
+    SeedCat { name: "Predplatné", kind: "expense", subs: &["Netflix", "Max HBO", "Voyo", "YouTube", "Apple", "Spotify"], system: false },
     SeedCat { name: "Investovanie", kind: "expense", subs: &["XTB", "TAM", "Finax", "Binance"], system: false },
     SeedCat { name: "Život", kind: "expense", subs: &["posilka", "suplementy", "zábava", "darčeky", "jednorazové"], system: false },
     SeedCat { name: "Hotovosť", kind: "expense", subs: &["bankomat"], system: true },

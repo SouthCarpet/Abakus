@@ -57,6 +57,60 @@ impl Store {
     }
     pub fn touch_rule(&mut self, id: i64) -> Result<()> { self.conn.execute("UPDATE rules SET hit_count = hit_count + 1 WHERE id = ?1", [id])?; Ok(()) }
 
+    /// Section 9 seed provenance: only an actual `transactions.rule_id`
+    /// pointing at a `match_kind=seed` rule counts, never a guess from
+    /// merchant text or category name. A missing transaction is an error; a
+    /// transaction with no seed pointer (learned rule, or none) returns
+    /// `Ok(None)`, never an error.
+    pub fn seed_rule_for_transaction(&self, transaction_id: i64) -> Result<Option<RuleView>> {
+        let exists: bool = self.conn.prepare("SELECT 1 FROM transactions WHERE id = ?1")?.exists([transaction_id])?;
+        if !exists { return Err(StoreError::UnknownTransaction { id: transaction_id }); }
+        let rule_id: Option<i64> = self
+            .conn
+            .query_row("SELECT r.id FROM transactions t JOIN rules r ON r.id = t.rule_id WHERE t.id = ?1 AND r.match_kind = 'seed'", [transaction_id], |r| r.get(0))
+            .ok();
+        Ok(match rule_id {
+            Some(id) => self.list_rules_view()?.into_iter().find(|r| r.id == id),
+            None => None,
+        })
+    }
+
+    /// Section 9 redirect, limited to seed rules this release. Atomic:
+    /// invalid target or a mid-write failure rolls back the rule AND every
+    /// row it would have touched. Reclassifies only open (`suggested`,
+    /// `unassigned`) rows through the existing rule-precedence classifier, so
+    /// confirmed and transfer rows are left byte-for-byte unchanged and a
+    /// higher-priority learned rule still wins where it already did.
+    pub fn update_rule_category(&mut self, rule_id: i64, category_id: i64) -> Result<RuleRedirectOutcome> {
+        let rule = self.list_rules()?.into_iter().find(|r| r.id == rule_id).ok_or(StoreError::UnknownRule { id: rule_id })?;
+        if rule.kind != RuleKind::Seed { return Err(StoreError::Parse("Presmerovanie je dostupné len pre pravidlá slovníka.".into())); }
+        self.check_redirect_target(category_id)?;
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        match self.update_rule_category_tx(rule_id, category_id) {
+            Ok(updated) => { self.conn.execute_batch("COMMIT")?; Ok(RuleRedirectOutcome { rule_id, category_id, updated }) }
+            Err(e) => { let _ = self.conn.execute_batch("ROLLBACK"); Err(e) }
+        }
+    }
+
+    /// A usable non-system active assignment category: a leaf, or a root
+    /// with no ACTIVE children (an archived child does not block it).
+    fn check_redirect_target(&self, category_id: i64) -> Result<()> {
+        let cat = self.category_row(category_id)?.ok_or(StoreError::UnknownCategory { id: category_id })?;
+        if cat.system || cat.archived { return Err(StoreError::Parse("Cieľová kategória nie je použiteľná.".into())); }
+        if cat.parent_id.is_none() && self.children_of(cat.id)?.iter().any(|c| !c.archived) {
+            return Err(StoreError::Parse("Cieľová kategória má aktívne podkategórie.".into()));
+        }
+        Ok(())
+    }
+
+    fn update_rule_category_tx(&mut self, rule_id: i64, category_id: i64) -> Result<usize> {
+        let n = self.conn.execute("UPDATE rules SET category_id = ?2 WHERE id = ?1 AND match_kind = 'seed'", rusqlite::params![rule_id, category_id])?;
+        if n == 0 { return Err(StoreError::UnknownRule { id: rule_id }); }
+        self.reclassify_open()?;
+        let updated: i64 = self.conn.query_row("SELECT COUNT(*) FROM transactions WHERE rule_id = ?1 AND status = 'suggested'", [rule_id], |r| r.get(0))?;
+        Ok(updated as usize)
+    }
+
     /// Rules joined with their category (and its parent) for the rules-list screen.
     pub fn list_rules_view(&self) -> Result<Vec<RuleView>> {
         let mut st = self.conn.prepare("SELECT r.id, r.match_kind, r.key, r.place, r.category_id, c.name, p.name, r.hit_count FROM rules r JOIN categories c ON c.id = r.category_id LEFT JOIN categories p ON p.id = c.parent_id ORDER BY r.hit_count DESC, r.id")?;
@@ -70,3 +124,6 @@ impl Store {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RuleView { pub id: i64, pub kind: RuleKind, pub key: String, pub place: Option<String>, pub category_id: i64, pub category_name: String, pub parent_name: Option<String>, pub hit_count: i64 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct RuleRedirectOutcome { pub rule_id: i64, pub category_id: i64, pub updated: usize }
