@@ -17,6 +17,25 @@ impl Drop for TempPath {
     fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); }
 }
 
+/// A dedicated directory, so a test can list exactly what it left behind
+/// (a lingering `.tmp` file from a failed or refused backup would show up
+/// here; nothing else in the OS temp dir would).
+struct TempDir(std::path::PathBuf);
+impl TempDir {
+    fn new(name: &str) -> Self {
+        let path = std::env::temp_dir().join(format!("abakus-backup-it-dir-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).unwrap();
+        TempDir(path)
+    }
+    fn file_names(&self) -> std::collections::BTreeSet<String> {
+        std::fs::read_dir(&self.0).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect()
+    }
+}
+impl Drop for TempDir {
+    fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+}
+
 fn fixture(name: &str) -> parser::Statement {
     parser::parse_text(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../fixtures/synthetic/").to_string() + name).unwrap()).unwrap()
 }
@@ -107,14 +126,15 @@ fn an_empty_pre_existing_destination_is_refused_and_left_empty() {
     assert_eq!(std::fs::metadata(&dst.0).unwrap().len(), 0, "an empty existing file at the destination must not be treated as free space to write into");
 }
 
-/// The bug this repairs: `dest.exists()` then `Connection::open(dest)` left a
-/// window between the check and the open where a competing writer could
-/// create the same path; whichever call opened it second could overwrite or,
-/// on cleanup, remove a file it never created. Many real threads racing for
-/// the same destination is the closest a single-process test gets to that
-/// window: with the fix (`create_new` claims the path atomically) exactly one
-/// can ever win, and every loser's own cleanup only ever touches a file it
-/// exclusively created, so the winner's snapshot is always left intact.
+/// `backup_to` builds each snapshot into its own private temp file, then
+/// publishes it to `dest` with a single atomic create-only move
+/// (`persist_noclobber`). `dest` only ever becomes visible already complete;
+/// a competing publish that loses the race fails outright instead of
+/// overwriting or truncating the winner. Many real threads racing for the
+/// same destination is the closest a single-process test gets to proving
+/// that: exactly one publish can ever land, and every loser's own cleanup
+/// (dropping its `TempPath`) only ever touches the private temp file it
+/// exclusively created, never `dest`.
 #[test]
 fn concurrent_backups_to_the_same_destination_race_safely_and_exactly_one_wins() {
     let src = TempPath::new("race-source");
@@ -153,4 +173,67 @@ fn a_destination_whose_directory_does_not_exist_fails_cleanly_and_leaves_the_sou
     assert!(matches!(e, StoreError::Db(_)), "got {e:?}");
     assert!(!bad_dest.exists(), "a failed backup must leave no partial file behind");
     assert_eq!(s.list_accounts().unwrap().len(), 1, "the live source must be unaffected by a failed backup");
+}
+
+#[test]
+fn a_successful_backup_leaves_only_the_source_and_the_named_destination_behind() {
+    let dir = TempDir::new("clean-success");
+    let src = dir.0.join("source.db");
+    let dest = dir.0.join("snapshot.db");
+    let (s, _) = seeded_store(&src);
+
+    let outcome = s.backup_to(&dest).unwrap();
+
+    assert!(outcome.bytes > 0);
+    let names = dir.file_names();
+    let expected: std::collections::BTreeSet<String> = ["source.db".to_string(), "snapshot.db".to_string()].into_iter().collect();
+    assert_eq!(names, expected, "a successful backup must publish exactly the named destination, no leftover temp file: {names:?}");
+}
+
+/// A hardlink is a second directory entry for the exact same file as the
+/// source: `backup_to` must refuse it the same way it refuses the source's
+/// own path, and by the same no-clobber publish, not a special case.
+#[test]
+fn a_hardlink_alias_of_the_source_is_refused_and_left_byte_for_byte_unchanged() {
+    let dir = TempDir::new("hardlink-alias");
+    let src = dir.0.join("source.db");
+    let alias = dir.0.join("alias.db");
+    let (s, _) = seeded_store(&src);
+    std::fs::hard_link(&src, &alias).unwrap();
+    let alias_before = std::fs::read(&alias).unwrap();
+
+    let e = s.backup_to(&alias).unwrap_err();
+
+    assert!(matches!(e, StoreError::BackupTargetExists { .. }), "got {e:?}");
+    assert_eq!(std::fs::read(&alias).unwrap(), alias_before, "a hardlink alias of the source must be left exactly as it was");
+    let names = dir.file_names();
+    let expected: std::collections::BTreeSet<String> = ["source.db".to_string(), "alias.db".to_string()].into_iter().collect();
+    assert_eq!(names, expected, "a refused backup onto an alias must leave no stray temp file behind: {names:?}");
+}
+
+/// `backup_to` zeroes the source connection's `busy_timeout` for the step
+/// loop, so a persistently locked source makes every step report busy
+/// immediately instead of blocking inside SQLite; `backup_to` must still
+/// eventually give up with a normal error, not retry forever and hold the
+/// caller's `Store` mutex hostage to whatever is holding the lock.
+#[test]
+fn backing_up_a_persistently_locked_source_fails_within_a_bounded_time_and_leaves_no_partial_file() {
+    let dir = TempDir::new("locked-source");
+    let src = dir.0.join("source.db");
+    let dest = dir.0.join("snapshot.db");
+    let (s, _) = seeded_store(&src);
+    let blocker = rusqlite::Connection::open(&src).unwrap();
+    blocker.execute_batch("BEGIN EXCLUSIVE;").unwrap();
+
+    let start = std::time::Instant::now();
+    let e = s.backup_to(&dest).unwrap_err();
+    let elapsed = start.elapsed();
+    blocker.execute_batch("ROLLBACK;").unwrap();
+
+    assert!(matches!(e, StoreError::Db(_)), "a persistently locked source must fail as a normal error, not hang: got {e:?}");
+    assert!(elapsed < std::time::Duration::from_secs(5), "a locked source must give up within a bounded time, took {elapsed:?}");
+    assert!(!dest.exists(), "a failed backup must leave no partial file at the destination");
+    let names = dir.file_names();
+    let expected: std::collections::BTreeSet<String> = ["source.db".to_string()].into_iter().collect();
+    assert_eq!(names, expected, "a failed backup must leave no stray temp file behind: {names:?}");
 }

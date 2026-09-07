@@ -50,22 +50,46 @@ worktrees were touched.
   single-line parsed fields, `raw_block` is still never passed through it),
   so a leading line feed is now a real input, not the hypothetical case the
   old doc comment described.
-- `crates/store/src/backup.rs` (new, race fixed in the 080-repair pass): `Store::backup_to(dest) -> BackupOutcome { path, bytes }`, via `rusqlite`'s
-  online-backup API (`Backup::new` + `run_to_completion`, not a filesystem
-  copy of the live file, and not the one-shot `Connection::backup` helper,
-  which does not retry `Busy`/`Locked`). `dest` is claimed with
-  `File::options().create_new(true)`, which atomically fails instead of
-  opening or truncating if the path already exists at that instant; this
-  refuses self-overwrite, an alias, an old backup, and a competing writer
-  that creates `dest` in the same window, all in one step, with no separate
-  existence check first. A failure at any later step removes `dest`, which
-  this call is always the exclusive creator of, so cleanup can never touch a
-  file another process owns. Touches only `self.conn` and the filesystem;
-  never the OS keyring.
+- `crates/store/src/backup.rs` (new; publish boundary rebuilt in the
+  080-backup-final pass): `Store::backup_to(dest) -> BackupOutcome { path,
+  bytes }`, via `rusqlite`'s online-backup API (`Backup::new` + a manual,
+  bounded `step` loop, not a filesystem copy of the live file, and not the
+  one-shot `Connection::backup` helper, which does not retry `Busy`/`Locked`
+  at all). The snapshot is built into a private temp file (`tempfile`,
+  created beside `dest` so the final move stays on one volume), then
+  published with one atomic create-only move (`TempPath::persist_noclobber`:
+  `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING` on Windows,
+  `renameat2`/`RENAME_NOREPLACE` or `link`+`unlink` on Unix). `dest` is never
+  opened, truncated, or visible in a partial state; the move simply fails if
+  `dest` already exists for any reason (the store's own file, a hardlink or
+  symlink alias of it, an old backup, or a backup that published first), with
+  no separate existence check before it. On any failure only the owned temp
+  file is removed; `dest` is never touched. The earlier 080-repair fix
+  (`File::create_new` claiming `dest` up front, then reopening it by path)
+  closed the plain check-then-open race but still left a window between the
+  claim and the reopen/cleanup where a competing writer could replace `dest`
+  in between, and exposed a partially-written file at `dest` for the
+  duration of the copy; building off-path and publishing once, atomically, at
+  the end removes both. The source connection's `busy_timeout` is
+  temporarily set to zero for the duration of the step loop (restored
+  afterwards): `rusqlite` sets a 5-second `busy_timeout` on every connection
+  by default, and stacking that under this call's own retry loop meant one
+  `Busy`/`Locked` step could itself block for up to 5 seconds before the
+  loop even got a chance to count it, so a bound on the outer loop alone
+  was not actually a bound. With the internal timeout at zero, `step`
+  reports `Busy`/`Locked` immediately and this call's own loop (100 pages
+  per step, 40 retries, 50ms apart) is the only thing pacing retries: at most
+  ~2 seconds of contention before it gives up with a normal error, instead of
+  either looping forever or the compounded multi-minute worst case the
+  080-repair version had. Touches only `self.conn` and the filesystem; never
+  the OS keyring.
 - `crates/store/Cargo.toml`: `rusqlite`'s `backup` feature enabled (both
   `[dependencies]` and `[dev-dependencies]`, matching the existing
   `bundled` duplication). This is a feature flag on the already-present
-  dependency, not a new crate.
+  dependency, not a new crate. `tempfile = "3"` added to `[dependencies]`
+  (080-backup-final): already present in `Cargo.lock` at 3.27.0 as a
+  transitive dependency of `crates/parser`, so declaring it in `store` did
+  not move any resolved version.
 - `src-tauri/src/commands.rs` / `lib.rs`: three new Tauri commands,
   registered in `invoke_handler!`: `statement_history`,
   `save_transaction_note`, `backup_database`. Each is a thin `lock(&state)?`
@@ -136,7 +160,19 @@ the brief.
   the source unaffected; 8 threads racing `backup_to` at the same real
   destination path resolve to exactly one winner and every loser reports
   `BackupTargetExists`, never a corrupted or double write (080-repair,
-  proving the check-then-open race is closed).
+  proving the original check-then-open race is closed). 080-backup-final
+  adds: a successful backup leaves exactly the source and the named
+  destination behind in the directory, no stray temp file
+  (`a_successful_backup_leaves_only_the_source_and_the_named_destination_behind`);
+  a hardlink alias of the source (a second directory entry for the identical
+  file) is refused through the same no-clobber publish and left byte-for-byte
+  unchanged, proving the fix is not a special-cased self-check
+  (`a_hardlink_alias_of_the_source_is_refused_and_left_byte_for_byte_unchanged`);
+  a second real connection holding `BEGIN EXCLUSIVE` on the source makes
+  every backup step report busy, and `backup_to` fails with a normal error
+  in bounded time (well under the 2-second retry ceiling) instead of hanging,
+  leaving no partial file
+  (`backing_up_a_persistently_locked_source_fails_within_a_bounded_time_and_leaves_no_partial_file`).
 - **JSON drift gate** (`src-tauri/tests/commands_json.rs`): `{accountId,
   accountKind}` (both independently optional, including the field being
   absent, not just `null`) for `statement_history`; `{id, note}` for
@@ -144,31 +180,36 @@ the brief.
   and `BackupOutcome` serialize the fields the UI reads; `TxRow`'s existing
   round-trip test extended with `note`.
 
-## Commands and results (080-repair, 2026-09-07)
+## Commands and results (080-backup-final, 2026-09-07)
 
 ```powershell
 $env:CARGO_TARGET_DIR = "A:/projects-vault/apps/abakus/target"
-cargo test --jobs 4 --workspace                              # exit 0, 281 tests, 0 failed
+cargo test --jobs 4 --workspace                              # exit 0, 284 tests, 0 failed
 cargo clippy --workspace --all-targets -- -D warnings         # exit 0, no warnings
 python -m lizard -C 12 crates src-tauri/src                   # exit 0, no function over CC 12
 ```
 
+284 tests is the 080-repair baseline (281) plus 3 new `backup.rs` tests:
+no-stray-file-on-success, hardlink alias, bounded-lock timeout. `npm test`
+(227 tests, 27 files) was re-run as a regression check; this lane touched no
+frontend file and none of it changed.
+
 `pdfium::tests::env_override_wins` (crate `parser`, not owned by this lane)
-failed once under the full-workspace multi-threaded run and passed cleanly
-alone and on a second full run: two `parser::pdfium` tests race a shared
-process environment variable. Pre-existing, unrelated to this repair, not
-fixed here (out of scope: PDF parsing is explicitly excluded from this
-lane).
+was flagged as flaky by 080-repair (races a shared process environment
+variable) and remains unrelated to and untouched by this pass; not observed
+to fail in this pass's runs.
 
 ## Honest limits
 
-- `Backup::run_to_completion`'s retry loop has no maximum attempt count; it
-  sleeps and retries on `Busy`/`Locked` until the source connection is free.
-  For this app that source is the SAME `Mutex`-guarded connection the
-  calling thread already holds, so there is no other in-process writer to
-  contend with; the only realistic contention is an external process
-  (antivirus, a second Abakus instance pointed at the same file), a case
-  this release does not add a timeout for.
+- `backup_to`'s step loop (080-backup-final) now bounds `Busy`/`Locked`
+  retries to 40 attempts, 50ms apart (~2 seconds worst case) before giving
+  up with a normal error. Within this app that source connection is the SAME
+  `Mutex`-guarded connection the calling thread already holds, so there is no
+  other in-process writer to contend with; the realistic case this bound
+  protects against is an external process (antivirus, a second Abakus
+  instance pointed at the same file) holding the source locked. ~2 seconds
+  was chosen as generous enough to ride out a brief external hold without
+  visibly freezing a user-triggered backup click for long.
 - The locked-database migration test proves the OUTER boundary (`Store::open`
   as a whole never leaves a partially-migrated file) via lock contention
   from a second connection, not a forced failure of one specific internal
