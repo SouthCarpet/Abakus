@@ -9,6 +9,7 @@ const READY_PATH = path.join(ROOT, 'acceptance', 'pdf-ready.json')
 const RESULTS_DIR = path.join(ROOT, 'acceptance', 'pdf-native-results')
 const PAGE_RESULTS_DIR = path.join(ROOT, 'acceptance', 'pdf-page-results')
 const PLAYWRIGHT_PATH = 'A:/projects-vault/apps/pdf-editor/node_modules/playwright/index.mjs'
+const IDENTITY_SCRIPT = path.join(ROOT, 'acceptance', 'verify-runtime-identity.ps1')
 const REQUIRED_READY_FIELDS = ['exe_path', 'binary_sha256', 'pid', 'cdp_endpoint', 'data_dir', 'oracle_path']
 
 function fail(message) {
@@ -51,6 +52,13 @@ function readReady() {
   assert(Number.isSafeInteger(ready.pid) && ready.pid > 0, `invalid PID: ${ready.pid}`)
   assert(fs.statSync(ready.exe_path).isFile(), `executable is missing: ${ready.exe_path}`)
   assertEqual(sha256(ready.exe_path), ready.binary_sha256.toLowerCase(), 'ready executable SHA256')
+  const identityCheck = spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-File', IDENTITY_SCRIPT, '-ReadyManifest', READY_PATH],
+    { encoding: 'utf8', windowsHide: true },
+  )
+  if (identityCheck.status !== 0) fail(`runtime identity check failed: ${identityCheck.stderr || identityCheck.stdout}`)
+  const runtimeIdentity = JSON.parse(identityCheck.stdout.trim())
   assert(fs.statSync(ready.oracle_path).isFile(), `oracle is missing: ${ready.oracle_path}`)
   const oracle = readJson(ready.oracle_path)
   assertEqual(path.resolve(oracle.data_dir), path.resolve(ready.data_dir), 'oracle and ready data_dir')
@@ -61,7 +69,7 @@ function readReady() {
   } catch (error) {
     fail(`ready PID ${ready.pid} is not running: ${error}`)
   }
-  return { ready, oracle }
+  return { ready, oracle, runtimeIdentity }
 }
 
 async function invoke(page, command, args = {}) {
@@ -81,7 +89,7 @@ async function invokeError(page, command, args = {}) {
 }
 
 async function attach() {
-  const { ready, oracle } = readReady()
+  const { ready, oracle, runtimeIdentity } = readReady()
   const playwright = await import(pathToFileURL(PLAYWRIGHT_PATH).href)
   const browser = await playwright.chromium.connectOverCDP(ready.cdp_endpoint)
   const pages = browser.contexts().flatMap((context) => context.pages())
@@ -94,7 +102,7 @@ async function attach() {
   // wrong profile even when a stale CDP endpoint is supplied.
   const actualDataDir = await invoke(page, 'data_dir')
   assertEqual(path.resolve(actualDataDir), path.resolve(ready.data_dir), 'genuine native data_dir')
-  return { browser, page, ready, oracle, actualDataDir }
+  return { browser, page, ready, oracle, runtimeIdentity, actualDataDir }
 }
 
 const PY_DB_STATE = String.raw`

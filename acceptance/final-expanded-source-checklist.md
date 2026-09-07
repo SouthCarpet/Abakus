@@ -99,6 +99,24 @@ directory.
   SQLite confirm the saved state. IPC-only canaries do not replace these
   front-door flows.
 
+## Migration profiles
+
+- [ ] `create-migration-oracles.py` creates one new root containing v2, v3,
+  v3 without the Spotify legacy signature, v2 version-write failure, v3 lock
+  and future-v5 profiles. Each profile stays inside `acceptance/`.
+- [ ] `verify-migration-oracle.py --phase before` passes before any launch.
+  Successful v2/v3 profiles then reach v4 with exact notes, learned
+  provenance, settings and assignments retained.
+- [ ] The exact legacy Spotify signature moves its seed rule and open row to
+  one new Spotify child. Its confirmed Apple row stays unchanged. The minimal
+  profile gains no Spotify category or rule.
+- [ ] The version-write trigger, an independently held SQLite lock and the
+  future-v5 marker each make the production process fail without changing
+  the original schema, marker or table hashes.
+- [ ] A post-migration snapshot is recorded after the first launch and
+  compared byte-for-byte as JSON after reopening the same profile. This is
+  the native idempotence proof; an in-process second open is secondary.
+
 ## Mechanical gates after the controller opens the serial Rust window
 
 - [ ] `cargo test --jobs 4 --workspace` with the controller target directory
