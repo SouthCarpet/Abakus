@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AccountKind, Status } from './api'
 import { Rail } from './components/Rail'
 import { ThemePicker } from './components/ThemePicker'
+import { ExportPdfAction } from './components/report/ExportPdfAction'
 import { Categories } from './screens/Categories'
 import { Import } from './screens/Import'
 import { Overview } from './screens/Overview'
@@ -46,7 +47,7 @@ export function App() {
     <div className="k-shell">
       <Rail items={RAIL_ITEMS} active={screen} onSelect={selectScreen} />
       <section className="k-page">
-        <ThemePicker />
+        <div className="k-app-toolbar"><ThemePicker /><ExportPdfAction /></div>
         {screen === 'overview' ? (
           <Overview onNavigateToImport={() => setScreen('import')} onNavigateToTransactions={goToTransactions} />
         ) : null}
