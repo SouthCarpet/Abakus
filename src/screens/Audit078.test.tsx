@@ -21,6 +21,39 @@ vi.mock('../api', async (original) => ({
   },
 }))
 vi.mock('../lib/files', () => ({ files: { saveCsv: vi.fn() } }))
+vi.mock('../lib/recurring-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/recurring-api')>()
+  return {
+    ...actual,
+    recurringApi: {
+      overview: vi.fn().mockResolvedValue({
+        as_of: '2026-09-07',
+        history_from: null,
+        future_period: false,
+        unfinished_period: true,
+        rows: [],
+        confirmed: {
+          monthly_income_cents: 0, monthly_expense_cents: 0, monthly_net_cents: 0,
+          annual_income_cents: 0, annual_expense_cents: 0, annual_net_cents: 0,
+          remaining_income_cents: 0, remaining_expense_cents: 0,
+        },
+        estimates: {
+          monthly_income_cents: 0, monthly_expense_cents: 0, monthly_net_cents: 0,
+          annual_income_cents: 0, annual_expense_cents: 0, annual_net_cents: 0,
+          remaining_income_cents: 0, remaining_expense_cents: 0,
+        },
+        excluded: { missing: 0, ended: 0, unknown: 0 },
+        expense_share_basis_points: null,
+        average_expense_cents: null,
+        average_months: [],
+      }),
+      detail: vi.fn(),
+      transactionContext: vi.fn(),
+      save: vi.fn(),
+      reset: vi.fn(),
+    },
+  }
+})
 const account: Account = { id: 7, label: 'Test účet', iban: 'SK3112000000198742637541', kind: 'personal', has_password: false }
 const preview: AccountDeletePreview = { account_id: 7, label: 'Test účet', statement_count: 2, transaction_count: 3, confirmed_count: 1, rules_deleted: 1, has_password: false }
 function row(overrides: Partial<TxRow> = {}): TxRow {

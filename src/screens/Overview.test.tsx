@@ -30,6 +30,41 @@ vi.mock('../api', async (importOriginal) => {
       // exercise them directly.
       listAccounts: vi.fn().mockResolvedValue([]),
       statementHistory: vi.fn().mockResolvedValue([]),
+      listCategories: vi.fn().mockResolvedValue([]),
+    },
+  }
+})
+
+vi.mock('../lib/recurring-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/recurring-api')>()
+  return {
+    ...actual,
+    recurringApi: {
+      overview: vi.fn().mockResolvedValue({
+        as_of: '2026-09-07',
+        history_from: null,
+        future_period: false,
+        unfinished_period: true,
+        rows: [],
+        confirmed: {
+          monthly_income_cents: 0, monthly_expense_cents: 0, monthly_net_cents: 0,
+          annual_income_cents: 0, annual_expense_cents: 0, annual_net_cents: 0,
+          remaining_income_cents: 0, remaining_expense_cents: 0,
+        },
+        estimates: {
+          monthly_income_cents: 0, monthly_expense_cents: 0, monthly_net_cents: 0,
+          annual_income_cents: 0, annual_expense_cents: 0, annual_net_cents: 0,
+          remaining_income_cents: 0, remaining_expense_cents: 0,
+        },
+        excluded: { missing: 0, ended: 0, unknown: 0 },
+        expense_share_basis_points: null,
+        average_expense_cents: null,
+        average_months: [],
+      }),
+      detail: vi.fn(),
+      transactionContext: vi.fn(),
+      save: vi.fn(),
+      reset: vi.fn(),
     },
   }
 })
@@ -162,5 +197,16 @@ describe('Overview keeps insights visible when the transaction summary is empty'
     render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
     expect(await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')).toBeInTheDocument()
     expect(await screen.findByText('Pokrytie výpismi')).toBeInTheDocument()
+  })
+})
+
+describe('Overview keeps the recurring panel visible when the transaction summary is empty', () => {
+  it('still mounts Pravidelné platby under the empty-overview card', async () => {
+    vi.mocked(api.summary).mockResolvedValue(emptySummary)
+    vi.mocked(api.recentStatements).mockResolvedValueOnce([])
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+    expect(await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')).toBeInTheDocument()
+    expect(await screen.findByText('Pravidelné platby')).toBeInTheDocument()
+    expect(await screen.findByText(/tri mesačné/)).toBeInTheDocument()
   })
 })

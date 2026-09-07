@@ -10,6 +10,8 @@ import { InsightsPanel } from '../components/insights/InsightsPanel'
 import { Kpi } from '../components/Kpi'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { monthRange, periodRange, validPeriod } from '../lib/period'
+import { localTodayIso } from '../lib/recurring-labels'
+import { RecurringPanel } from '../components/recurring'
 
 const ACCOUNT_KINDS: { id: 'all' | AccountKind; label: string }[] = [
   { id: 'all', label: 'Všetko' },
@@ -224,6 +226,11 @@ export function Overview({
           />
         )
       ) : null}
+
+      {/* Recurring schedules are a snapshot at period end, not a sum of the
+          selected-period transactions, so the panel stays mounted even when
+          that summary is empty. */}
+      <RecurringPanel period={period} accountKind={accountKind} today={localTodayIso()} />
 
       {/* Coverage, balance history and category comparison own their own
           fetches and stay visible even when the transaction summary above is

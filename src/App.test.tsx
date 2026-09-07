@@ -22,9 +22,44 @@ vi.mock('./api', () => ({
       top_merchants: [],
     }),
     recentStatements: vi.fn().mockResolvedValue([]),
+    listCategories: vi.fn().mockResolvedValue([]),
   },
   formatEur: (cents: number) => `${cents}`,
 }))
+
+vi.mock('./lib/recurring-api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./lib/recurring-api')>()
+  return {
+    ...actual,
+    recurringApi: {
+      overview: vi.fn().mockResolvedValue({
+        as_of: '2026-09-07',
+        history_from: null,
+        future_period: false,
+        unfinished_period: true,
+        rows: [],
+        confirmed: {
+          monthly_income_cents: 0, monthly_expense_cents: 0, monthly_net_cents: 0,
+          annual_income_cents: 0, annual_expense_cents: 0, annual_net_cents: 0,
+          remaining_income_cents: 0, remaining_expense_cents: 0,
+        },
+        estimates: {
+          monthly_income_cents: 0, monthly_expense_cents: 0, monthly_net_cents: 0,
+          annual_income_cents: 0, annual_expense_cents: 0, annual_net_cents: 0,
+          remaining_income_cents: 0, remaining_expense_cents: 0,
+        },
+        excluded: { missing: 0, ended: 0, unknown: 0 },
+        expense_share_basis_points: null,
+        average_expense_cents: null,
+        average_months: [],
+      }),
+      detail: vi.fn(),
+      transactionContext: vi.fn(),
+      save: vi.fn(),
+      reset: vi.fn(),
+    },
+  }
+})
 
 // A17: this is the wiring the dark theme block in tokens.css depends on. If
 // nothing sets `data-theme`, the dark block is dead code even though it is
