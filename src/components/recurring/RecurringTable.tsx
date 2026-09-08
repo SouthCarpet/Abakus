@@ -140,7 +140,7 @@ function RowActions({
 }) {
   if (row.decision === 'estimate') {
     return (
-      <div className="k-row">
+      <div className="k-row k-recurring-actions">
         <Button variant="primary" disabled={busy} aria-label={`Potvrdiť ${row.name}`} onClick={() => onConfirm(row)}>
           Potvrdiť
         </Button>
@@ -155,7 +155,7 @@ function RowActions({
   }
   if (row.decision === 'ignored') {
     return (
-      <div className="k-row">
+      <div className="k-row k-recurring-actions">
         <Button variant="secondary" disabled={busy} aria-label={`Upraviť ${row.name}`} onClick={() => onEdit(row)}>
           Upraviť
         </Button>
@@ -166,7 +166,7 @@ function RowActions({
     )
   }
   return (
-    <div className="k-row">
+    <div className="k-row k-recurring-actions">
       <Button variant="secondary" disabled={busy} aria-label={`Upraviť ${row.name}`} onClick={() => onEdit(row)}>
         Upraviť
       </Button>
