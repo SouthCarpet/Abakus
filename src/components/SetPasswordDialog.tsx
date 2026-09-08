@@ -16,6 +16,12 @@ import { Field } from './Field'
 // it unconditionally with a `key` that changes on every open, see
 // `Settings.tsx`), so a fresh open always starts from an empty, error-free
 // draft even when it targets the same account as the previous open.
+// Mirrors the backend limit (`commands::PASSWORD_MAX_CHARS`). Counted the
+// same way the backend counts it, by Unicode scalar value (`[...value]`),
+// not by `.length` (UTF-16 code units), so the two limits agree for any
+// character this dialog can reasonably see.
+const PASSWORD_MAX_CHARS = 512
+
 export function SetPasswordDialog({ account, onClose, onSaved }: {
   account: Account | null
   onClose: () => void
@@ -26,6 +32,7 @@ export function SetPasswordDialog({ account, onClose, onSaved }: {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const tooLong = [...value].length > PASSWORD_MAX_CHARS
 
   // Keeps the typed draft on failure so the user is not asked to retype it;
   // clears it only once the keyring write actually succeeded, so a stored
@@ -53,15 +60,16 @@ export function SetPasswordDialog({ account, onClose, onSaved }: {
     onClose={close}
     actions={<>
       <Button variant="secondary" disabled={action.busy} onClick={close}>Zrušiť</Button>
-      <Button variant="primary" disabled={action.busy || value === '' || value !== confirm} onClick={() => void action.run(save)}>Uložiť</Button>
+      <Button variant="primary" disabled={action.busy || value === '' || value !== confirm || tooLong} onClick={() => void action.run(save)}>Uložiť</Button>
     </>}
   >
     <Field label="Heslo">
-      <input type="password" className="k-input k-well" value={value} onChange={(e) => setValue(e.target.value)} />
+      <input type="password" maxLength={PASSWORD_MAX_CHARS} className="k-input k-well" value={value} onChange={(e) => setValue(e.target.value)} />
     </Field>
     <Field label="Zopakovať heslo">
-      <input type="password" className="k-input k-well" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+      <input type="password" maxLength={PASSWORD_MAX_CHARS} className="k-input k-well" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
     </Field>
+    {tooLong ? <p role="alert" className="k-text-danger">Limit je 512 znakov.</p> : null}
     {error ? <p role="alert" className="k-text-danger">{error}</p> : null}
     {saved ? <p role="status">Heslo je uložené v Správcovi poverení.</p> : null}
   </Dialog>
