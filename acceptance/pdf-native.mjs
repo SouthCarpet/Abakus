@@ -45,6 +45,17 @@ function writeNewJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' })
 }
 
+// Node inherits PSModulePath from this process's parent shell (often a pwsh 7
+// profile path list). A Windows PowerShell 5.1 child that sees those pwsh 7
+// module paths can fail to resolve its own built-in cmdlets (observed:
+// Get-FileHash inside verify-runtime-identity.ps1). Every powershell.exe
+// child drops PSModulePath so it falls back to its own default module path.
+function powershellEnv(extra = {}) {
+  const env = { ...process.env, ...extra }
+  delete env.PSModulePath
+  return env
+}
+
 function readReady() {
   assert(fs.existsSync(READY_PATH), `missing final readiness manifest: ${READY_PATH}`)
   const ready = readJson(READY_PATH)
@@ -55,7 +66,7 @@ function readReady() {
   const identityCheck = spawnSync(
     'powershell.exe',
     ['-NoProfile', '-NonInteractive', '-File', IDENTITY_SCRIPT, '-ReadyManifest', READY_PATH],
-    { encoding: 'utf8', windowsHide: true },
+    { encoding: 'utf8', windowsHide: true, env: powershellEnv() },
   )
   if (identityCheck.status !== 0) fail(`runtime identity check failed: ${identityCheck.stderr || identityCheck.stdout}`)
   const runtimeIdentity = JSON.parse(identityCheck.stdout.trim())
@@ -216,77 +227,128 @@ async function inspectMode() {
   }
 }
 
+// This script is written to a temporary .ps1 file and run with -File, not
+// piped through -Command -. Windows PowerShell 5.1's -Command - reader treats
+// piped stdin line by line: a multi-line brace block (the try/catch itself,
+// the while loops) silently fails to parse when fed that way, and any
+// uncaught `throw` only aborts the one statement it occurred in, leaving
+// later statements (including the final success JSON) to still run and
+// print. Both defects were confirmed with control tests on this host before
+// choosing -File. The whole script is wrapped in try/catch so every
+// terminating error (an explicit throw, or $ErrorActionPreference = 'Stop'
+// turning a cmdlet error into one) reaches the catch, prints to stderr, and
+// exits 1 with no success JSON on stdout.
 const DIALOG_AUTOMATION = String.raw`
 Add-Type -AssemblyName UIAutomationClient
-$targetPid = [int]$env:ABAKUS_ACCEPT_PID
-$action = $env:ABAKUS_ACCEPT_ACTION
-$targetPath = $env:ABAKUS_ACCEPT_PATH
-$root = [System.Windows.Automation.AutomationElement]::RootElement
-$pidCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $targetPid)
-$deadline = [DateTime]::UtcNow.AddSeconds(25)
-$dialog = $null
-$edit = $null
-while ([DateTime]::UtcNow -lt $deadline -and $null -eq $edit) {
-  $windows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $pidCondition)
-  foreach ($window in $windows) {
-    $idCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, '1001')
-    $candidate = $window.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $idCondition)
-    if ($null -ne $candidate) { $dialog = $window; $edit = $candidate; break }
-  }
-  if ($null -eq $edit) { [System.Threading.ManualResetEventSlim]::new($false).Wait(100) }
+try {
+    $ErrorActionPreference = 'Stop'
+    $targetPid = [int]$env:ABAKUS_ACCEPT_PID
+    $action = $env:ABAKUS_ACCEPT_ACTION
+    $targetPath = $env:ABAKUS_ACCEPT_PATH
+    $root = [System.Windows.Automation.AutomationElement]::RootElement
+    $pidCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $targetPid)
+    $dialogClassCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ClassNameProperty, '#32770')
+    $dialogCondition = New-Object System.Windows.Automation.AndCondition($pidCondition, $dialogClassCondition)
+    $deadline = [DateTime]::UtcNow.AddSeconds(25)
+    $dialog = $null
+    while ([DateTime]::UtcNow -lt $deadline -and $null -eq $dialog) {
+        $dialog = $root.FindFirst([System.Windows.Automation.TreeScope]::Children, $dialogCondition)
+        if ($null -eq $dialog) { Start-Sleep -Milliseconds 100 }
+    }
+    if ($null -eq $dialog) { throw "Save dialog (#32770) owned by PID $targetPid was not found" }
+
+    function Find-Scoped($parent, $automationId, $type) {
+        $idCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $automationId)
+        $typeCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, $type)
+        $scopedCondition = New-Object System.Windows.Automation.AndCondition($idCondition, $typeCondition)
+        return $parent.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $scopedCondition)
+    }
+
+    if ($action -eq 'cancel') {
+        $cancel = Find-Scoped $dialog '2' ([System.Windows.Automation.ControlType]::Button)
+        if ($null -eq $cancel) { throw 'Cancel button (AutomationId 2) was not found inside the save dialog' }
+        $cancel.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        Write-Output '{"action":"cancel","ok":true}'
+        exit 0
+    }
+
+    $edit = Find-Scoped $dialog '1001' ([System.Windows.Automation.ControlType]::Edit)
+    if ($null -eq $edit) { throw 'Filename edit (AutomationId 1001) was not found inside the save dialog' }
+    $edit.SetFocus()
+    $valuePattern = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+    $valuePattern.SetValue($targetPath)
+    $actualValue = $valuePattern.Current.Value
+    if ($actualValue -ne $targetPath) {
+        throw "filename edit did not accept the requested path: expected '$targetPath', got '$actualValue'"
+    }
+
+    $save = Find-Scoped $dialog '1' ([System.Windows.Automation.ControlType]::Button)
+    if ($null -eq $save) { throw 'Save button (AutomationId 1) was not found inside the save dialog' }
+    $save.SetFocus()
+    $save.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+
+    if ($action -eq 'occupied') {
+        $confirm = $null
+        while ([DateTime]::UtcNow -lt $deadline -and $null -eq $confirm) {
+            $ownerWindows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $pidCondition)
+            foreach ($owner in $ownerWindows) {
+                $promptCondition = New-Object System.Windows.Automation.AndCondition(
+                    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)),
+                    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, 'Potvrdenie uloženia súboru ako'))
+                )
+                $promptWindow = $owner.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $promptCondition)
+                if ($null -ne $promptWindow) {
+                    $confirmCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'CommandButton_6')
+                    $confirm = $promptWindow.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $confirmCondition)
+                    if ($null -ne $confirm) { break }
+                }
+            }
+            if ($null -eq $confirm) { Start-Sleep -Milliseconds 100 }
+        }
+        if ($null -eq $confirm) { throw 'Overwrite confirmation button (CommandButton_6) was not found' }
+        $confirm.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    }
+
+    Write-Output '{"action":"save","ok":true}'
+    exit 0
+} catch {
+    [Console]::Error.WriteLine($_)
+    exit 1
 }
-if ($null -eq $edit) { throw "Save dialog for PID $targetPid was not found" }
-if ($action -eq 'cancel') {
-  $cancelCondition = New-Object System.Windows.Automation.OrCondition(
-    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, '2')),
-    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, 'Zrušiť'))
-  )
-  $cancel = $dialog.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cancelCondition)
-  if ($null -eq $cancel) { throw 'Cancel button was not found' }
-  $cancel.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-  '{"action":"cancel","ok":true}'
-  exit 0
-}
-$edit.SetFocus()
-$edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($targetPath)
-$saveCondition = New-Object System.Windows.Automation.OrCondition(
-  (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, '1')),
-  (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, 'Uložiť'))
-)
-$save = $dialog.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $saveCondition)
-if ($null -eq $save) { throw 'Save button was not found' }
-$save.SetFocus()
-$save.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-if ($action -eq 'occupied') {
-  $confirm = $null
-  while ([DateTime]::UtcNow -lt $deadline -and $null -eq $confirm) {
-    $confirmCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'CommandButton_6')
-    $confirm = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $confirmCondition)
-    if ($null -eq $confirm) { [System.Threading.ManualResetEventSlim]::new($false).Wait(100) }
-  }
-  if ($null -eq $confirm) { throw 'Occupied-target confirmation button was not found' }
-  $confirm.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
-}
-'{"action":"save","ok":true}'
 `
 
 function automateDialog(pid, action, targetPath = '') {
+  fs.mkdirSync(RESULTS_DIR, { recursive: true })
+  const scriptPath = path.join(RESULTS_DIR, `.dialog-automation-${crypto.randomUUID()}.ps1`)
+  fs.writeFileSync(scriptPath, DIALOG_AUTOMATION, { flag: 'wx' })
+  const cleanup = () => { try { fs.rmSync(scriptPath, { force: true }) } catch { /* best effort */ } }
   return new Promise((resolve, reject) => {
-    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '-'], {
-      env: { ...process.env, ABAKUS_ACCEPT_PID: String(pid), ABAKUS_ACCEPT_ACTION: action, ABAKUS_ACCEPT_PATH: targetPath },
+    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', scriptPath], {
+      env: powershellEnv({ ABAKUS_ACCEPT_PID: String(pid), ABAKUS_ACCEPT_ACTION: action, ABAKUS_ACCEPT_PATH: targetPath }),
       windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     })
     let stdout = ''
     let stderr = ''
     child.stdout.on('data', (chunk) => { stdout += chunk })
     child.stderr.on('data', (chunk) => { stderr += chunk })
-    child.on('error', reject)
+    child.on('error', (error) => { cleanup(); reject(error) })
     child.on('close', (code) => {
-      if (code !== 0) reject(new Error(`dialog automation failed (${code}): ${stderr || stdout}`))
-      else resolve({ action, stdout: stdout.trim() })
+      cleanup()
+      if (code !== 0) { reject(new Error(`dialog automation failed (${code}): ${stderr || stdout}`)); return }
+      let parsed
+      try {
+        parsed = JSON.parse(stdout.trim())
+      } catch {
+        reject(new Error(`dialog automation produced no parsable ok:true JSON: stdout=${stdout} stderr=${stderr}`))
+        return
+      }
+      if (parsed.ok !== true || parsed.action !== action) {
+        reject(new Error(`dialog automation did not confirm success for action ${action}: ${stdout}`))
+        return
+      }
+      resolve({ action, stdout: stdout.trim() })
     })
-    child.stdin.end(DIALOG_AUTOMATION)
   })
 }
 
@@ -300,9 +362,9 @@ async function openExportDialog(page) {
 async function chooseFamily(dialog, name, family) {
   const period = family.request.period
   await dialog.getByLabel('Obdobie').selectOption(period.kind)
-  if (period.kind === 'month') await dialog.getByLabel('Mesiac').fill(period.month)
-  if (period.kind === 'six_months') await dialog.getByLabel('Koncový mesiac').fill(period.ending_month)
-  if (period.kind === 'year') await dialog.getByLabel('Rok').fill(String(period.year))
+  if (period.kind === 'month') await dialog.getByLabel('Mesiac', { exact: true }).fill(period.month)
+  if (period.kind === 'six_months') await dialog.getByLabel('Koncový mesiac', { exact: true }).fill(period.ending_month)
+  if (period.kind === 'year') await dialog.getByLabel('Rok', { exact: true }).fill(String(period.year))
   const scope = family.request.scope
   const scopeValue = scope.kind === 'account' ? `account:${scope.account_id}` : scope.kind === 'kind' ? scope.account_kind : 'all'
   await dialog.getByLabel('Účty').selectOption(scopeValue)
@@ -740,6 +802,41 @@ function normalizeExtractedText(value) {
   return value.normalize('NFC').replace(/\s+/g, ' ').trim()
 }
 
+// Literal from acceptance/create-pdf-oracle.py month_transactions(): the
+// report table renders merchant_raw text, never the SYNTH-<id> reference
+// column, so this is what the oracle's ordered_ids can actually be checked
+// against on the rendered page.
+const MONTH_MERCHANT_TEXT = {
+  1001: 'Príjem 1000',
+  1002: 'Výdavok 100',
+  1003: 'Refundácia 25',
+  1004: 'Navrhnuté bez kategórie',
+  1005: 'Nezaradená refundácia',
+  1006: 'Odchádzajúci prevod',
+  1007: 'Prichádzajúci prevod',
+  1008: 'Nulová položka',
+}
+
+function assertMonthRowsInOrder(text, orderedIds) {
+  let previousOrdinalIndex = -1
+  orderedIds.forEach((txId, position) => {
+    const ordinal = position + 1
+    const merchant = MONTH_MERCHANT_TEXT[txId]
+    assert(merchant, `month PDF has no known merchant text for transaction ${txId}`)
+    assertEqual(text.split(merchant).length - 1, 1, `month PDF single occurrence of ${merchant}`)
+    const ordinalIndex = text.indexOf(`${ordinal}. `)
+    const merchantIndex = text.indexOf(merchant)
+    assert(ordinalIndex !== -1, `month PDF lacks running ordinal ${ordinal}`)
+    assert(ordinalIndex > previousOrdinalIndex, `month PDF ordinal ${ordinal} is out of order`)
+    assert(merchantIndex > ordinalIndex, `month PDF row ${ordinal} merchant ${merchant} does not follow its own ordinal`)
+    const nextOrdinalIndex = text.indexOf(`${ordinal + 1}. `)
+    if (nextOrdinalIndex !== -1) {
+      assert(merchantIndex < nextOrdinalIndex, `month PDF row ${ordinal} merchant ${merchant} spilled past the next ordinal`)
+    }
+    previousOrdinalIndex = ordinalIndex
+  })
+}
+
 function inspectPageManifest(name, oracle) {
   const directory = path.join(PAGE_RESULTS_DIR, name.replaceAll('_', '-'))
   const manifestPath = path.join(directory, 'manifest.json')
@@ -761,7 +858,7 @@ function inspectPageManifest(name, oracle) {
   const family = oracle.families[name]
   if (name === 'month') {
     for (const required of ['1 000,00 €', '100,00 €', '900,00 €', '200,00 €']) assert(text.includes(required), `month PDF lacks ${required}`)
-    for (const txId of family.ordered_ids) assert(text.includes(`SYNTH-${txId}`), `month PDF lacks transaction ${txId}`)
+    assertMonthRowsInOrder(text, family.ordered_ids)
   }
   if (name === 'all_time') {
     for (const required of Object.values(family.year_sentinels).filter((value) => typeof value === 'string')) assert(text.includes(required), `all-time PDF lacks ${required}`)

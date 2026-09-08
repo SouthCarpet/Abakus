@@ -880,6 +880,17 @@ fn renderer_prints_original_currency_but_never_adds_it_to_eur_totals() {
     row.category_kind = Some(CategoryKind::Expense);
     let (_directory, _path, pages) = write_and_extract(&snapshot(vec![row]), "foreign.pdf");
     let text = extracted_text(&pages);
-    assert!(text.contains("Pôvodná suma: -10.00 USD"));
+    assert!(text.contains("Pôvodná suma: -10,00 USD"));
     assert!(text.contains("-9,23 €"));
+}
+
+#[test]
+fn renderer_groups_original_currency_thousands_like_the_euro_total() {
+    let mut row = transaction(1, "foreign large", "", -1);
+    row.transaction.orig_amount_cents = Some(-100_000);
+    row.transaction.orig_currency = Some("USD".into());
+    row.category_kind = Some(CategoryKind::Expense);
+    let (_directory, _path, pages) = write_and_extract(&snapshot(vec![row]), "foreign-grouped.pdf");
+    let text = extracted_text(&pages);
+    assert!(text.contains("Pôvodná suma: -1 000,00 USD"));
 }

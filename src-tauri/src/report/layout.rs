@@ -998,7 +998,11 @@ fn date(value: chrono::NaiveDate) -> String {
     value.format("%d.%m.%Y").to_string()
 }
 
-fn format_money(cents: i64) -> String {
+/// Formats cents as a signed, space-grouped, comma-decimal amount without a
+/// currency suffix, e.g. `-1 000,00`. Shared by [`format_money`] (which adds
+/// ` €`) and [`format_original`] (which the caller suffixes with the foreign
+/// currency code), so the two amounts never drift into different locales.
+fn format_grouped(cents: i64) -> String {
     let sign = if cents < 0 { "-" } else { "" };
     let magnitude = cents.unsigned_abs();
     let digits = magnitude.div_euclid(100).to_string();
@@ -1009,7 +1013,11 @@ fn format_money(cents: i64) -> String {
         .map(|chunk| std::str::from_utf8(chunk).unwrap_or(""))
         .collect::<Vec<_>>()
         .join(" ");
-    format!("{sign}{grouped},{:02} €", magnitude.rem_euclid(100))
+    format!("{sign}{grouped},{:02}", magnitude.rem_euclid(100))
+}
+
+fn format_money(cents: i64) -> String {
+    format!("{} €", format_grouped(cents))
 }
 
 #[derive(Debug)]
@@ -1194,7 +1202,5 @@ fn status_label(status: Status) -> &'static str {
 }
 
 fn format_original(cents: i64) -> String {
-    let sign = if cents < 0 { "-" } else { "" };
-    let value = cents.unsigned_abs();
-    format!("{sign}{}.{:02}", value / 100, value % 100)
+    format_grouped(cents)
 }

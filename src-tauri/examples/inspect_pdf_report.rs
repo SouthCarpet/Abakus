@@ -12,6 +12,7 @@ use std::error::Error;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 type AnyResult<T> = Result<T, Box<dyn Error>>;
 
@@ -48,14 +49,18 @@ struct RenderedPage {
     png_height: u32,
 }
 
-#[derive(Serialize)]
-struct Manifest {
+/// The manifest fields known before any page is rendered, plus the running
+/// aggregates collected as pages stream past. `pages` itself is never held
+/// here: each page's already-serialized JSON record is assembled straight
+/// into `manifest.json` from its own small file (see [`write_page_record`]
+/// and [`write_manifest_file`]), so this process never holds more than one
+/// page's glyph data in memory at a time.
+struct ManifestHeader {
     input: String,
     input_sha256: String,
     page_count: usize,
     pages_with_no_text: Vec<usize>,
     outside_page_glyphs: usize,
-    pages: Vec<RenderedPage>,
 }
 
 struct Arguments {
@@ -169,35 +174,111 @@ fn partial_path(output: &Path) -> AnyResult<PathBuf> {
     Ok(parent.join(format!(".{name}.partial-{}", std::process::id())))
 }
 
-fn inspect(arguments: &Arguments, stage: &Path) -> AnyResult<Manifest> {
+/// Writes one page's already-computed record to its own small JSON file in
+/// `stage`, immediately after that page finishes (PNG and record together),
+/// so the file system carries evidence of progress instead of everything
+/// staying buffered in this process until the very end.
+fn write_page_record(stage: &Path, page: &RenderedPage) -> AnyResult<PathBuf> {
+    let path = stage.join(format!("page-{:04}.record.json", page.page_number));
+    let file = File::create(&path)?;
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer(&mut writer, page)?;
+    writer.flush()?;
+    Ok(path)
+}
+
+/// Renders every page, one at a time, writing that page's PNG and JSON
+/// record to `stage` as soon as it is done and printing `page i/n` progress
+/// to stderr. Returns the header fields plus the ordered list of per-page
+/// record files still to be folded into the final `manifest.json`.
+fn inspect_pages(arguments: &Arguments, stage: &Path) -> AnyResult<(ManifestHeader, Vec<PathBuf>)> {
     let library_dir = env::var_os("ABAKUS_PDFIUM_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("src-tauri/resources/pdfium"));
     let library = Pdfium::pdfium_platform_library_name_at_path(&library_dir);
     let pdfium = Pdfium::new(Pdfium::bind_to_library(&library)?);
     let document = pdfium.load_pdf_from_file(&arguments.input, None)?;
-    if document.pages().is_empty() {
+    let page_count = document.pages().len() as usize;
+    if page_count == 0 {
         return Err("PDF contains no pages".into());
     }
 
-    let mut pages = Vec::new();
+    let mut pages_with_no_text = Vec::new();
+    let mut outside_page_glyphs = 0_usize;
+    let mut record_paths = Vec::with_capacity(page_count);
+    let started = Instant::now();
     for (index, page) in document.pages().iter().enumerate() {
-        pages.push(render_page(&page, index + 1, stage)?);
+        let page_started = Instant::now();
+        let rendered = render_page(&page, index + 1, stage)?;
+        if rendered.extracted_text.trim().is_empty() {
+            pages_with_no_text.push(rendered.page_number);
+        }
+        outside_page_glyphs += rendered.outside_page_glyphs;
+        eprintln!(
+            "page {}/{page_count} ({:.3}s, {} glyphs)",
+            rendered.page_number,
+            page_started.elapsed().as_secs_f64(),
+            rendered.glyph_count,
+        );
+        record_paths.push(write_page_record(stage, &rendered)?);
     }
-    let pages_with_no_text = pages
-        .iter()
-        .filter(|page| page.extracted_text.trim().is_empty())
-        .map(|page| page.page_number)
-        .collect();
-    let outside_page_glyphs = pages.iter().map(|page| page.outside_page_glyphs).sum();
-    Ok(Manifest {
-        input: arguments.input.canonicalize()?.display().to_string(),
-        input_sha256: sha256_file(&arguments.input)?,
-        page_count: pages.len(),
-        pages_with_no_text,
-        outside_page_glyphs,
-        pages,
-    })
+    eprintln!(
+        "inspect_pdf_report: {page_count} pages done in {:.3}s",
+        started.elapsed().as_secs_f64()
+    );
+
+    Ok((
+        ManifestHeader {
+            input: arguments.input.canonicalize()?.display().to_string(),
+            input_sha256: sha256_file(&arguments.input)?,
+            page_count,
+            pages_with_no_text,
+            outside_page_glyphs,
+        },
+        record_paths,
+    ))
+}
+
+/// Renders the manifest's non-`pages` fields as a JSON object prefix, open
+/// brace through the start of the `"pages"` array.
+fn manifest_header_json(header: &ManifestHeader) -> AnyResult<String> {
+    Ok(format!(
+        "{{\n  \"input\": {},\n  \"input_sha256\": {},\n  \"page_count\": {},\n  \"pages_with_no_text\": {},\n  \"outside_page_glyphs\": {},\n  \"pages\": [\n",
+        serde_json::to_string(&header.input)?,
+        serde_json::to_string(&header.input_sha256)?,
+        header.page_count,
+        serde_json::to_string(&header.pages_with_no_text)?,
+        header.outside_page_glyphs,
+    ))
+}
+
+/// Writes the `"pages"` array body by copying each already-serialized
+/// per-page record file's bytes straight through, comma-separated.
+fn write_manifest_pages(writer: &mut impl Write, record_paths: &[PathBuf]) -> AnyResult<()> {
+    for (index, record_path) in record_paths.iter().enumerate() {
+        if index > 0 {
+            writer.write_all(b",\n")?;
+        }
+        writer.write_all(&fs::read(record_path)?)?;
+    }
+    Ok(())
+}
+
+/// Assembles the final `manifest.json` from the header fields and the
+/// already-serialized per-page record files, in the same shape the old
+/// buffered-in-memory `Manifest` struct produced, then removes the
+/// now-redundant per-page record files.
+fn write_manifest_file(stage: &Path, header: &ManifestHeader, record_paths: &[PathBuf]) -> AnyResult<()> {
+    let file = File::create(stage.join("manifest.json"))?;
+    let mut writer = BufWriter::new(file);
+    writer.write_all(manifest_header_json(header)?.as_bytes())?;
+    write_manifest_pages(&mut writer, record_paths)?;
+    writer.write_all(b"\n  ]\n}\n")?;
+    writer.flush()?;
+    for record_path in record_paths {
+        fs::remove_file(record_path)?;
+    }
+    Ok(())
 }
 
 fn create_stage(arguments: &Arguments) -> AnyResult<PathBuf> {
@@ -218,13 +299,8 @@ fn create_stage(arguments: &Arguments) -> AnyResult<PathBuf> {
 }
 
 fn write_manifest(arguments: &Arguments, stage: &Path) -> AnyResult<()> {
-    let manifest = inspect(arguments, stage)?;
-    let file = File::create(stage.join("manifest.json"))?;
-    let mut writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(&mut writer, &manifest)?;
-    writer.write_all(b"\n")?;
-    writer.flush()?;
-    Ok(())
+    let (header, record_paths) = inspect_pages(arguments, stage)?;
+    write_manifest_file(stage, &header, &record_paths)
 }
 
 fn commit_stage(arguments: &Arguments, stage: &Path) -> AnyResult<()> {
