@@ -829,7 +829,7 @@ async function expandedCommandCanaries(page) {
 async function noteAndBackupCanaries(page, oracle) {
   const note = `${'Ž'.repeat(1980)}\nFINAL-NOTE-SENTINEL`
   assertEqual([...note].length, 2000, 'native note boundary fixture')
-  await showTransactionInRange(page, 1008, 'Zero row', '2024-02-01', '2024-02-29')
+  await showTransactionInRange(page, 1008, 'Nulová položka', '2024-02-01', '2024-02-29')
   const editor = page.getByLabel('Poznámka k transakcii 1008')
   await editor.fill(note)
   await editor.locator('xpath=..').getByRole('button', { name: 'Uložiť poznámku', exact: true }).click()
@@ -838,11 +838,17 @@ async function noteAndBackupCanaries(page, oracle) {
   const tooLong = await invokeError(page, 'save_transaction_note', { id: 1008, note: `${note}X` })
   const nul = await invokeError(page, 'save_transaction_note', { id: 1008, note: 'before\0after' })
   const unknown = await invokeError(page, 'save_transaction_note', { id: 9_999_999, note: 'unknown' })
+  // create-pdf-oracle.py:180 (long_text_transactions, offset 0) already gives
+  // transaction 5001 a note ending in FINAL-NOTE-SENTINEL, so writing the
+  // same sentinel to 1008 here makes two real matches, 5001 (2025-06-01,
+  // newer) before 1008 (2024-02-21, older) in the product's own descending
+  // tx_date order (observed live, 2026-09-08). The original single-row
+  // expectation contradicted the oracle generator.
   const rows = await invoke(page, 'list_transactions', { filter: { text: 'final-note-sentinel' } })
-  assertEqual(rows.map((row) => row.id), [1008], 'literal folded note search')
+  assertEqual(rows.map((row) => row.id), [5001, 1008], 'literal folded note search')
   const csvPath = path.join(RESULTS_DIR, 'note-literal.csv')
   const csvCount = await invoke(page, 'export_csv', { filter: { text: 'final-note-sentinel' }, path: csvPath })
-  assertEqual(csvCount, 1, 'CSV literal note row count')
+  assertEqual(csvCount, 2, 'CSV literal note row count')
   const csv = fs.readFileSync(csvPath, 'utf8')
   assert(csv.includes('poznamka'), 'CSV lacks poznamka header')
   assert(csv.includes('FINAL-NOTE-SENTINEL'), 'CSV lacks exact note content')
@@ -1158,7 +1164,12 @@ async function captureCategoryStates(page, screenshotDir, screenshots, flows) {
   await captureScreenshot(page, screenshotDir, screenshots, { slug: 'category-create', state: 'New category dialog with explicit parent and kind', theme: 'light', width: 1280, locator: create, requiredText: ['Nová kategória', 'Nadradená kategória', 'Druh'] })
   await create.getByRole('button', { name: 'Uložiť', exact: true }).click()
   await create.getByRole('alert').waitFor()
-  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'category-create-error', state: 'Category duplicate error with draft retained', theme: 'light', width: 1280, locator: create, requiredText: ['Spotify'] })
+  // 'Spotify' lives only in the Názov <input>'s value; innerText() never
+  // includes input values (confirmed live, 2026-09-08: the dialog's actual
+  // innerText has no 'Spotify' anywhere, only the alert text below). The
+  // real fact the screenshot state proves visually is the rendered alert;
+  // the retained draft is verified precisely, right after, via inputValue().
+  await captureScreenshot(page, screenshotDir, screenshots, { slug: 'category-create-error', state: 'Category duplicate error with draft retained', theme: 'light', width: 1280, locator: create, requiredText: ['Kategória s týmto názvom na tejto úrovni už existuje.'] })
   assertEqual(await create.getByLabel('Názov kategórie').inputValue(), 'Spotify', 'category error retains draft')
   await create.getByRole('button', { name: 'Zrušiť', exact: true }).click()
 
