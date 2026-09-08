@@ -33,6 +33,7 @@ export const api = {
   updateAccount: (id: number, label: string, kind: AccountKind, acknowledgeKindChange: boolean) =>
     invoke<Account>('update_account', { id, label, kind, acknowledgeKindChange }),
   clearPassword: (accountId: number) => invoke<void>('clear_password', { accountId }),
+  setAccountPassword: (accountId: number, password: string) => invoke<void>('set_account_password', { accountId, password }),
   accountDeletePreview: (accountId: number) => invoke<AccountDeletePreview>('account_delete_preview', { accountId }),
   deleteAccount: (accountId: number) => invoke<AccountDeleteOutcome>('delete_account', { accountId }),
   listCategories: () => invoke<Category[]>('list_categories'),

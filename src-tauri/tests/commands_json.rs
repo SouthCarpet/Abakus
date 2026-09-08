@@ -42,6 +42,12 @@ struct ClearPasswordArgs {
 }
 
 #[derive(serde::Deserialize)]
+struct SetAccountPasswordArgs {
+    #[serde(rename = "accountId")] account_id: i64,
+    password: String,
+}
+
+#[derive(serde::Deserialize)]
 struct SaveCategoryArgs {
     id: Option<i64>,
     #[serde(rename = "parentId")] parent_id: Option<i64>,
@@ -217,6 +223,13 @@ fn net_log_args_match_the_ui_call() {
 fn clear_password_args_match_the_ui_call() {
     let args: ClearPasswordArgs = serde_json::from_value(json!({"accountId": 3})).unwrap();
     assert_eq!(args.account_id, 3);
+}
+
+#[test]
+fn set_account_password_args_match_the_ui_call() {
+    let args: SetAccountPasswordArgs = serde_json::from_value(json!({"accountId": 3, "password": "tajneheslo"})).unwrap();
+    assert_eq!(args.account_id, 3);
+    assert_eq!(args.password, "tajneheslo");
 }
 
 #[test]

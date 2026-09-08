@@ -41,6 +41,7 @@ vi.mock('../api', async (importOriginal) => {
       setCheckUpdates: vi.fn(),
       runNetAudit: vi.fn(),
       updateAccount: vi.fn(),
+      setAccountPassword: vi.fn(),
     },
   }
 })
@@ -141,5 +142,72 @@ describe('Settings: edit account', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /Potvrdzujem zmenu typu účtu/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
     await waitFor(() => expect(updateAccount).toHaveBeenNthCalledWith(2, 1, 'Osobný', 'business', true))
+  })
+})
+
+// Nedá sa nastaviť alebo zmeniť heslo pri účte (Michal, 2026-09-08): the
+// account row's password button and its dialog, next to `set_account_password`.
+describe('Settings: account password', () => {
+  const withoutPassword: Account = { id: 1, iban: 'SK4411000000000012345678', kind: 'personal', label: 'Osobný', has_password: false }
+  const withPassword: Account = { id: 2, iban: 'SK3711000000000098765432', kind: 'business', label: 'Firemný', has_password: true }
+
+  it('sets a password on an account that has none, shows the row and the status line updated', async () => {
+    const setAccountPassword = vi.fn().mockResolvedValue(undefined)
+    mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]), setAccountPassword } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
+    await screen.findByRole('dialog', { name: 'Heslo k výpisom účtu Osobný' })
+    fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: 'tajneheslo' } })
+    fireEvent.change(screen.getByLabelText('Zopakovať heslo'), { target: { value: 'tajneheslo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
+
+    await waitFor(() => expect(setAccountPassword).toHaveBeenCalledWith(1, 'tajneheslo'))
+    await screen.findByText('Heslo je uložené v Správcovi poverení.')
+  })
+
+  it('changes a password on an account that already has one', async () => {
+    const setAccountPassword = vi.fn().mockResolvedValue(undefined)
+    mockApi({ listAccounts: vi.fn().mockResolvedValue([withPassword]), setAccountPassword } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Zmeniť heslo' }))
+    fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: 'nove-heslo' } })
+    fireEvent.change(screen.getByLabelText('Zopakovať heslo'), { target: { value: 'nove-heslo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
+
+    await waitFor(() => expect(setAccountPassword).toHaveBeenCalledWith(2, 'nove-heslo'))
+  })
+
+  it('keeps Uložiť disabled while the two fields do not match or are empty', async () => {
+    mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]) } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
+    expect(screen.getByRole('button', { name: 'Uložiť' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: 'tajneheslo' } })
+    expect(screen.getByRole('button', { name: 'Uložiť' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Zopakovať heslo'), { target: { value: 'ine' } })
+    expect(screen.getByRole('button', { name: 'Uložiť' })).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText('Zopakovať heslo'), { target: { value: 'tajneheslo' } })
+    expect(screen.getByRole('button', { name: 'Uložiť' })).not.toBeDisabled()
+  })
+
+  it('shows the alert on a failure, keeps the draft and the dialog open', async () => {
+    const setAccountPassword = vi.fn().mockRejectedValue('Uloženie hesla zlyhalo: keyring locked')
+    mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]), setAccountPassword } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
+    fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: 'tajneheslo' } })
+    fireEvent.change(screen.getByLabelText('Zopakovať heslo'), { target: { value: 'tajneheslo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
+
+    await screen.findByText('Uloženie hesla zlyhalo: keyring locked')
+    expect(screen.getByRole('dialog', { name: 'Heslo k výpisom účtu Osobný' })).toBeInTheDocument()
+    expect((screen.getByLabelText('Heslo') as HTMLInputElement).value).toBe('tajneheslo')
   })
 })

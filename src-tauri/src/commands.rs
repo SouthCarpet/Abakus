@@ -72,6 +72,42 @@ pub fn clear_password(state: State<AppState>, account_id: i64) -> Result<(), Str
     s.set_has_password(account_id, false).map_err(|e| e.to_string())
 }
 
+/// Sets or changes the PDF-statement password Abakus stores for an account
+/// (the same credential a locked import can already save via "Zapamätať pre
+/// tento účet"). Unlike that path, this one has no fresh PDF to validate the
+/// password against: it stores exactly what the user typed.
+#[tauri::command]
+pub fn set_account_password(state: State<AppState>, account_id: i64, password: String) -> Result<(), String> {
+    let mut s = lock(&state)?;
+    set_account_password_inner(&mut s, account_id, &password, &secrets::set)
+}
+
+const PASSWORD_MAX_CHARS: usize = 512;
+
+/// The testable body of `set_account_password`, same seam shape as
+/// `delete_account_inner`: `set_secret` stands in for the real keyring
+/// write, so a test can inject a failing fake and prove the keyring-failure
+/// boundary without ever touching a real credential. Validation runs BEFORE
+/// the account lookup and the keyring write, so a refused password never
+/// touches either; a keyring failure runs BEFORE `set_has_password`, so a
+/// failed write never leaves `has_password` claiming a credential that is
+/// not actually there.
+fn set_account_password_inner(store: &mut store::Store, account_id: i64, password: &str, set_secret: &dyn Fn(&str, &str) -> Result<(), String>) -> Result<(), String> {
+    if password.trim().is_empty() {
+        return Err("Heslo je prázdne.".into());
+    }
+    let actual = password.chars().count();
+    if actual > PASSWORD_MAX_CHARS {
+        return Err(format!("Heslo je príliš dlhé. Limit je {PASSWORD_MAX_CHARS} znakov."));
+    }
+    let account = store
+        .account_by_id(account_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("Účet s id {account_id} neexistuje."))?;
+    set_secret(&account.iban, password).map_err(|e| format!("Uloženie hesla zlyhalo: {e}"))?;
+    store.set_has_password(account_id, true).map_err(|e| e.to_string())
+}
+
 /// 078: what a delete of this account would remove, for the confirmation
 /// text. Runs the same rule query the delete runs (mirrors
 /// `statement_delete_preview`), so the numbers the user confirms are the
@@ -359,6 +395,87 @@ mod tests {
         assert_eq!(outcome.account_id, id);
         assert!(calls.borrow().is_empty(), "an account with no stored password must never call the keyring");
         assert!(s.account_by_id(id).unwrap().is_none());
+    }
+
+    #[test]
+    fn setting_a_password_writes_the_secret_once_and_marks_has_password() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let calls: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let record = |iban: &str, pw: &str| -> Result<(), String> { calls.borrow_mut().push((iban.into(), pw.into())); Ok(()) };
+
+        set_account_password_inner(&mut s, id, "tajneheslo", &record).unwrap();
+
+        assert_eq!(calls.borrow().as_slice(), [("SK4411000000000012345678".to_string(), "tajneheslo".to_string())]);
+        assert!(s.account_by_id(id).unwrap().unwrap().has_password);
+    }
+
+    #[test]
+    fn a_keyring_failure_leaves_has_password_unset_and_returns_the_error() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let failing = |_: &str, _: &str| -> Result<(), String> { Err("keyring locked".into()) };
+
+        let e = set_account_password_inner(&mut s, id, "tajneheslo", &failing).unwrap_err();
+
+        assert_eq!(e, "Uloženie hesla zlyhalo: keyring locked");
+        assert!(!s.account_by_id(id).unwrap().unwrap().has_password);
+    }
+
+    #[test]
+    fn an_empty_or_whitespace_only_password_never_calls_the_keyring() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let never = |_: &str, _: &str| -> Result<(), String> { panic!("must not be called: the password was empty") };
+
+        let e = set_account_password_inner(&mut s, id, "   ", &never).unwrap_err();
+
+        assert_eq!(e, "Heslo je prázdne.");
+        assert!(!s.account_by_id(id).unwrap().unwrap().has_password);
+    }
+
+    #[test]
+    fn exactly_the_length_limit_is_accepted_one_over_is_rejected_and_the_keyring_is_never_touched_again() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let calls: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let record = |iban: &str, pw: &str| -> Result<(), String> { calls.borrow_mut().push((iban.into(), pw.into())); Ok(()) };
+        let at_limit = "č".repeat(PASSWORD_MAX_CHARS);
+        set_account_password_inner(&mut s, id, &at_limit, &record).unwrap();
+        assert_eq!(calls.borrow().len(), 1);
+
+        let over = "č".repeat(PASSWORD_MAX_CHARS + 1);
+        let e = set_account_password_inner(&mut s, id, &over, &record).unwrap_err();
+
+        assert_eq!(e, format!("Heslo je príliš dlhé. Limit je {PASSWORD_MAX_CHARS} znakov."));
+        assert_eq!(calls.borrow().len(), 1, "the over-limit attempt must not touch the keyring");
+    }
+
+    #[test]
+    fn setting_a_password_on_an_unknown_account_is_a_clear_slovak_error() {
+        let mut s = Store::open_in_memory().unwrap();
+        let never = |_: &str, _: &str| -> Result<(), String> { panic!("must not be called: no account was found") };
+
+        let e = set_account_password_inner(&mut s, 9_999, "tajneheslo", &never).unwrap_err();
+
+        assert_eq!(e, "Účet s id 9999 neexistuje.");
+    }
+
+    #[test]
+    fn changing_an_existing_password_overwrites_and_keeps_the_flag_true() {
+        let mut s = Store::open_in_memory().unwrap();
+        let id = s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+        let calls: RefCell<Vec<(String, String)>> = RefCell::new(Vec::new());
+        let record = |iban: &str, pw: &str| -> Result<(), String> { calls.borrow_mut().push((iban.into(), pw.into())); Ok(()) };
+
+        set_account_password_inner(&mut s, id, "prve", &record).unwrap();
+        set_account_password_inner(&mut s, id, "druhe", &record).unwrap();
+
+        assert_eq!(
+            calls.borrow().as_slice(),
+            [("SK4411000000000012345678".to_string(), "prve".to_string()), ("SK4411000000000012345678".to_string(), "druhe".to_string())]
+        );
+        assert!(s.account_by_id(id).unwrap().unwrap().has_password);
     }
 
     /// The exact boundary the 078 review correction asked for named and

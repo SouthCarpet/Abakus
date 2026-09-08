@@ -3,6 +3,7 @@ import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
 import { BackupSection } from '../components/BackupSection'
 import { DeleteAccountDialog } from '../components/DeleteAccountDialog'
+import { SetPasswordDialog } from '../components/SetPasswordDialog'
 import type { Account, AccountKind, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
@@ -103,11 +104,13 @@ function resolveIban(input: string): string {
 function AccountRow({
   account,
   onForgetPassword,
+  onSetPassword,
   onEdit,
   onDelete,
 }: {
   account: Account
   onForgetPassword: (id: number) => void
+  onSetPassword: (account: Account) => void
   onEdit: (account: Account) => void
   onDelete: (account: Account) => void
 }) {
@@ -122,6 +125,9 @@ function AccountRow({
           Upraviť
         </Button>
         <Button variant="ghost" onClick={() => onDelete(account)}>Zmazať účet</Button>
+        <Button variant="ghost" onClick={() => onSetPassword(account)}>
+          {account.has_password ? 'Zmeniť heslo' : 'Nastaviť heslo'}
+        </Button>
         {account.has_password ? (
           <Button variant="ghost" onClick={() => onForgetPassword(account.id)}>
             Zabudnúť heslo
@@ -157,6 +163,8 @@ export function Settings() {
   const [editKind, setEditKind] = useState<AccountKind>('personal')
   const [editAcknowledge, setEditAcknowledge] = useState(false)
   const [editError, setEditError] = useState('')
+  const [passwordTarget, setPasswordTarget] = useState<Account | null>(null)
+  const [passwordAttempt, setPasswordAttempt] = useState(0)
 
   async function refresh() {
     const request = ++accountRequest.current
@@ -225,6 +233,14 @@ export function Settings() {
   async function forgetPassword(accountId: number) {
     await api.clearPassword(accountId)
     await refresh()
+  }
+
+  // Bumps `passwordAttempt` so `SetPasswordDialog` (always mounted, see its
+  // own comment) remounts with a fresh draft, even when the same account is
+  // reopened right after a previous open closed with an error.
+  function openPassword(account: Account) {
+    setPasswordTarget(account)
+    setPasswordAttempt((v) => v + 1)
   }
 
   function openEdit(account: Account) {
@@ -296,7 +312,7 @@ export function Settings() {
                 </thead>
                 <tbody>
                   {accounts.map((account) => (
-                    <AccountRow key={account.id} account={account} onForgetPassword={(id) => void action.run(() => forgetPassword(id))} onEdit={openEdit} onDelete={setDeleteTarget} />
+                    <AccountRow key={account.id} account={account} onForgetPassword={(id) => void action.run(() => forgetPassword(id))} onSetPassword={openPassword} onEdit={openEdit} onDelete={setDeleteTarget} />
                   ))}
                 </tbody>
               </table>
@@ -400,6 +416,7 @@ export function Settings() {
           </label>
         ) : null}
       </Dialog>
+      <SetPasswordDialog key={passwordAttempt} account={passwordTarget} onClose={() => setPasswordTarget(null)} onSaved={refresh} />
     </div>
   )
 }

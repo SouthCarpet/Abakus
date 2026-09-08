@@ -43,6 +43,7 @@ pub fn run() {
             commands::save_account,
             commands::update_account,
             commands::clear_password,
+            commands::set_account_password,
             commands::account_delete_preview,
             commands::delete_account,
             commands::list_categories,
