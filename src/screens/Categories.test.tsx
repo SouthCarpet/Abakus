@@ -45,6 +45,25 @@ const JEDLO: import('../api').Category = { id: 1, parent_id: null, name: 'Jedlo'
 const POTRAVINY: import('../api').Category = { id: 2, parent_id: 1, name: 'potraviny', kind: 'expense', sort: 0, system: false, archived: false }
 const FAKTURY: import('../api').Category = { id: 3, parent_id: null, name: 'Faktúry', kind: 'income', sort: 1, system: false, archived: false }
 
+// Oracle: live r4 measure at 1024/1280; minWidth 560 wraps the Pravidlá card
+// onto its own row at 1024 and keeps both columns at 1280 with every header
+// inside .k-table-scroll (scrollLeft = 0, no page overflow).
+describe('Categories rules column wrap threshold', () => {
+  afterEach(() => {
+    cleanup()
+    vi.mocked(api.listCategories).mockReset()
+  })
+
+  it('sets the rules column min-width to 560px so the flex row wraps before the table clips', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    const { container } = render(<Categories />)
+    await waitFor(() => expect(screen.getByText('Pravidlá')).toBeInTheDocument())
+    const col = container.querySelector('.k-rules-card-col')
+    expect(col).toBeInstanceOf(HTMLElement)
+    expect((col as HTMLElement).style.minWidth).toBe('560px')
+  })
+})
+
 describe('Categories edit flow', () => {
   afterEach(() => {
     cleanup()

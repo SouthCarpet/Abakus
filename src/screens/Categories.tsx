@@ -391,7 +391,7 @@ export function Categories() {
               />
             </Card>
           </div>
-          <div className="k-rules-card-col" style={{ flex: 1, minWidth: 320 }}>
+          <div className="k-rules-card-col" style={{ flex: 1, minWidth: 560 }}>
             <Card title="Pravidlá">
               <p className="k-field-label">
                 Pravidlá vzniknú po priradení kategórie alebo potvrdení návrhu pri rozpoznateľnom obchodníkovi. Samotné vytvorenie kategórie pravidlo nevytvorí.
