@@ -229,17 +229,65 @@ fn spawn_installer(path: &Path) -> std::io::Result<()> {
     std::process::Command::new(path).spawn().map(|_child| ())
 }
 
-/// Only a link under this exact prefix is ever opened, so `open_release_page`
-/// can never be pointed at an arbitrary local or remote command.
+/// Only a link under this exact prefix is ever opened. Combined with the
+/// character allowlist in `is_allowed_release_url` and the shell-free launch
+/// in `browser_launch_command`, `open_release_page` can never be pointed at
+/// an arbitrary local or remote command.
 const ALLOWED_RELEASE_PREFIX: &str = "https://github.com/SouthCarpet/Abakus/";
 
+/// Bytes a GitHub release URL under `ALLOWED_RELEASE_PREFIX` can legitimately
+/// need: RFC 3986 unreserved characters plus the sub-delims and gen-delims a
+/// `/releases/tag/<tag>` or `/blob/...#<anchor>` link uses. `&`, whitespace,
+/// `"`, `<`, `>`, `|`, `^`, `` ` `` and `\` are deliberately absent.
+const URL_SAFE_BYTES: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?#[]@!$'()*+,;=%";
+
+fn is_url_safe_byte(b: u8) -> bool {
+    URL_SAFE_BYTES.contains(&b)
+}
+
+fn hex_digit(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// A `%XX` escape is accepted only when the byte it decodes to would itself
+/// have passed `is_url_safe_byte`: a URL cannot use `%20` (or any other
+/// escape) to smuggle a space or a metacharacter past the filter below.
+fn is_allowed_percent_escape(bytes: &[u8], at: usize) -> bool {
+    let (Some(&hi), Some(&lo)) = (bytes.get(at + 1), bytes.get(at + 2)) else { return false };
+    let (Some(hi), Some(lo)) = (hex_digit(hi), hex_digit(lo)) else { return false };
+    is_url_safe_byte(hi * 16 + lo)
+}
+
 fn is_allowed_release_url(url: &str) -> bool {
-    url.starts_with(ALLOWED_RELEASE_PREFIX)
+    if !url.starts_with(ALLOWED_RELEASE_PREFIX) {
+        return false;
+    }
+    let bytes = url.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            if !is_allowed_percent_escape(bytes, i) {
+                return false;
+            }
+            i += 3;
+            continue;
+        }
+        if !is_url_safe_byte(bytes[i]) {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
 
 /// The testable body of `open_release_page`: `open` stands in for actually
-/// asking Windows to open the URL, so a test can prove the prefix guard
-/// without spawning a browser.
+/// asking Windows to open the URL, so a test can prove the prefix and
+/// character guard without spawning a browser.
 pub(crate) fn open_release_page_with(url: &str, open: &dyn Fn(&str) -> std::io::Result<()>) -> Result<(), String> {
     if !is_allowed_release_url(url) {
         return Err("Neplatná adresa vydania.".to_string());
@@ -247,13 +295,23 @@ pub(crate) fn open_release_page_with(url: &str, open: &dyn Fn(&str) -> std::io::
     open(url).map_err(|e| e.to_string())
 }
 
-/// `cmd /C start "" <url>` is the standard way to hand a URL to the user's
-/// default browser on Windows without adding a Tauri shell/opener plugin
-/// (`no_network.rs` bans both); the empty `""` is the window-title argument
-/// `start` expects before the URL, otherwise a URL in quotes is misread as
-/// the title itself.
+/// The program and its single URL argument `open_in_default_browser` hands
+/// to `Command::spawn`, split out so a test can prove the launcher is never
+/// `cmd` without actually starting a browser.
+fn browser_launch_command(url: &str) -> (&'static str, [String; 2]) {
+    ("rundll32", ["url.dll,FileProtocolHandler".to_string(), url.to_string()])
+}
+
+/// `rundll32.exe url.dll,FileProtocolHandler <url>` is Windows' own way to
+/// hand a URL to the registered default browser without adding a Tauri
+/// shell/opener plugin (`no_network.rs` bans both) and, unlike the earlier
+/// `cmd /C start "" <url>`, without ever going through `cmd.exe`: the URL
+/// reaches `CreateProcess` as a single argument, so `&`, `|`, `^` and the
+/// rest of the characters `is_allowed_release_url` also rejects have no
+/// shell left to be interpreted by.
 fn open_in_default_browser(url: &str) -> std::io::Result<()> {
-    std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn().map(|_child| ())
+    let (program, args) = browser_launch_command(url);
+    std::process::Command::new(program).args(args).spawn().map(|_child| ())
 }
 
 #[tauri::command]
@@ -510,5 +568,38 @@ mod tests {
         let err = open_release_page_with("https://evil.example.com/steal", &never).unwrap_err();
 
         assert_eq!(err, "Neplatná adresa vydania.");
+    }
+
+    #[test]
+    fn is_allowed_release_url_accepts_real_release_links() {
+        assert!(is_allowed_release_url("https://github.com/SouthCarpet/Abakus/releases/tag/v0.1.4"));
+        assert!(is_allowed_release_url("https://github.com/SouthCarpet/Abakus/releases/tag/v0.1.5"));
+        assert!(is_allowed_release_url("https://github.com/SouthCarpet/Abakus/blob/main/CHANGELOG.md#014-2026-09-08"));
+    }
+
+    #[test]
+    fn is_allowed_release_url_refuses_shell_metacharacters_and_lookalike_prefixes() {
+        let refused = [
+            "https://github.com/SouthCarpet/Abakus/x&echo>C:\\t\\INJECTED.txt",
+            "https://github.com/SouthCarpet/Abakus/x|calc",
+            "https://github.com/SouthCarpet/Abakus/x^&calc",
+            "https://github.com/SouthCarpet/Abakus/x%20y",
+            "https://github.com/SouthCarpet/Abakus/x y",
+            "https://github.com/evil/",
+            "https://github.com/SouthCarpet/Abakus.evil/",
+        ];
+        for url in refused {
+            assert!(!is_allowed_release_url(url), "must refuse: {url}");
+        }
+    }
+
+    #[test]
+    fn browser_launch_command_is_never_cmd() {
+        let (program, args) = browser_launch_command("https://github.com/SouthCarpet/Abakus/releases/tag/v0.1.4");
+
+        assert_eq!(program, "rundll32");
+        assert_ne!(program, "cmd", "the url must never reach cmd.exe's shell parsing");
+        assert_eq!(args[0], "url.dll,FileProtocolHandler");
+        assert_eq!(args[1], "https://github.com/SouthCarpet/Abakus/releases/tag/v0.1.4");
     }
 }

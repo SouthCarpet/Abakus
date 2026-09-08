@@ -111,7 +111,7 @@ pub(crate) const DOWNLOAD_MAX_REDIRECTS: u8 = 3;
 /// bound below; it does not change a release build's behaviour at all.
 #[cfg(debug_assertions)]
 fn is_allowed_download_url(url: &str) -> bool {
-    url.starts_with("https://") || url.starts_with("http://127.0.0.1")
+    url.starts_with("https://") || url.starts_with("http://127.0.0.1/") || url.starts_with("http://127.0.0.1:")
 }
 
 #[cfg(not(debug_assertions))]
@@ -355,6 +355,18 @@ mod tests {
         assert!(!is_localhost("::ffff:8.8.8.8".parse().unwrap()));
     }
 
+    /// The debug-only loopback allowance must not also match a hostname that
+    /// merely starts with the loopback literal: `127.0.0.1.evil.example.com`
+    /// resolves as its own DNS name, not as loopback.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn is_allowed_download_url_refuses_a_loopback_lookalike_hostname() {
+        assert!(!is_allowed_download_url("http://127.0.0.1.evil.example.com/asset"));
+        assert!(is_allowed_download_url("http://127.0.0.1/asset"));
+        assert!(is_allowed_download_url("http://127.0.0.1:8080/asset"));
+        assert!(is_allowed_download_url("https://objects.githubusercontent.com/asset"));
+    }
+
     /// A17/F7: the audit-log write used to be `let _ = ...`, so a store that
     /// could not take the row left no trace anywhere. A poisoned store lock is
     /// the deterministic version of that failure. This test fails again if
@@ -416,15 +428,23 @@ mod tests {
         assert_eq!(store.lock().unwrap().net_log(10).unwrap().len(), 2, "both hops must be logged");
     }
 
+    /// Literal oracles on purpose (not `DOWNLOAD_MAX_REDIRECTS`): a mutation
+    /// that raises the constant from 3 to 4 must still fail this test, not
+    /// silently follow the new limit.
     #[tokio::test]
     async fn download_with_redirects_gives_up_after_the_redirect_limit() {
         let store = Mutex::new(Store::open_in_memory().unwrap());
-        let send = |url: String| async move { Ok(RawResponse { status: 302, location: Some(format!("{url}+")), body: Vec::new() }) };
+        let requests = std::sync::atomic::AtomicUsize::new(0);
+        let send = |url: String| {
+            requests.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async move { Ok(RawResponse { status: 302, location: Some(format!("{url}+")), body: Vec::new() }) }
+        };
 
         let err = download_with_redirects(&store, "https://api.github.com/loop", 1024, &send).await.unwrap_err();
 
-        assert_eq!(err, DownloadError::TooManyRedirects(DOWNLOAD_MAX_REDIRECTS));
-        assert_eq!(store.lock().unwrap().net_log(10).unwrap().len(), (DOWNLOAD_MAX_REDIRECTS as usize) + 1, "every hop up to the limit must still be logged");
+        assert_eq!(err, DownloadError::TooManyRedirects(3));
+        assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 4, "the initial request plus 3 redirects, one request per hop");
+        assert_eq!(store.lock().unwrap().net_log(10).unwrap().len(), 4, "every hop up to the limit must still be logged");
     }
 
     #[tokio::test]
