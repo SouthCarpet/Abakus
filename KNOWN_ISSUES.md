@@ -37,7 +37,12 @@
   overil skutočný zamknutý PDF vytvorený zo syntetických údajov, zadanie hesla
   a následné spracovanie bez uloženia hesla. Automatické opätovné použitie
   skutočného hesla zo Správcu poverení nebolo súčasťou tejto kontroly.
-  Chyby čistenia poverení pokrývajú testy s náhradnou službou.
+  Chyby čistenia poverení pokrývajú testy s náhradnou službou. 0.1.3 pridala
+  druhú cestu k tomu istému úložisku: nastavenie alebo zmenu hesla priamo v
+  Nastaveniach, bez čerstvého PDF na overenie (`set_account_password`,
+  testované náhradnou funkciou namiesto Správcu poverení). Skutočný zápis do
+  Správcu poverení systému Windows nie je pokrytý žiadnym automatizovaným
+  testom v tomto repozitári.
 - **Net-audit connection sampler is a single snapshot, not continuous monitoring.**
   `sample_connections` reads the process's open TCP sockets once, at app start
   (`src-tauri/src/lib.rs`), and again whenever the settings screen re-runs it. A

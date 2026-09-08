@@ -40,7 +40,7 @@ cargo test --jobs 4 --workspace
 ## Prvé použitie
 
 1. V časti **Nastavenia** pridajte vlastné účty. Zadajte IBAN alebo zápis v tvare `kód banky/prefix-číslo účtu`.
-2. V časti **Import** pridajte mesačné PDF výpisy. Pri zamknutom PDF zadajte heslo. Ak zvolíte **Zapamätať pre tento účet**, appka ho pri ďalšom importe použije automaticky.
+2. V časti **Import** pridajte mesačné PDF výpisy. Pri zamknutom PDF zadajte heslo. Ak zvolíte **Zapamätať pre tento účet**, appka ho pri ďalšom importe použije automaticky. Heslo môžete nastaviť alebo zmeniť aj priamo v **Nastaveniach**, bez importu.
 3. V časti **Transakcie** skontrolujte navrhnuté kategórie. Odhad potvrdíte jedným kliknutím.
 4. V časti **Prehľad** si pozrite príjmy, výdavky, kategórie a vývoj v čase.
 
@@ -75,7 +75,7 @@ Záloha obsahuje bankové údaje, účty, výpisy, kategórie, naučené pravidl
 
 ## Licencia a stav
 
-Abakus je vo verzii 0.1.2 a používa licenciu MIT. Táto verzia spája opravy 0.1.1, päť funkcií pre kontrolu údajov, pravidelné platby, správu kategórií a PDF reporty. Zmeny opisuje [prehľad vydania](docs/release-0.1.2.md), obmedzenia sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+Abakus je vo verzii 0.1.3 a používa licenciu MIT. Táto verzia pridáva priame nastavenie a zmenu hesla k výpisom účtu v Nastaveniach. Zmeny opisuje [prehľad vydania](docs/release-0.1.3.md), obmedzenia sú v súbore [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Pravidelné platby a kategórie
 
@@ -115,6 +115,8 @@ V detaile transakcie možno uložiť poznámku do 2 000 znakov vrátane nových 
 ## Odstránenie účtu a vzhľad
 
 V **Nastaveniach** kliknite v riadku účtu na **Zmazať účet**. Náhľad uvedie názov a počty výpisov, transakcií a pravidiel. Na potvrdenie napíšte presný názov účtu a kliknite na **Natrvalo zmazať účet**. Zrušenie nič neodstráni. Odstránenie importovaných údajov je nezvratné; pôvodné bankové PDF súbory zostanú na disku. Prípadné zlyhanie databázy alebo odstránenia hesla sa zobrazí v dialógu. Obnovenie zobrazenia po úspešnom odstránení neopakuje odstránenie.
+
+V riadku účtu je aj tlačidlo **Nastaviť heslo** (alebo **Zmeniť heslo**, ak je už uložené). Otvorí dialóg s dvomi poľami: heslo a jeho zopakovanie. **Uložiť** je dostupné, až keď sa obe zhodujú a nie sú prázdne. Po úspechu appka zobrazí potvrdenie a heslo uloží do Správcu poverení systému Windows; riadok potom ukáže **heslo uložené**. Pri zlyhaní appka zachová rozpísané heslo a zobrazí dôvod.
 
 Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, **Podľa systému**. Prvé dve možnosti ignorujú zmeny systému, tretia ich sleduje. Voľba sa uloží pre ďalšie spustenie. Pri poškodenom alebo nedostupnom úložisku sa použije systémový režim; pri zlyhaní zápisu platí nová voľba len v aktuálnom behu.
 
