@@ -8,6 +8,10 @@
   textu, 2 000 strán a 100 MiB výsledného súboru. Prekročenie ukončí export
   chybou, nie skráteným výpisom. Nepodporovaný znak má viditeľný zápis
   `[U+...]`. PDF používa vlastný výber účtov a obdobia, nie filtre tabuľky.
+- **Dialóg hesla k účtu nekontroluje dĺžku pred uložením.** Limit 512 znakov
+  stráži backend a vráti chybu, tlačidlo Uložiť ostáva pri príliš dlhom hesle
+  aktívne. Veľmi dlhý text v poli prekryje ikonu zobrazenia hesla (WebView2).
+  Bežné heslá k výpisom sa to netýka. Oprava je plánovaná vo verzii 0.1.4.
 - **Detail pravidelnej platby s veľmi dlhým názvom obchodníka rozšíri stránku.**
   Tabuľka obchodníkov v detaile (Prehľad) nemá vlastné vodorovné posúvanie.
   Názov obchodníka s niekoľkými stovkami znakov (nameraný syntetický prípad:
