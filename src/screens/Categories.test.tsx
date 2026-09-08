@@ -14,6 +14,15 @@ describe('RulesTable', () => {
     expect(screen.getByText('presné')).toBeInTheDocument(); expect(screen.getByText('slovník')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Zmazať' })).toHaveLength(1)
   })
+
+  it('carries the overflow-safe key cell class so a long merchant string wraps instead of widening the card', () => {
+    const rules = [
+      { id: 1, kind: 'exact', key: 'aldi sued', place: 'neuss', category_id: 2, category_name: 'potraviny', parent_name: 'Jedlo', hit_count: 3 },
+    ] as const
+    const { container } = render(<RulesTable rules={[...rules]} onDelete={vi.fn()} />)
+    const table = container.querySelector('table')
+    expect(table).toHaveClass('k-table', 'k-rules-table')
+  })
 })
 
 vi.mock('../api', async (importOriginal) => {

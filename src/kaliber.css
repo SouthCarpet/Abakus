@@ -281,6 +281,13 @@ fieldset.k-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .k-accounts-table td:last-child { min-width: calc(var(--space-8) * 5); }
 .k-accounts-table .k-btn { white-space: nowrap; }
 
+/* Rules table key cell can hold a long merchant string; wrap it instead of widening the card. */
+.k-rules-table td:first-child { overflow-wrap: anywhere; max-width: calc(var(--space-8) * 8); }
+/* Card body is a flex item with no min-width override, so its automatic minimum grows to the
+   table's unwrapped content width and the page scrolls instead of the table scroll region.
+   Scoped to the Pravidlá card column so other cards keep their current sizing. */
+.k-rules-card-col .k-card-body { min-width: 0; }
+
 .k-category-bars { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
 .k-category-bar { width: 100%; min-width: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
 .k-category-bar:hover { background: var(--color-surface-hover); }

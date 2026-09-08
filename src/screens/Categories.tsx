@@ -22,7 +22,7 @@ const ARCHIVE_CONFIRM_TEXT = 'Kategória sa skryje z výberu. Historické prirad
 
 export function RulesTable({ rules, onDelete }: { rules: RuleView[]; onDelete: (id: number) => void }) {
   return (
-    <table className="k-table">
+    <table className="k-table k-rules-table">
       <thead>
         <tr>
           <th>Kľúč</th>
@@ -391,7 +391,7 @@ export function Categories() {
               />
             </Card>
           </div>
-          <div style={{ flex: 1, minWidth: 320 }}>
+          <div className="k-rules-card-col" style={{ flex: 1, minWidth: 320 }}>
             <Card title="Pravidlá">
               <p className="k-field-label">
                 Pravidlá vzniknú po priradení kategórie alebo potvrdení návrhu pri rozpoznateľnom obchodníkovi. Samotné vytvorenie kategórie pravidlo nevytvorí.
