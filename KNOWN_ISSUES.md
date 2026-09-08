@@ -8,10 +8,6 @@
   textu, 2 000 strán a 100 MiB výsledného súboru. Prekročenie ukončí export
   chybou, nie skráteným výpisom. Nepodporovaný znak má viditeľný zápis
   `[U+...]`. PDF používa vlastný výber účtov a obdobia, nie filtre tabuľky.
-- **Dialóg hesla k účtu nekontroluje dĺžku pred uložením.** Limit 512 znakov
-  stráži backend a vráti chybu, tlačidlo Uložiť ostáva pri príliš dlhom hesle
-  aktívne. Veľmi dlhý text v poli prekryje ikonu zobrazenia hesla (WebView2).
-  Bežné heslá k výpisom sa to netýka. Oprava je plánovaná vo verzii 0.1.4.
 - **Detail pravidelnej platby s veľmi dlhým názvom obchodníka rozšíri stránku.**
   Tabuľka obchodníkov v detaile (Prehľad) nemá vlastné vodorovné posúvanie.
   Názov obchodníka s niekoľkými stovkami znakov (nameraný syntetický prípad:
@@ -76,6 +72,12 @@
   published release with a tag, that endpoint has nothing to return, so a fresh
   install reports "no update" even when the code on `main` is newer than the copy
   the user built.
+- **The `Aktualizovať na <tag>` button only appears when a release has both
+  an installer asset and a `SHA256SUMS.txt` asset.** `update::installer_assets`
+  (spec 0.1.4) requires both to populate `installer_url`/`checksums_url`; a
+  release published with just source archives, or with an installer but no
+  checksums file, still shows the quiet informational line and the link, never
+  a button with nothing to verify against.
 - **"Použiť aj na podobné" never rewrites a confirmed row.** Applying a category to
   matching transactions (`Store::assign` with `apply_to_matching`, see
   `crates/store/src/assign.rs`) re-files only rows still `suggested` or
