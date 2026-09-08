@@ -84,10 +84,57 @@ Obe majú predvolenú odpoveď **Nie**, takže bez potvrdenia sa nič nezmaže.
 
 ## WebView2
 
-Abakus je Tauri appka a na Windows potrebuje modul WebView2 runtime. Windows
-10 (verzia 2004 a novšie) a Windows 11 ho už majú predinštalovaný. Na
-staršom Windows ho treba doinštalovať samostatne
-(https://developer.microsoft.com/microsoft-edge/webview2/).
+Abakus je Tauri appka a na Windows potrebuje modul Microsoft Edge WebView2
+Runtime. Windows 10 (verzia 2004 a novšie) a Windows 11 ho už majú
+predinštalovaný, takže na väčšine počítačov sa nič nestane.
+
+Od verzie 0.1.4 inštalátor kontroluje modul sám, ešte pred prvou obrazovkou
+sprievodcu (`InitializeSetup` v `packaging\abakus.iss`). Kontrola číta
+hodnotu `pv` z troch registrových kľúčov, v tomto poradí:
+
+1. `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
+2. `HKLM\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
+3. `HKCU\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
+
+Chýbajúca hodnota alebo `0.0.0.0` znamená, že modul nie je nainštalovaný.
+Vtedy inštalátor po slovensky zobrazí:
+
+> Abakus potrebuje Microsoft Edge WebView2 Runtime. Stiahnuť a nainštalovať
+> teraz (asi 2 MB, vyžaduje internet)?
+
+- **Áno** stiahne oficiálny Evergreen bootstrapper
+  (`https://go.microsoft.com/fwlink/p/?LinkId=2124703`) do `{tmp}`, spustí
+  ho s `/silent /install` a znova skontroluje registrové kľúče. Nevyžaduje
+  práva správcu: bootstrapper sa spustí bez zvýšených práv, rovnako ako
+  samotný inštalátor Abakusu (`PrivilegesRequired=lowest`).
+- **Nie**, alebo zlyhanie sťahovania/inštalácie modulu, inštaláciu Abakusu
+  nezastaví. Zobrazí sa iba upozornenie, že appka sa bez modulu nespustí a
+  modul sa dá doinštalovať samostatne aj neskôr
+  (https://developer.microsoft.com/microsoft-edge/webview2/).
+
+Každý krok kontroly sa zapíše do inštalačného denníka (`Log(...)` v
+`[Code]`), viditeľného pri behu s `/LOG="cesta.txt"`.
+
+### Tiché prepínače (overené na tomto počítači)
+
+Skúšobná inštalácia mimo skutočného `%LOCALAPPDATA%\Programs\Abakus`:
+
+```powershell
+abakus-setup-0.1.4.exe /VERYSILENT /DIR="C:\cesta\scratch" /NOICONS
+```
+
+Odinštalovanie tej istej skúšobnej inštalácie:
+
+```powershell
+"C:\cesta\scratch\unins000.exe" /VERYSILENT
+```
+
+### Vývojárska voľba: preskočenie kontroly
+
+`ISCC /DWebView2Check=skip packaging\abakus.iss` skompiluje inštalátor, ktorý
+kontrolu modulu úplne vynechá (iba do denníka zapíše, že bola preskočená).
+Slúži pre zostavenie bez siete alebo bez možnosti overiť registre (napríklad
+CI); bežný release build (bez tohto prepínača) kontrolu vždy spustí.
 
 ## Inštalátor nie je podpísaný
 
