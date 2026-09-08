@@ -16,6 +16,20 @@ function fail(message) {
   throw new Error(message)
 }
 
+// Historical fixture scenarios pass an explicit IPC `today`/`asOf` tied to
+// the oracle's fixed reference date (oracle.today), so they stay correct no
+// matter when the harness runs. A UI label that shows "today" reads the
+// real system clock, so any harness assertion comparing against that text
+// must compute the same local date at run time, not embed the day the
+// fixture was authored (recurring-acceptance.md, "Native acceptance").
+function localDateToday() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function assert(condition, message) {
   if (!condition) fail(message)
 }
@@ -601,13 +615,13 @@ async function editRecurringThroughUi(page, transactionId, merchant, action) {
   await dialog.waitFor({ state: 'hidden', timeout: 15000 })
 }
 
-async function recurringUiJourney(page) {
+async function recurringUiJourney(page, oracle) {
   await editRecurringThroughUi(page, 1010, 'Bežný návrh s kategóriou', async (dialog) => {
     await dialog.getByLabel('Interval').selectOption('yearly')
     await dialog.getByLabel('Kotva').fill('2024-01-15')
     await dialog.getByRole('button', { name: 'Uložiť', exact: true }).click()
   })
-  const manual = await invoke(page, 'transaction_recurring_context', { transactionId: 1010, asOf: '2026-09-07' })
+  const manual = await invoke(page, 'transaction_recurring_context', { transactionId: 1010, asOf: oracle.today })
   assertEqual(manual.decision?.cadence, 'yearly', 'U01 manual recurrence through UI')
 
   await editRecurringThroughUi(page, 8031, 'Mesačný príjem', async (dialog) => {
@@ -615,7 +629,7 @@ async function recurringUiJourney(page) {
     await dialog.getByLabel('Kotva').fill('2026-07-20')
     await dialog.getByRole('button', { name: 'Uložiť', exact: true }).click()
   })
-  const income = await invoke(page, 'transaction_recurring_context', { transactionId: 8031, asOf: '2026-09-07' })
+  const income = await invoke(page, 'transaction_recurring_context', { transactionId: 8031, asOf: oracle.today })
   assertEqual(income.decision?.mode, 'confirmed', 'U01 manual income recurrence through UI')
   assertEqual(income.decision?.cadence, 'monthly', 'U01 manual income cadence through UI')
 
@@ -624,26 +638,26 @@ async function recurringUiJourney(page) {
     await dialog.getByLabel('Kotva').fill('2026-01-31')
     await dialog.getByRole('button', { name: 'Uložiť', exact: true }).click()
   })
-  const confirmed = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: '2026-09-07' })
+  const confirmed = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: oracle.today })
   assertEqual(confirmed.decision?.mode, 'confirmed', 'U02 confirmed state')
 
   await editRecurringThroughUi(page, 8001, 'Mesačný kotviaci obchod', async (dialog) => {
     await dialog.getByLabel('Interval').selectOption('quarterly')
     await dialog.getByRole('button', { name: 'Uložiť', exact: true }).click()
   })
-  const edited = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: '2026-09-07' })
+  const edited = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: oracle.today })
   assertEqual(edited.decision?.cadence, 'quarterly', 'U02 edited cadence')
 
   await editRecurringThroughUi(page, 8001, 'Mesačný kotviaci obchod', async (dialog) => {
     await dialog.getByRole('button', { name: 'Toto nie je pravidelná platba', exact: true }).click()
   })
-  const ignored = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: '2026-09-07' })
+  const ignored = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: oracle.today })
   assertEqual(ignored.decision?.mode, 'ignored', 'U02 ignored state')
 
   await editRecurringThroughUi(page, 8001, 'Mesačný kotviaci obchod', async (dialog) => {
     await dialog.getByRole('button', { name: 'Obnoviť odhad', exact: true }).click()
   })
-  const reset = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: '2026-09-07' })
+  const reset = await invoke(page, 'transaction_recurring_context', { transactionId: 8001, asOf: oracle.today })
   assertEqual(reset.decision, null, 'U02 reset state')
   return { manual: manual.decision, income: income.decision, confirmed: confirmed.decision, edited: edited.decision, ignored: ignored.decision, reset: reset.decision }
 }
@@ -668,7 +682,7 @@ async function recurringU03Journey(page, oracle) {
     assertEqual(await detailDialog.getByText(excludedDate, { exact: true }).count(), 0, `U03 excluded ${excludedDate}`)
   }
   await detailDialog.getByRole('button', { name: 'Celá známa história', exact: true }).click()
-  await detailDialog.getByText('Celá známa história do 2026-09-07', { exact: true }).waitFor()
+  await detailDialog.getByText(`Celá známa história do ${localDateToday()}`, { exact: true }).waitFor()
   const historyMembers = detailDialog.getByRole('table', { name: 'Členovia vo zvolenom rozsahu' })
   await historyMembers.getByText('5. 1. 2026', { exact: true }).waitFor()
   await historyMembers.getByText('5. 2. 2026', { exact: true }).waitFor()
@@ -681,7 +695,7 @@ async function recurringU03Journey(page, oracle) {
     await dialog.getByLabel('Kotva').fill('2026-01-18')
     await dialog.getByRole('button', { name: 'Uložiť', exact: true }).click()
   })
-  const createdContext = await invoke(page, 'transaction_recurring_context', { transactionId: 8061, asOf: '2026-09-07' })
+  const createdContext = await invoke(page, 'transaction_recurring_context', { transactionId: 8061, asOf: oracle.today })
   assertEqual(createdContext.decision?.scope, 'selected', 'U03 manual selected scope')
   const decisionId = createdContext.decision?.id
   assert(Number.isSafeInteger(decisionId), 'U03 selected decision id is missing')
@@ -697,7 +711,7 @@ async function recurringU03Journey(page, oracle) {
   await editor.waitFor({ state: 'hidden', timeout: 15000 })
 
   const appended = await invoke(page, 'recurring_detail', {
-    request: { series_key: `s:${decisionId}`, query: { from: null, to: null, account_kind: null, today: '2026-09-07' } },
+    request: { series_key: `s:${decisionId}`, query: { from: null, to: null, account_kind: null, today: oracle.today } },
   })
   assertEqual(appended.matching_transaction_ids, [8061, 8062], 'U03 appended exact membership')
   assert(appended.compatible_transactions.some((row) => row.id === 8063), 'U03 compatible occurrence disappeared')
@@ -713,7 +727,7 @@ async function recurringU03Journey(page, oracle) {
   assert(/súčasťou|ručného výberu|manual/i.test(overlapError), `U03 overlap error is unclear: ${overlapError}`)
   assertEqual(databaseState(oracle.db_path).tables.recurring_members, membersBeforeOverlap, 'U03 overlap changed membership')
   const original = await invoke(page, 'recurring_detail', {
-    request: { series_key: 's:503', query: { from: null, to: null, account_kind: null, today: '2026-09-07' } },
+    request: { series_key: 's:503', query: { from: null, to: null, account_kind: null, today: oracle.today } },
   })
   assertEqual(original.matching_transaction_ids, oracle.recurring.u03.first_contract_members, 'U03 original contract after overlap')
   return {
@@ -867,7 +881,7 @@ async function flowsMode() {
     const occupied = await occupiedUi(page, occupiedDialog, ready, oracle.families.month, path.join(RESULTS_DIR, 'ui-occupied.pdf'))
     await occupiedDialog.getByRole('button', { name: 'Zrušiť', exact: true }).click()
 
-    const recurringUi = await recurringUiJourney(page)
+    const recurringUi = await recurringUiJourney(page, oracle)
     const recurringU03 = await recurringU03Journey(page, oracle)
     const categoryUi = await categoryUiJourney(page)
     const fileSafety = await fileSafetyCanaries(page, oracle)
