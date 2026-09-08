@@ -306,11 +306,41 @@ fn export_csv_args_match_the_ui_call() {
 
 #[test]
 fn release_serializes_with_the_fields_the_ui_reads() {
-    let release = Release { tag: "0.2.0".into(), url: "https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0".into(), notes: "poznamky".into() };
+    let release = Release {
+        tag: "0.2.0".into(),
+        url: "https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0".into(),
+        notes: "poznamky".into(),
+        installer_url: None,
+        installer_name: None,
+        installer_size: None,
+        checksums_url: None,
+    };
     let v = serde_json::to_value(&release).unwrap();
     assert_eq!(v["tag"], json!("0.2.0"));
     assert_eq!(v["url"], json!("https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0"));
     assert_eq!(v["notes"], json!("poznamky"));
+    assert_eq!(v["installer_url"], json!(null));
+}
+
+/// 0.1.4: when the release has an installer asset and a checksums asset,
+/// those fields serialize too, snake_case like the rest of `Release`, so
+/// `Settings.tsx` can show the `Aktualizovať na <tag>` button.
+#[test]
+fn release_serializes_the_installer_fields_when_present() {
+    let release = Release {
+        tag: "0.1.4".into(),
+        url: "https://github.com/SouthCarpet/Abakus/releases/tag/0.1.4".into(),
+        notes: "poznamky".into(),
+        installer_url: Some("https://objects.githubusercontent.com/exe".into()),
+        installer_name: Some("abakus-setup-0.1.4.exe".into()),
+        installer_size: Some(12_345_678),
+        checksums_url: Some("https://objects.githubusercontent.com/sums".into()),
+    };
+    let v = serde_json::to_value(&release).unwrap();
+    assert_eq!(v["installer_url"], json!("https://objects.githubusercontent.com/exe"));
+    assert_eq!(v["installer_name"], json!("abakus-setup-0.1.4.exe"));
+    assert_eq!(v["installer_size"], json!(12_345_678));
+    assert_eq!(v["checksums_url"], json!("https://objects.githubusercontent.com/sums"));
 }
 
 #[test]
@@ -492,4 +522,45 @@ fn backup_outcome_serializes_the_fields_the_ui_reads() {
     let o = BackupOutcome { path: "C:/zálohy/abakus.db".into(), bytes: 45_056 };
     let v = serde_json::to_value(&o).unwrap();
     assert_eq!(v, json!({"path": "C:/zálohy/abakus.db", "bytes": 45_056}));
+}
+
+#[derive(serde::Deserialize)]
+struct DownloadUpdateArgs { tag: String }
+
+#[derive(serde::Deserialize)]
+struct LaunchUpdateArgs { path: String, sha256: String }
+
+#[derive(serde::Deserialize)]
+struct OpenReleasePageArgs { url: String }
+
+/// 0.1.4 contract: `download_update` takes only `{tag}` (the frontend never
+/// sends a URL; the command re-fetches the release itself, see
+/// `update_install::download_update_with`).
+#[test]
+fn download_update_args_match_the_ui_call() {
+    let args: DownloadUpdateArgs = serde_json::from_value(json!({"tag": "0.1.4"})).unwrap();
+    assert_eq!(args.tag, "0.1.4");
+}
+
+/// 0.1.4 contract: `launch_update` takes `{path, sha256}`, the exact pair
+/// `download_update` returned, so it can re-verify before it runs anything.
+#[test]
+fn launch_update_args_match_the_ui_call() {
+    let args: LaunchUpdateArgs = serde_json::from_value(json!({"path": "C:/Users/x/AppData/Local/Temp/abakus-update/abakus-setup-0.1.4.exe", "sha256": "deadbeef"})).unwrap();
+    assert_eq!(args.path, "C:/Users/x/AppData/Local/Temp/abakus-update/abakus-setup-0.1.4.exe");
+    assert_eq!(args.sha256, "deadbeef");
+}
+
+#[test]
+fn open_release_page_args_match_the_ui_call() {
+    let args: OpenReleasePageArgs = serde_json::from_value(json!({"url": "https://github.com/SouthCarpet/Abakus/releases/tag/0.1.4"})).unwrap();
+    assert_eq!(args.url, "https://github.com/SouthCarpet/Abakus/releases/tag/0.1.4");
+}
+
+#[test]
+fn downloaded_update_serializes_the_fields_the_ui_reads() {
+    use abakus_lib::update_install::DownloadedUpdate;
+    let d = DownloadedUpdate { path: "C:/temp/abakus-setup-0.1.4.exe".into(), sha256: "deadbeef".into() };
+    let v = serde_json::to_value(&d).unwrap();
+    assert_eq!(v, json!({"path": "C:/temp/abakus-setup-0.1.4.exe", "sha256": "deadbeef"}));
 }

@@ -9,6 +9,7 @@ pub mod report_commands;
 pub mod secrets;
 pub mod state;
 pub mod update;
+pub mod update_install;
 
 use tauri::Manager;
 
@@ -71,6 +72,9 @@ pub fn run() {
             commands::get_check_updates,
             commands::set_check_updates,
             commands::check_update_now,
+            update_install::download_update,
+            update_install::launch_update,
+            update_install::open_release_page,
             commands::net_log,
             commands::net_audit_failures,
             commands::run_net_audit,
