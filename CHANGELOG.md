@@ -4,7 +4,7 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
 ## 0.1.4 (2026-09-08)
 
-Prvé verejné vydanie. Zdrojový kód je na [GitHub](https://github.com/SouthCarpet/Abakus). Licencia je AGPL-3.0-or-later.
+Prvé vydanie s aktualizáciou v aplikácii, licenciou AGPL-3.0 a verejnou dokumentáciou. Zdrojový kód je na [GitHub](https://github.com/SouthCarpet/Abakus). Licencia je AGPL-3.0-or-later.
 
 - V Nastaveniach zapnite **Kontrolovať aktualizácie (GitHub)**. Ak existuje novšie vydanie, appka ukáže jeho poznámky a tlačidlo `Aktualizovať na v<verzia>`.
 - Tlačidlo stiahne inštalátor z GitHub Releases. Súbor sa overí voči `SHA256SUMS.txt` toho vydania. Nič sa nespustí, kým na tlačidlo nekliknete.

@@ -120,8 +120,14 @@ Každý krok kontroly sa zapíše do inštalačného denníka (`Log(...)` v
 Skúšobná inštalácia mimo skutočného `%LOCALAPPDATA%\Programs\Abakus`:
 
 ```powershell
-abakus-setup-0.1.4.exe /VERYSILENT /DIR="C:\cesta\scratch" /NOICONS
+abakus-setup-0.1.4.exe /VERYSILENT /DIR="C:\cesta\scratch" /MERGETASKS="!startmenuicon,!desktopicon"
 ```
+
+`/NOICONS` nevypne vlastné úlohy `[Tasks]` `startmenuicon` a `desktopicon`
+z `packaging/abakus.iss`; použite `/MERGETASKS` s `!` pred názvom úlohy.
+`AppId` je pevný, takže druhá (skúšobná) inštalácia prepíše ten istý záznam
+`HKCU\...\Uninstall\{AppId}_is1` aj odkazy existujúcej inštalácie. Jej
+odinštalovanie potom zmaže tie isté odkazy a záznam.
 
 Odinštalovanie tej istej skúšobnej inštalácie:
 

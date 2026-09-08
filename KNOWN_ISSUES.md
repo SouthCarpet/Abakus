@@ -94,4 +94,15 @@
 - **Audit-write failures exist only in the current process.** Nastavenia shows
   them until the application closes.
 - **Two chips share the label "Všetko".** On Prehľad the period cluster and the account-type cluster each end with a chip named "Všetko" (`src/screens/Overview.tsx`). Position tells them apart, wording does not. Reported by the closing visual verification (2026-09-01) as a SHOULD, left as a residual rather than reopening the round.
+- **Poznámky k vydaniu v karte Stav vykresľujú iba nadpisy a odrážky.** Vnorený
+  Markdown (`**tučné**`, odkazy, spätné apostrofy) sa zobrazí doslovne, nie
+  naformátovaný.
+- **Stav "Overujem podpis súboru…" sa nikdy nevykreslí.** Overenie beží v tom
+  istom volaní ako sťahovanie, takže používateľ vidí "Sťahujem inštalátor…" a
+  potom rovno "Spúšťam inštalátor…".
+- **`SHA256SUMS.txt` riadok s názvom súboru obsahujúcim medzeru sa nenájde.**
+  Hľadanie riadku delí text podľa bielych znakov. Dnešné názvy súborov medzeru
+  nemajú.
+- **Tabuľka Sieťová aktivita sa počas sťahovania neobnovuje automaticky.**
+  Dáta v `net_log` sú úplné, iba obrazovka ich nenačíta znova sama od seba.
 

@@ -41,3 +41,12 @@ tým, ako vydanie skutočne existuje na GitHube.
 - Kontrola aktualizácie ostáva jediné sieťové volanie mimo sťahovania
   inštalátora, obe len na tvoj pokyn a v predvolenom stave vypnuté.
 - Import, kategórie, pravidelné platby, PDF report a zálohy sa nemenili.
+
+## Overenie
+
+Prvé kolo nezávislého overenia vrátilo čiastočný výsledok (PARTIAL). Zistenia
+z toho kola sú opravené v tomto commite: otvorenie stránky vydania už
+nespúšťa `cmd.exe` a adresa prejde cez znakový filter (odkaz nikdy nedosiahne
+shell); test hraníc presmerovaní má doslovné očakávané hodnoty namiesto
+odkazu na konštantu; ladiaca výnimka pre `127.0.0.1` už neuznáva podobný
+názov hostiteľa. Zvyšné nálezy z toho kola sú v [KNOWN_ISSUES.md](../KNOWN_ISSUES.md).
