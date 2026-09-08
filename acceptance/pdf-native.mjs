@@ -240,55 +240,136 @@ async function inspectMode() {
 // exits 1 with no success JSON on stdout.
 const DIALOG_AUTOMATION = String.raw`
 Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName System.Windows.Forms
+# Every element inside this native Save dialog (filename edit, Save/Cancel
+# buttons) reports zero supported UIA control patterns in this session
+# (confirmed live, 2026-09-08: GetSupportedPatterns() empty,
+# IsValuePatternAvailable/IsInvokePatternAvailable/IsKeyboardFocusable all
+# False, even after SetForegroundWindow on the dialog's own hwnd), so
+# SetFocus/ValuePattern/InvokePattern all throw. A genuine synthetic mouse
+# click (SendInput) followed by SendKeys DOES reach the real control, since
+# it goes through the normal Windows input queue instead of the UIA
+# provider's COM layer. NativeInput below drives every interaction with this
+# dialog and the nested overwrite prompt through real input, never patterns.
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+using System.Threading;
+public static class NativeInput {
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [StructLayout(LayoutKind.Sequential)] public struct MOUSEINPUT { public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
+    [StructLayout(LayoutKind.Sequential)] public struct INPUT { public int type; public MOUSEINPUT mi; }
+    [DllImport("user32.dll")] public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+    const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
+    const uint MOUSEEVENTF_LEFTUP = 0x0004;
+    public static void Click(int x, int y) {
+        SetCursorPos(x, y);
+        var down = new INPUT { type = 0, mi = new MOUSEINPUT { dwFlags = MOUSEEVENTF_LEFTDOWN } };
+        var up = new INPUT { type = 0, mi = new MOUSEINPUT { dwFlags = MOUSEEVENTF_LEFTUP } };
+        SendInput(1, new[] { down }, Marshal.SizeOf(typeof(INPUT)));
+        Thread.Sleep(50);
+        SendInput(1, new[] { up }, Marshal.SizeOf(typeof(INPUT)));
+    }
+}
+'@
 try {
     $ErrorActionPreference = 'Stop'
     $targetPid = [int]$env:ABAKUS_ACCEPT_PID
     $action = $env:ABAKUS_ACCEPT_ACTION
     $targetPath = $env:ABAKUS_ACCEPT_PATH
+
+    function Click-Element($element, $activateHwnd) {
+        # $activateHwnd is the owning dialog/prompt window's own handle, not
+        # $element's: a raw MSAA-bridged child control (this dialog's edit
+        # and buttons) commonly has no HWND of its own to activate.
+        [NativeInput]::SetForegroundWindow([IntPtr]$activateHwnd) | Out-Null
+        Start-Sleep -Milliseconds 100
+        $rect = $element.Current.BoundingRectangle
+        $cx = [int]($rect.X + $rect.Width / 2)
+        $cy = [int]($rect.Y + $rect.Height / 2)
+        [NativeInput]::Click($cx, $cy)
+        Start-Sleep -Milliseconds 200
+    }
+
     $root = [System.Windows.Automation.AutomationElement]::RootElement
     $pidCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ProcessIdProperty, $targetPid)
     $dialogClassCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ClassNameProperty, '#32770')
     $dialogCondition = New-Object System.Windows.Automation.AndCondition($pidCondition, $dialogClassCondition)
-    $deadline = [DateTime]::UtcNow.AddSeconds(25)
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
     $dialog = $null
     while ([DateTime]::UtcNow -lt $deadline -and $null -eq $dialog) {
-        $dialog = $root.FindFirst([System.Windows.Automation.TreeScope]::Children, $dialogCondition)
+        # The dialog is a descendant of the task's own top-level window in the
+        # UIAutomation tree, not a sibling top-level window of the desktop
+        # (confirmed live: 2026-09-08, "Uložiť ako" #32770 found nested under
+        # the "Tauri Window" via FindAll(Children, pid) + FindFirst(Descendants,
+        # AND(pid, class)) on the owner, zero hits when searching Children of
+        # the desktop root directly). Search each task-owned top-level window's
+        # descendants first; fall back to a full-desktop descendants search in
+        # case a future build makes the dialog a true sibling top-level window.
+        $ownerWindows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $pidCondition)
+        foreach ($owner in $ownerWindows) {
+            $candidate = $owner.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $dialogCondition)
+            if ($null -ne $candidate) { $dialog = $candidate; break }
+        }
+        if ($null -eq $dialog) { $dialog = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $dialogCondition) }
         if ($null -eq $dialog) { Start-Sleep -Milliseconds 100 }
     }
     if ($null -eq $dialog) { throw "Save dialog (#32770) owned by PID $targetPid was not found" }
 
-    function Find-Scoped($parent, $automationId, $type) {
+    # The filename edit and the Save/Cancel buttons all report
+    # ControlType.Pane in this dialog's UIAutomation view (confirmed live,
+    # 2026-09-08: AutomationId 1001/1/2 all had ControlType Pane, not
+    # Edit/Button). The property that actually distinguishes them, and
+    # disambiguates AutomationId 1001 from the address bar's ToolbarWindow32
+    # (also AutomationId 1001, Finding 2), is ClassName.
+    function Find-Scoped($parent, $automationId, $className) {
         $idCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $automationId)
-        $typeCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, $type)
-        $scopedCondition = New-Object System.Windows.Automation.AndCondition($idCondition, $typeCondition)
+        $classCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ClassNameProperty, $className)
+        $scopedCondition = New-Object System.Windows.Automation.AndCondition($idCondition, $classCondition)
         return $parent.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $scopedCondition)
     }
 
+    $dialogHwnd = [IntPtr]$dialog.Current.NativeWindowHandle
+
     if ($action -eq 'cancel') {
-        $cancel = Find-Scoped $dialog '2' ([System.Windows.Automation.ControlType]::Button)
+        $cancel = Find-Scoped $dialog '2' 'Button'
         if ($null -eq $cancel) { throw 'Cancel button (AutomationId 2) was not found inside the save dialog' }
-        $cancel.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        Click-Element $cancel $dialogHwnd
         Write-Output '{"action":"cancel","ok":true}'
         exit 0
     }
 
-    $edit = Find-Scoped $dialog '1001' ([System.Windows.Automation.ControlType]::Edit)
+    $edit = Find-Scoped $dialog '1001' 'Edit'
     if ($null -eq $edit) { throw 'Filename edit (AutomationId 1001) was not found inside the save dialog' }
-    $edit.SetFocus()
-    $valuePattern = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-    $valuePattern.SetValue($targetPath)
-    $actualValue = $valuePattern.Current.Value
+    # SetFocus/ValuePattern throw here (see the NativeInput comment above), so
+    # click into the box for real, select all, and type the path through the
+    # real input queue; the Name property (proven live to reflect what is
+    # actually typed) is what verifies the write landed. SendKeys can drop an
+    # early keystroke right after a focus change (observed live, 2026-09-08:
+    # "acceptance" arrived as "aceptance"), so retry select-all+type a few
+    # times until the readback matches exactly; never accept a mismatch.
+    $escapedPath = [System.Text.RegularExpressions.Regex]::Replace($targetPath, '([+^%~(){}\[\]])', '{$1}')
+    $actualValue = $null
+    for ($attempt = 1; $attempt -le 5 -and $actualValue -ne $targetPath; $attempt++) {
+        Click-Element $edit $dialogHwnd
+        [System.Windows.Forms.SendKeys]::SendWait('^a')
+        Start-Sleep -Milliseconds 150
+        [System.Windows.Forms.SendKeys]::SendWait($escapedPath)
+        Start-Sleep -Milliseconds 300
+        $actualValue = $edit.Current.Name
+    }
     if ($actualValue -ne $targetPath) {
         throw "filename edit did not accept the requested path: expected '$targetPath', got '$actualValue'"
     }
 
-    $save = Find-Scoped $dialog '1' ([System.Windows.Automation.ControlType]::Button)
+    $save = Find-Scoped $dialog '1' 'Button'
     if ($null -eq $save) { throw 'Save button (AutomationId 1) was not found inside the save dialog' }
-    $save.SetFocus()
-    $save.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Click-Element $save $dialogHwnd
 
     if ($action -eq 'occupied') {
         $confirm = $null
+        $confirmHwnd = $null
         while ([DateTime]::UtcNow -lt $deadline -and $null -eq $confirm) {
             $ownerWindows = $root.FindAll([System.Windows.Automation.TreeScope]::Children, $pidCondition)
             foreach ($owner in $ownerWindows) {
@@ -300,16 +381,16 @@ try {
                 if ($null -ne $promptWindow) {
                     $confirmCondition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'CommandButton_6')
                     $confirm = $promptWindow.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $confirmCondition)
-                    if ($null -ne $confirm) { break }
+                    if ($null -ne $confirm) { $confirmHwnd = [IntPtr]$promptWindow.Current.NativeWindowHandle; break }
                 }
             }
             if ($null -eq $confirm) { Start-Sleep -Milliseconds 100 }
         }
         if ($null -eq $confirm) { throw 'Overwrite confirmation button (CommandButton_6) was not found' }
-        $confirm.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        Click-Element $confirm $confirmHwnd
     }
 
-    Write-Output '{"action":"save","ok":true}'
+    Write-Output ('{"action":"' + $action + '","ok":true}')
     exit 0
 } catch {
     [Console]::Error.WriteLine($_)
@@ -320,7 +401,14 @@ try {
 function automateDialog(pid, action, targetPath = '') {
   fs.mkdirSync(RESULTS_DIR, { recursive: true })
   const scriptPath = path.join(RESULTS_DIR, `.dialog-automation-${crypto.randomUUID()}.ps1`)
-  fs.writeFileSync(scriptPath, DIALOG_AUTOMATION, { flag: 'wx' })
+  // Windows PowerShell 5.1 has no way to declare a script file's encoding
+  // and, without a BOM, reads it using the system ANSI codepage (1250 on
+  // this host), not UTF-8. Every non-ASCII literal in DIALOG_AUTOMATION
+  // (the Slovak overwrite-prompt title) then decodes to garbage that never
+  // matches the real window text (confirmed live, 2026-09-08: 'ž'/'ú' each
+  // became two wrong CP1250 characters without the BOM). Prefixing the
+  // UTF-8 BOM makes PowerShell 5.1 auto-detect UTF-8 and decode correctly.
+  fs.writeFileSync(scriptPath, `\uFEFF${DIALOG_AUTOMATION}`, { flag: 'wx', encoding: 'utf8' })
   const cleanup = () => { try { fs.rmSync(scriptPath, { force: true }) } catch { /* best effort */ } }
   return new Promise((resolve, reject) => {
     const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', scriptPath], {
