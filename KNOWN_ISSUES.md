@@ -8,6 +8,12 @@
   textu, 2 000 strán a 100 MiB výsledného súboru. Prekročenie ukončí export
   chybou, nie skráteným výpisom. Nepodporovaný znak má viditeľný zápis
   `[U+...]`. PDF používa vlastný výber účtov a obdobia, nie filtre tabuľky.
+- **Detail pravidelnej platby s veľmi dlhým názvom obchodníka rozšíri stránku.**
+  Tabuľka obchodníkov v detaile (Prehľad) nemá vlastné vodorovné posúvanie.
+  Názov obchodníka s niekoľkými stovkami znakov (nameraný syntetický prípad:
+  372 znakov) rozšíri stránku pri šírke 1280 px a treba ju posunúť vodorovne.
+  Bežné názvy z výpisov sa zmestia. Testy rozloženia pripínajú názvy tried,
+  nie geometriu; overenie geometrie robí kontrola snímok pri vydaní.
 - **Ručný formulár na nové pravidlo nie je dostupný.** Pravidlá sa učia
   pri priradení alebo potvrdení transakcie s rozpoznaným obchodníkom.
   Samotné vytvorenie kategórie pravidlo nevytvorí. Cieľ vstavaného pravidla
