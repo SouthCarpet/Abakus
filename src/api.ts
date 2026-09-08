@@ -21,7 +21,16 @@ export interface BadChecksum { statement_id: number; number: number; account_lab
 export interface RecentStatement { statement_id: number; number: number; period_end: string; account_label: string; transaction_count: number; checksum: Checksum }
 export interface StatementHistoryRow { statement_id: number; account_id: number; account_label: string; account_kind: AccountKind; number: number; period_start: string; period_end: string; opening_cents: number | null; closing_cents: number | null; checksum: Checksum }
 export interface BackupOutcome { path: string; bytes: number }
-export interface Release { tag: string; url: string; notes: string }
+export interface Release {
+  tag: string
+  url: string
+  notes: string
+  installer_url: string | null
+  installer_name: string | null
+  installer_size: number | null
+  checksums_url: string | null
+}
+export interface DownloadedUpdate { path: string; sha256: string }
 export interface NetLogRow { id: number; started_at: string; url: string; status: string; duration_ms: number; bytes_in: number }
 export interface AuditFailure { at: string; url: string; error: string }
 
@@ -59,6 +68,9 @@ export const api = {
   getCheckUpdates: () => invoke<boolean>('get_check_updates'),
   setCheckUpdates: (on: boolean) => invoke<void>('set_check_updates', { on }),
   checkUpdateNow: () => invoke<Release | null>('check_update_now'),
+  downloadUpdate: (tag: string) => invoke<DownloadedUpdate>('download_update', { tag }),
+  launchUpdate: (path: string, sha256: string) => invoke<void>('launch_update', { path, sha256 }),
+  openReleasePage: (url: string) => invoke<void>('open_release_page', { url }),
   netLog: (limit: number) => invoke<NetLogRow[]>('net_log', { limit }),
   runNetAudit: () => invoke<number>('run_net_audit'),
   netAuditFailures: () => invoke<AuditFailure[]>('net_audit_failures'),

@@ -13,6 +13,74 @@ import { Field } from '../components/Field'
 import { usePeriod } from '../components/PeriodPicker'
 import { fromSkParts, maskIban } from '../lib/iban'
 import { periodRange, validPeriod } from '../lib/period'
+import { parseReleaseNotes } from '../lib/releaseNotes'
+import { type UpdatePhase, updateButtonLabel } from '../lib/updatePhase'
+
+// 0.1.4 (Michal, 2026-09-08): the release notes are third-party text from a
+// GitHub release body, so this renders them as plain React text nodes only
+// (React escapes text content itself), never through dangerouslySetInnerHTML.
+function ReleaseNotes({ notes }: { notes: string }) {
+  const blocks = parseReleaseNotes(notes)
+  if (blocks.length === 0) return null
+  return (
+    <div className="k-release-notes">
+      {blocks.map((block, i) => {
+        if (block.kind === 'heading') return <h4 key={i}>{block.text}</h4>
+        if (block.kind === 'bullets') return <ul key={i}>{block.items.map((item, j) => <li key={j}>{item}</li>)}</ul>
+        return <p key={i}>{block.text}</p>
+      })}
+    </div>
+  )
+}
+
+// 0.1.4: shows the release Nastavenia found, never installs anything on its
+// own. Only the deliberate click on "Aktualizovať na <tag>" downloads and
+// verifies the installer (`download_update`), then starts it
+// (`launch_update`, which exits the app once the installer's own wizard
+// takes over). Every other path here stays purely informational.
+function UpdateAvailable({ release }: { release: Release }) {
+  const [phase, setPhase] = useState<UpdatePhase>('idle')
+  const [error, setError] = useState('')
+
+  async function update() {
+    setError('')
+    setPhase('downloading')
+    try {
+      const downloaded = await api.downloadUpdate(release.tag)
+      // `download_update` already verified the hash server-side; this state
+      // names that step for the user. `await Promise.resolve()` forces a
+      // render commit for it before moving on, rather than letting it merge
+      // into the same update as `launching` below.
+      setPhase('verifying')
+      await Promise.resolve()
+      setPhase('launching')
+      await api.launchUpdate(downloaded.path, downloaded.sha256)
+      // A successful launch calls app.exit(0) on the Rust side: the process
+      // closes before this ever returns, so there is nothing left to render.
+    } catch (e) {
+      setError(String(e))
+      setPhase('error')
+    }
+  }
+
+  const busy = phase === 'downloading' || phase === 'verifying' || phase === 'launching'
+
+  return (
+    <div className="k-section">
+      <p className="k-card-title">Dostupná aktualizácia {release.tag}</p>
+      <ReleaseNotes notes={release.notes} />
+      <Button variant="ghost" onClick={() => void api.openReleasePage(release.url).catch((e) => setError(String(e)))}>
+        {release.url}
+      </Button>
+      {release.installer_url ? (
+        <Button variant="primary" disabled={busy} onClick={() => void update()}>
+          {updateButtonLabel(phase, release.tag)}
+        </Button>
+      ) : null}
+      {error ? <p role="alert" className="k-text-danger">{error}</p> : null}
+    </div>
+  )
+}
 
 const NET_LOG_LIMIT = 20
 
@@ -339,13 +407,8 @@ export function Settings() {
                 <input type="checkbox" checked={checkUpdates} onChange={(e) => void action.run(() => toggleCheckUpdates(e.target.checked))} />
                 Kontrolovať aktualizácie (GitHub)
               </label>
-              <p>Toto je jediné sieťové volanie aplikácie. V predvolenom stave je vypnuté.</p>
-              {release ? (
-                <>
-                  <p>Dostupná aktualizácia {release.tag}</p>
-                  <p>{release.url}</p>
-                </>
-              ) : null}
+              <p>Sieťové volania: kontrola aktualizácií a stiahnutie inštalátora, obe len na tvoj pokyn; v predvolenom stave vypnuté.</p>
+              {release ? <UpdateAvailable release={release} /> : null}
               <NetLogSection rows={netLog} failures={auditFailures} onScanNow={() => void action.run(() => scanNow())} />
             </Card>
           </div>

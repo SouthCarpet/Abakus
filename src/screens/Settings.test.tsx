@@ -9,7 +9,23 @@ beforeEach(() => vi.clearAllMocks())
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ save: vi.fn() }))
 
-const release: Release = { tag: '0.2.0', url: 'https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0', notes: '' }
+const release: Release = {
+  tag: '0.2.0',
+  url: 'https://github.com/SouthCarpet/Abakus/releases/tag/0.2.0',
+  notes: '',
+  installer_url: null,
+  installer_name: null,
+  installer_size: null,
+  checksums_url: null,
+}
+const releaseWithInstaller: Release = {
+  ...release,
+  tag: '0.1.4',
+  installer_url: 'https://objects.githubusercontent.com/exe',
+  installer_name: 'abakus-setup-0.1.4.exe',
+  installer_size: 12_345,
+  checksums_url: 'https://objects.githubusercontent.com/sums',
+}
 const netLogRow: NetLogRow = { id: 1, started_at: '2026-08-31T10:00:00Z', url: 'https://api.github.com/repos/SouthCarpet/Abakus/releases/latest', status: '200', duration_ms: 120, bytes_in: 512 }
 const auditFailure: AuditFailure = { at: '2026-08-31T10:00:05Z', url: 'https://api.github.com/repos/SouthCarpet/Abakus/releases/latest', error: 'store lock poisoned' }
 
@@ -22,6 +38,7 @@ function mockApi(overrides: Partial<typeof api> = {}) {
   vi.mocked(api.getCheckUpdates).mockResolvedValue(false)
   vi.mocked(api.checkUpdateNow).mockResolvedValue(null)
   vi.mocked(api.setCheckUpdates).mockResolvedValue(undefined)
+  vi.mocked(api.openReleasePage).mockResolvedValue(undefined)
   vi.mocked(api.runNetAudit).mockResolvedValue(0)
   Object.assign(api, overrides)
 }
@@ -39,6 +56,9 @@ vi.mock('../api', async (importOriginal) => {
       getCheckUpdates: vi.fn(),
       checkUpdateNow: vi.fn(),
       setCheckUpdates: vi.fn(),
+      downloadUpdate: vi.fn(),
+      launchUpdate: vi.fn(),
+      openReleasePage: vi.fn(),
       runNetAudit: vi.fn(),
       updateAccount: vi.fn(),
       setAccountPassword: vi.fn(),
@@ -70,6 +90,72 @@ describe('Settings: opt-in update check', () => {
     box.click()
     await waitFor(() => expect(api.setCheckUpdates).toHaveBeenCalledWith(true))
     await waitFor(() => expect(screen.getByText('Dostupná aktualizácia 0.2.0')).toBeInTheDocument())
+  })
+})
+
+// A deferred promise the test resolves/rejects on its own schedule, so a
+// click's in-flight state (button disabled, phase label shown) is asserted
+// deterministically rather than racing a timer (tott-test-craft R12).
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
+describe('Settings: update button (0.1.4)', () => {
+  it('shows only the quiet line and the link, no button, when the release has no installer asset', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
+    render(<Settings />)
+    await screen.findByText('Dostupná aktualizácia 0.2.0')
+    expect(screen.queryByRole('button', { name: /Aktualizovať na/ })).not.toBeInTheDocument()
+  })
+
+  it('downloads then launches on click, cycling the button label through downloading and launching', async () => {
+    const download = deferred<{ path: string; sha256: string }>()
+    const launch = deferred<void>()
+    mockApi({
+      getCheckUpdates: vi.fn().mockResolvedValue(true),
+      checkUpdateNow: vi.fn().mockResolvedValue(releaseWithInstaller),
+      downloadUpdate: vi.fn().mockReturnValue(download.promise),
+      launchUpdate: vi.fn().mockReturnValue(launch.promise),
+    } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Aktualizovať na 0.1.4' }))
+    expect(api.downloadUpdate).toHaveBeenCalledWith('0.1.4')
+    expect(screen.getByRole('button', { name: 'Sťahujem inštalátor…' })).toBeDisabled()
+
+    download.resolve({ path: 'C:/temp/abakus-update/abakus-setup-0.1.4.exe', sha256: 'deadbeef' })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Spúšťam inštalátor…' })).toBeDisabled())
+    expect(api.launchUpdate).toHaveBeenCalledWith('C:/temp/abakus-update/abakus-setup-0.1.4.exe', 'deadbeef')
+
+    launch.resolve()
+  })
+
+  it('shows the alert and re-enables the button when the download fails', async () => {
+    mockApi({
+      getCheckUpdates: vi.fn().mockResolvedValue(true),
+      checkUpdateNow: vi.fn().mockResolvedValue(releaseWithInstaller),
+      downloadUpdate: vi.fn().mockRejectedValue('Stiahnutie zlyhalo: offline'),
+    } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Aktualizovať na 0.1.4' }))
+
+    await screen.findByText('Stiahnutie zlyhalo: offline')
+    expect(screen.getByRole('alert')).toHaveTextContent('Stiahnutie zlyhalo: offline')
+    expect(screen.getByRole('button', { name: 'Aktualizovať na 0.1.4' })).not.toBeDisabled()
+    expect(api.launchUpdate).not.toHaveBeenCalled()
+  })
+
+  it('opens the release page through open_release_page when the link is clicked', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
+    render(<Settings />)
+
+    fireEvent.click(await screen.findByText(release.url))
+
+    await waitFor(() => expect(api.openReleasePage).toHaveBeenCalledWith(release.url))
   })
 })
 
@@ -209,5 +295,31 @@ describe('Settings: account password', () => {
     await screen.findByText('Uloženie hesla zlyhalo: keyring locked')
     expect(screen.getByRole('dialog', { name: 'Heslo k výpisom účtu Osobný' })).toBeInTheDocument()
     expect((screen.getByLabelText('Heslo') as HTMLInputElement).value).toBe('tajneheslo')
+  })
+
+  // 0.1.4: mirrors the backend's exact boundary
+  // (`commands::PASSWORD_MAX_CHARS`, `exactly_the_length_limit_is_accepted_
+  // one_over_is_rejected...`), so a length the backend would refuse is
+  // caught client-side, before Uložiť even sends it.
+  it('accepts exactly 512 characters and rejects 513 with the Slovak hint, Uložiť disabled', async () => {
+    const setAccountPassword = vi.fn().mockResolvedValue(undefined)
+    mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]), setAccountPassword } as Partial<typeof api>)
+    render(<Settings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
+
+    const atLimit = 'a'.repeat(512)
+    fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: atLimit } })
+    fireEvent.change(screen.getByLabelText('Zopakovať heslo'), { target: { value: atLimit } })
+    expect(screen.queryByText('Limit je 512 znakov.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Uložiť' })).not.toBeDisabled()
+
+    const overLimit = 'a'.repeat(513)
+    fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: overLimit } })
+    fireEvent.change(screen.getByLabelText('Zopakovať heslo'), { target: { value: overLimit } })
+    expect(screen.getByText('Limit je 512 znakov.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Uložiť' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
+    expect(setAccountPassword).not.toHaveBeenCalled()
   })
 })

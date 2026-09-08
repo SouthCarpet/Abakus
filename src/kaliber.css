@@ -104,6 +104,9 @@ ul { padding: 0; list-style: none; }
 }
 .k-input.is-focus, .k-select.is-focus { border-color: var(--color-accent); }
 .k-input:disabled, .k-input.is-disabled { background: var(--color-disabled-fill); color: var(--color-text-muted); }
+/* WebView2 draws its own password-reveal eye icon inside the field on the
+   right; without this, a long typed password scrolls under it. */
+.k-input[type="password"] { padding-right: var(--space-8); }
 
 .k-checkbox { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
 
