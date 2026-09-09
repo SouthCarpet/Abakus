@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImportReport, RecentStatement, StatementDeletePreview } from '../api'
 import { api } from '../api'
@@ -11,6 +11,7 @@ vi.mock('../api', () => ({
     importStatements: vi.fn(),
     importWithPassword: vi.fn(),
     saveAccount: vi.fn(),
+    setAccountPassword: vi.fn(),
     recentStatements: vi.fn().mockResolvedValue([]),
     statementDeletePreview: vi.fn(),
     deleteStatement: vi.fn(),
@@ -55,34 +56,131 @@ describe('ImportResultCard', () => {
   })
 })
 
-describe('Import retry after unknown account', () => {
-  it('threads the original remember=true choice into the post-add-account retry', async () => {
+// Michal, 2026-09-09: "pridať alert, že účet nie je nastavený a či ho chceme
+// nastaviť" - the dialog now opens by itself as soon as an unknown-account
+// result lands, instead of waiting for the secondary "Pridať účet" click.
+describe('Import: set up an unknown account automatically', () => {
+  beforeEach(() => vi.clearAllMocks())
+  const unknownReport: ImportReport = { path: 'C:/x/a.pdf', status: 'unknown_account', accountLabel: null, accountKind: 'business', ibanMasked: 'SK44...5678', iban: 'SK4411000000000012345678', statementNumber: null, periodStart: null, periodEnd: null, inserted: 0, duplicates: 0, checksum: null, warnings: [], message: null, statementId: null }
+
+  async function dropUnknown(report: ImportReport = unknownReport) {
     const { open } = await import('@tauri-apps/plugin-dialog')
-    const lockedReport: ImportReport = { path: 'C:/x/locked.pdf', status: 'locked', accountLabel: null, accountKind: null, ibanMasked: null, iban: null, statementNumber: null, periodStart: null, periodEnd: null, inserted: 0, duplicates: 0, checksum: null, warnings: [], message: null, statementId: null }
-    const unknownAccountReport: ImportReport = { ...lockedReport, status: 'unknown_account', iban: 'SK4411000000000012345678', accountKind: 'personal' }
-    const importedReport: ImportReport = { ...lockedReport, status: 'imported', accountLabel: 'Osobný', accountKind: 'personal', inserted: 3 }
-
-    vi.mocked(open).mockResolvedValue(lockedReport.path)
-    vi.mocked(api.importStatements).mockResolvedValueOnce([lockedReport])
-    vi.mocked(api.importWithPassword).mockResolvedValueOnce(unknownAccountReport).mockResolvedValueOnce(importedReport)
-    vi.mocked(api.saveAccount).mockResolvedValue({ id: 1, iban: unknownAccountReport.iban ?? '', kind: 'personal', label: 'Test účet', has_password: false })
-
+    vi.mocked(open).mockResolvedValue(report.path)
+    vi.mocked(api.importStatements).mockResolvedValueOnce([report])
     render(<Import />)
-
     fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Zadať heslo' })).toBeInTheDocument())
+    return screen.findByRole('dialog', { name: 'Účet nie je nastavený' })
+  }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zadať heslo' }))
-    fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: 'secret' } })
-    fireEvent.click(screen.getByLabelText('Zapamätať pre tento účet'))
-    fireEvent.click(screen.getByRole('button', { name: 'Potvrdiť' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Pridať účet' })).toBeInTheDocument())
+  it('opens by itself with the masked IBAN in the text and the kind preselected', async () => {
+    const dialog = await dropUnknown()
+    expect(within(dialog).getByText(/SK44\.\.\.5678/)).toBeInTheDocument()
+    expect(within(dialog).getByText(unknownReport.iban ?? '')).toBeInTheDocument()
+    expect(screen.getByLabelText('Druh účtu')).toHaveValue('business')
+  })
+
+  it('Neskôr closes the dialog, and Pridať účet on the card reopens it', async () => {
+    await dropUnknown()
+    fireEvent.click(screen.getByRole('button', { name: 'Neskôr' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Pridať účet' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
-    await waitFor(() => expect(vi.mocked(api.importWithPassword).mock.calls).toHaveLength(2))
+    expect(await screen.findByRole('dialog', { name: 'Účet nie je nastavený' })).toBeInTheDocument()
+  })
 
-    expect(vi.mocked(api.importWithPassword).mock.calls[1]).toEqual([lockedReport.path, 'secret', true])
+  it('without a password: saves the account with the statement IBAN, then retries with importStatements', async () => {
+    const importedReport: ImportReport = { ...unknownReport, status: 'imported', accountLabel: 'Firemný', inserted: 4 }
+    vi.mocked(api.saveAccount).mockResolvedValue({ id: 7, iban: unknownReport.iban ?? '', kind: 'business', label: 'Firemný účet', has_password: false })
+    vi.mocked(api.importStatements).mockResolvedValueOnce([unknownReport]).mockResolvedValueOnce([importedReport])
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    vi.mocked(open).mockResolvedValue(unknownReport.path)
+    render(<Import />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
+    await screen.findByRole('dialog', { name: 'Účet nie je nastavený' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nastaviť účet' }))
+
+    await waitFor(() => expect(api.saveAccount).toHaveBeenCalledWith(unknownReport.iban, 'business', 'Firemný účet'))
+    expect(api.setAccountPassword).not.toHaveBeenCalled()
+    await waitFor(() => expect(vi.mocked(api.importStatements).mock.calls).toHaveLength(2))
+    expect(vi.mocked(api.importStatements).mock.calls[1]).toEqual([[unknownReport.path]])
+    expect(await screen.findByText('4 nových, 0 duplicít')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('with a typed password: sets it on the saved account, then retries with importWithPassword and remember=false', async () => {
+    const importedReport: ImportReport = { ...unknownReport, status: 'imported', accountLabel: 'Firemný', inserted: 2 }
+    vi.mocked(api.saveAccount).mockResolvedValue({ id: 8, iban: unknownReport.iban ?? '', kind: 'business', label: 'Firemný účet', has_password: true })
+    vi.mocked(api.setAccountPassword).mockResolvedValue(undefined)
+    vi.mocked(api.importWithPassword).mockResolvedValueOnce(importedReport)
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    vi.mocked(open).mockResolvedValue(unknownReport.path)
+    vi.mocked(api.importStatements).mockResolvedValueOnce([unknownReport])
+    render(<Import />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
+    await screen.findByRole('dialog', { name: 'Účet nie je nastavený' })
+
+    fireEvent.change(screen.getByLabelText('Heslo k výpisom'), { target: { value: 'tajne' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Nastaviť účet' }))
+
+    await waitFor(() => expect(api.setAccountPassword).toHaveBeenCalledWith(8, 'tajne'))
+    expect(api.importWithPassword).toHaveBeenCalledWith(unknownReport.path, 'tajne', false)
+    expect(await screen.findByText('2 nových, 0 duplicít')).toBeInTheDocument()
+  })
+
+  it('a failing saveAccount shows the error inside the dialog and keeps the typed values', async () => {
+    vi.mocked(api.saveAccount).mockRejectedValueOnce(new Error('Účet sa nedá uložiť'))
+    await dropUnknown()
+
+    fireEvent.change(screen.getByLabelText('Názov účtu'), { target: { value: 'Môj biznis' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Nastaviť účet' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Účet sa nedá uložiť')
+    expect(screen.getByLabelText('Názov účtu')).toHaveValue('Môj biznis')
+    expect(api.importStatements).toHaveBeenCalledTimes(1)
+  })
+
+  it('queues two unknown-account results, one dialog at a time, in drop order', async () => {
+    const second: ImportReport = { ...unknownReport, path: 'C:/x/b.pdf', ibanMasked: 'SK89...5555', iban: 'SK8911000000000055555555', accountKind: 'personal' }
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    vi.mocked(open).mockResolvedValue([unknownReport.path, second.path])
+    vi.mocked(api.importStatements).mockResolvedValueOnce([unknownReport, second])
+    render(<Import />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
+
+    const first = await screen.findByRole('dialog', { name: 'Účet nie je nastavený' })
+    expect(within(first).getByText(/SK44\.\.\.5678/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Neskôr' }))
+
+    const nextDialog = await screen.findByRole('dialog', { name: 'Účet nie je nastavený' })
+    expect(within(nextDialog).getByText(/SK89\.\.\.5555/)).toBeInTheDocument()
+  })
+})
+
+describe('Import: password prompt reveal toggle', () => {
+  it('keeps the typed password readable after the field loses focus', async () => {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const lockedReport: ImportReport = { path: 'C:/x/locked.pdf', status: 'locked', accountLabel: null, accountKind: null, ibanMasked: null, iban: null, statementNumber: null, periodStart: null, periodEnd: null, inserted: 0, duplicates: 0, checksum: null, warnings: [], message: null, statementId: null }
+    vi.mocked(open).mockResolvedValue(lockedReport.path)
+    vi.mocked(api.importStatements).mockResolvedValueOnce([lockedReport])
+
+    render(<Import />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zadať heslo' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Zadať heslo' }))
+
+    const input = screen.getByLabelText('Heslo') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'secret' } })
+    expect(input.type).toBe('password')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zobraziť' }))
+    expect(input.type).toBe('text')
+
+    fireEvent.blur(input)
+    fireEvent.click(screen.getByRole('dialog'))
+    expect(input.type).toBe('text')
+    expect(screen.getByRole('button', { name: 'Skryť' })).toBeInTheDocument()
   })
 })
 

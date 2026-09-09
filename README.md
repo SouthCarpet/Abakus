@@ -48,7 +48,7 @@ Ak Abakus už máte nainštalovaný, druhé spustenie inštalátora ho aktualizu
 ## Ako to funguje
 
 1. V **Nastaveniach** pridajte účty. Zadajte IBAN alebo zápis `kód banky/prefix-číslo účtu`.
-2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu.
+2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu. Ak výpis patrí účtu, ktorý appka ešte nepozná, otvorí sa hneď dialóg na jeho nastavenie s druhom účtu a prípadným heslom. Nastavenia zostávajú druhou cestou, ako účet pridať aj bez importu.
 3. V **Transakciách** skontrolujte navrhnuté kategórie. Odhad potvrdíte jedným kliknutím.
 4. V **Prehľade** uvidíte príjmy, výdavky, kategórie, pravidelné platby a vývoj v čase.
 
@@ -103,7 +103,7 @@ V detaile transakcie možno uložiť poznámku do 2 000 znakov vrátane nových 
 
 V **Nastaveniach** kliknite v riadku účtu na **Zmazať účet**. Náhľad uvedie názov a počty výpisov, transakcií a pravidiel. Na potvrdenie napíšte presný názov účtu a kliknite na **Natrvalo zmazať účet**. Zrušenie nič neodstráni. Odstránenie importovaných údajov je nezvratné. Pôvodné bankové PDF súbory zostanú na disku. Prípadné zlyhanie databázy alebo odstránenia hesla sa zobrazí v dialógu. Obnovenie zobrazenia po úspešnom odstránení neopakuje odstránenie.
 
-V riadku účtu je aj tlačidlo **Nastaviť heslo** (alebo **Zmeniť heslo**, ak je už uložené). Otvorí dialóg s dvomi poľami: heslo a jeho zopakovanie. **Uložiť** je dostupné, až keď sa obe zhodujú a nie sú prázdne. Po úspechu appka zobrazí potvrdenie a heslo uloží do Správcu poverení systému Windows. Riadok potom ukáže **heslo uložené**. Pri zlyhaní appka zachová rozpísané heslo a zobrazí dôvod.
+V riadku účtu je aj tlačidlo **Nastaviť heslo** (alebo **Zmeniť heslo**, ak je už uložené). Otvorí dialóg s dvomi poľami: heslo a jeho zopakovanie. Pri každom poli je tlačidlo **Zobraziť**, ktoré heslo odkryje a zostane funkčné aj po kliknutí mimo poľa. **Uložiť** je dostupné, až keď sa obe zhodujú a nie sú prázdne. Po úspechu appka zobrazí potvrdenie a heslo uloží do Správcu poverení systému Windows. Riadok potom ukáže **heslo uložené**. Pri zlyhaní appka zachová rozpísané heslo a zobrazí dôvod.
 
 Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, **Podľa systému**. Prvé dve možnosti ignorujú zmeny systému. Tretia ich sleduje. Voľba sa uloží pre ďalšie spustenie. Pri poškodenom alebo nedostupnom úložisku sa použije systémový režim. Pri zlyhaní zápisu platí nová voľba len v aktuálnom behu.
 

@@ -8,6 +8,8 @@ import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
+import { PasswordInput } from '../components/PasswordInput'
+import { SetupAccountDialog, type SetupAccountTarget } from '../components/SetupAccountDialog'
 import { checksumLabel, formatDate, importStatusLabel } from '../lib/format'
 
 const RECENT_STATEMENTS_LIMIT = 8
@@ -89,12 +91,7 @@ function LockedAction({
         }
       >
         <Field label="Heslo">
-          <input
-            className="k-input k-well"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <PasswordInput value={password} onChange={setPassword} />
         </Field>
         <label className="k-checkbox">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
@@ -165,10 +162,23 @@ export function ImportResultCard({
   )
 }
 
-interface AddAccountTarget {
-  path: string
-  iban: string
-  kind: AccountKind
+function toSetupTarget(report: ImportReport, password: string): SetupAccountTarget {
+  return { path: report.path, iban: report.iban ?? '', ibanMasked: report.ibanMasked, kind: report.accountKind ?? 'personal', password }
+}
+
+// Shared by the automatic open (append, drop order) and the "Pridať účet"
+// button reopen (front, the user asked for it now). Either way, a target
+// already queued for the same file is replaced in place rather than
+// duplicated.
+function upsertQueue(prev: SetupAccountTarget[], targets: SetupAccountTarget[], toFront: boolean): SetupAccountTarget[] {
+  const next = [...prev]
+  for (const t of targets) {
+    const i = next.findIndex((p) => p.path === t.path)
+    if (i >= 0) next.splice(i, 1)
+    if (toFront) next.unshift(t)
+    else next.push(t)
+  }
+  return next
 }
 
 function RecentImportsRow({
@@ -259,13 +269,11 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
   const [previewError, setPreviewError] = useState('')
   const [reports, setReports] = useState<ImportReport[]>([])
   const [recent, setRecent] = useState<RecentStatement[]>([])
-  const [addAccount, setAddAccount] = useState<AddAccountTarget | null>(null)
-  const [accountLabel, setAccountLabel] = useState('')
-  const [addAccountError, setAddAccountError] = useState('')
+  const [unknownQueue, setUnknownQueue] = useState<SetupAccountTarget[]>([])
   const [deleteTarget, setDeleteTarget] = useState<RecentStatement | null>(null)
   const [deletePreview, setDeletePreview] = useState<StatementDeletePreview | null>(null)
   const canDrop = useRef(true)
-  canDrop.current = deleteTarget === null && addAccount === null
+  canDrop.current = deleteTarget === null && unknownQueue.length === 0
   const passwordsRef = useRef<Record<string, { password: string; remember: boolean }>>({})
 
   const loadRecent = useCallback(() => {
@@ -291,6 +299,10 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
         }
         return next
       })
+      const unknown = incoming
+        .filter((r) => r.status === 'unknown_account' && r.iban)
+        .map((r) => toSetupTarget(r, passwordsRef.current[r.path]?.password ?? ''))
+      if (unknown.length > 0) setUnknownQueue((prev) => upsertQueue(prev, unknown, false))
       for (const report of incoming) {
         if (report.status !== 'unknown_account') delete passwordsRef.current[report.path]
       }
@@ -338,30 +350,17 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
     mergeReports([report])
   }
 
-  function handleAddAccount(path: string, iban: string, kind: AccountKind) {
-    setAccountLabel('')
-    setAddAccountError('')
-    setAddAccount({ path, iban, kind })
+  // Reopens the dialog for a report the user dismissed earlier, at the front
+  // of the queue: they asked for it now, so it does not wait behind other
+  // pending files.
+  function handleAddAccount(report: ImportReport) {
+    if (!report.iban) return
+    const target = toSetupTarget(report, passwordsRef.current[report.path]?.password ?? '')
+    setUnknownQueue((prev) => upsertQueue(prev, [target], true))
   }
 
-  async function retryImport(path: string) {
-    const stored = passwordsRef.current[path]
-    const report = stored
-      ? await api.importWithPassword(path, stored.password, stored.remember)
-      : (await api.importStatements([path]))[0]
-    if (report) mergeReports([report])
-  }
-
-  async function saveAccountAndRetry() {
-    if (!addAccount) return
-    setAddAccountError('')
-    try {
-      await api.saveAccount(addAccount.iban, addAccount.kind, accountLabel)
-      await retryImport(addAccount.path)
-      setAddAccount(null)
-    } catch (e) {
-      setAddAccountError(String(e))
-    }
+  function dequeueUnknown(path: string) {
+    setUnknownQueue((prev) => prev.filter((t) => t.path !== path))
   }
 
   // Keep confirmation disabled until the current preview resolves.
@@ -407,44 +406,18 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
             key={report.path}
             report={report}
             onPassword={(password, remember) => void action.run(() => handlePassword(report.path, password, remember))}
-            onAddAccount={(iban, kind) => handleAddAccount(report.path, iban, kind)}
+            onAddAccount={() => handleAddAccount(report)}
             onContinue={onNavigateToTransactions}
           />
         ))}
         <RecentImports statements={recent} onNavigate={(id) => onNavigateToTransactions?.(id)} onDelete={(s) => void requestDelete(s)} />
       </fieldset>
-      <Dialog
-        open={addAccount !== null}
-        title="Pridať účet"
-        onClose={() => { if (!action.busy) setAddAccount(null) }}
-        actions={
-          <>
-            <Button variant="secondary" disabled={action.busy} onClick={() => setAddAccount(null)}>
-              Zrušiť
-            </Button>
-            <Button variant="primary" disabled={action.busy} onClick={() => void action.run(saveAccountAndRetry)}>
-              Uložiť
-            </Button>
-          </>
-        }
-      >
-        <Field label="Názov účtu">
-          <input className="k-input k-well" value={accountLabel} onChange={(e) => setAccountLabel(e.target.value)} />
-        </Field>
-        <Field label="Druh účtu">
-          <select
-            className="k-select k-well"
-            value={addAccount?.kind ?? 'personal'}
-            onChange={(e) =>
-              setAddAccount((prev) => (prev ? { ...prev, kind: e.target.value as AccountKind } : prev))
-            }
-          >
-            <option value="personal">Osobný</option>
-            <option value="business">Firemný</option>
-          </select>
-        </Field>
-        {addAccountError ? <p role="alert" className="k-text-danger">{addAccountError}</p> : null}
-      </Dialog>
+      <SetupAccountDialog
+        key={unknownQueue[0]?.path ?? 'none'}
+        target={unknownQueue[0] ?? null}
+        onSkip={() => dequeueUnknown(unknownQueue[0]?.path ?? '')}
+        onSetup={(report) => { mergeReports([report]); dequeueUnknown(report.path) }}
+      />
       <Dialog
         open={deleteTarget !== null}
         title="Natrvalo zmazať výpis?"
