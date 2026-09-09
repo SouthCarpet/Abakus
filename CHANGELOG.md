@@ -7,6 +7,9 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 Opravuje import výpisov z nového generátora PDF Tatra banky a zjednodušuje nastavenie účtu.
 
 - Výpisy, ktoré od júla 2026 končili hláškou „not a Tatra banka statement: no IBAN line“, sa importujú. Text z PDF sa skladá podľa základne písma a kroku znakov, nie podľa rámčekov glyfov, a hlavička sa číta až po riadok tabuľky.
+- Konečný zostatok sa prečíta aj vtedy, keď je súhrn v tom istom bloku ako posledná transakcia, takže kontrolný súčet výpisu opäť vychádza.
+- Detail platby kartou, ktorý pokračuje na ďalšej strane, sa spojí so svojou transakciou. Zmizli hlásenia „Blok sa nepodarilo spracovať“.
+- Nové názvy z výpisu appka pozná: nákup E-COMM sa počíta ako platba kartou a `Poplatok za účet` aj `Poplatky za transakcie` sa uložia bez hlásenia o neznámom type. Rozpis poplatkov je detail transakcie.
 - Výpis z účtu, ktorý v aplikácii ešte nie je, otvorí dialóg `Účet nie je nastavený`: názov, druh (osobný alebo firemný, predvyplnený z výpisu) a voliteľné heslo k výpisom. Po potvrdení sa účet uloží a import zopakuje. `Neskôr` dialóg zavrie, `Pridať účet` na karte ho otvorí znova.
 - Pri každom poli s heslom je tlačidlo `Zobraziť` a `Skryť`, ktoré zostane funkčné aj po kliknutí mimo poľa. Natívna ikona oka je vypnutá.
 - Diagnostika pre vývoj: `abakus-cli lines` a `abakus-cli geometry` vypíšu text a geometriu strany s maskovanými číslicami.
