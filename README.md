@@ -101,7 +101,7 @@ V detaile transakcie možno uložiť poznámku do 2 000 znakov vrátane nových 
 
 V **Nastaveniach** kliknite v riadku účtu na **Zmazať účet**. Náhľad uvedie názov a počty výpisov, transakcií a pravidiel. Na potvrdenie napíšte presný názov účtu a kliknite na **Natrvalo zmazať účet**. Zrušenie nič neodstráni. Odstránenie importovaných údajov je nezvratné. Pôvodné bankové PDF súbory zostanú na disku. Prípadné zlyhanie databázy alebo odstránenia hesla sa zobrazí v dialógu. Obnovenie zobrazenia po úspešnom odstránení neopakuje odstránenie.
 
-V riadku účtu je aj tlačidlo **Nastaviť heslo** (alebo **Zmeniť heslo**, ak je už uložené). Otvorí dialóg s dvomi poľami: heslo a jeho zopakovanie. **Uložiť** je dostupné, až keď sa obe zhodujú a nie sú prázdne. Po úspechu appka zobrazí potvrdenie a heslo uloží do Správcu poverení systému Windows. Riadok potom ukáže **heslo uložené**. Pri zlyhaní appka zachová rozpísané heslo a zobrazí dôvod.
+V riadku účtu je aj tlačidlo **Nastaviť heslo** (alebo **Zmeniť heslo**, ak je už uložené). Otvorí dialóg s dvomi poľami: heslo a jeho zopakovanie. Pri každom poli je tlačidlo **Zobraziť**, ktoré heslo odkryje a zostane funkčné aj po kliknutí mimo poľa. **Uložiť** je dostupné, až keď sa obe zhodujú a nie sú prázdne. Po úspechu appka zobrazí potvrdenie a heslo uloží do Správcu poverení systému Windows. Riadok potom ukáže **heslo uložené**. Pri zlyhaní appka zachová rozpísané heslo a zobrazí dôvod.
 
 Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, **Podľa systému**. Prvé dve možnosti ignorujú zmeny systému. Tretia ich sleduje. Voľba sa uloží pre ďalšie spustenie. Pri poškodenom alebo nedostupnom úložisku sa použije systémový režim. Pri zlyhaní zápisu platí nová voľba len v aktuálnom behu.
 

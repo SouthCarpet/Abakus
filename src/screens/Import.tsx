@@ -8,6 +8,7 @@ import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
+import { PasswordInput } from '../components/PasswordInput'
 import { checksumLabel, formatDate, importStatusLabel } from '../lib/format'
 
 const RECENT_STATEMENTS_LIMIT = 8
@@ -89,12 +90,7 @@ function LockedAction({
         }
       >
         <Field label="Heslo">
-          <input
-            className="k-input k-well"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <PasswordInput value={password} onChange={setPassword} />
         </Field>
         <label className="k-checkbox">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />

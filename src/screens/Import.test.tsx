@@ -86,6 +86,32 @@ describe('Import retry after unknown account', () => {
   })
 })
 
+describe('Import: password prompt reveal toggle', () => {
+  it('keeps the typed password readable after the field loses focus', async () => {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const lockedReport: ImportReport = { path: 'C:/x/locked.pdf', status: 'locked', accountLabel: null, accountKind: null, ibanMasked: null, iban: null, statementNumber: null, periodStart: null, periodEnd: null, inserted: 0, duplicates: 0, checksum: null, warnings: [], message: null, statementId: null }
+    vi.mocked(open).mockResolvedValue(lockedReport.path)
+    vi.mocked(api.importStatements).mockResolvedValueOnce([lockedReport])
+
+    render(<Import />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zadať heslo' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Zadať heslo' }))
+
+    const input = screen.getByLabelText('Heslo') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'secret' } })
+    expect(input.type).toBe('password')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zobraziť' }))
+    expect(input.type).toBe('text')
+
+    fireEvent.blur(input)
+    fireEvent.click(screen.getByRole('dialog'))
+    expect(input.type).toBe('text')
+    expect(screen.getByRole('button', { name: 'Skryť' })).toBeInTheDocument()
+  })
+})
+
 // A17/F1: delete asks a real question (the backend's own counts) and then
 // removes the row, refreshing the list so the numbers change immediately.
 describe('Recent imports: delete a statement', () => {

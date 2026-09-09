@@ -4,6 +4,7 @@ import { useAction } from '../lib/useAction'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
 import { Field } from './Field'
+import { PasswordInput } from './PasswordInput'
 
 // Sets or changes the PDF-statement password Abakus stores for one account
 // (Michal, 2026-09-08: "Nedá sa nastaviť alebo zmeniť heslo pri účte"). On
@@ -64,10 +65,10 @@ export function SetPasswordDialog({ account, onClose, onSaved }: {
     </>}
   >
     <Field label="Heslo">
-      <input type="password" maxLength={PASSWORD_MAX_CHARS} className="k-input k-well" value={value} onChange={(e) => setValue(e.target.value)} />
+      <PasswordInput value={value} onChange={setValue} maxLength={PASSWORD_MAX_CHARS} />
     </Field>
     <Field label="Zopakovať heslo">
-      <input type="password" maxLength={PASSWORD_MAX_CHARS} className="k-input k-well" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+      <PasswordInput value={confirm} onChange={setConfirm} maxLength={PASSWORD_MAX_CHARS} />
     </Field>
     {tooLong ? <p role="alert" className="k-text-danger">Limit je 512 znakov.</p> : null}
     {error ? <p role="alert" className="k-text-danger">{error}</p> : null}
