@@ -36,6 +36,43 @@ does not sit between the words it separates. `group_lines` drops these
 before doing anything else, so every space in the output comes from measured
 glyph geometry, never from a character PDFium invented.
 
-`abakus-cli lines <pdf>` and `abakus-cli geometry <pdf>` are diagnostics for
-this: `lines` prints the masked, grouped text; `geometry` prints PDFium's
-raw per-character boxes, origin and font for page 1.
+`abakus-cli lines <pdf> [--page N] [--count M]` and `abakus-cli geometry <pdf>`
+are diagnostics for this: `lines` prints the masked, grouped text of one page
+(default page 1, 25 lines, up to 200); `geometry` prints PDFium's raw
+per-character boxes, origin and font for page 1.
+
+## Header scope in `header::parse_header`
+
+Page 1 carries the header fields (IBAN, account kind, statement number,
+date), but on some layouts a client-details and bank-address block pushes
+"Výpis číslo" far down the page (Michal's real statement, 2026-09-09: line
+22). `header_scope` reads up to (not including) the first column-header
+line (`blocks::is_column_header`, never fewer than the original 12 lines),
+or the first 40 lines if page 1 has no column header at all.
+
+## Continuation blocks and glued summaries in `statement::parse_pages`
+
+Two more real-statement shapes, after `split_blocks`/`split_records`:
+
+- **Continuation blocks.** A page break can land between a record's first
+  line and its detail lines, or a fee breakdown table can be cut by a
+  shorter dashed line; either way `split_blocks` produces a block with no
+  record start. `merge_continuations` appends such a block onto the
+  previous record's lines, unless it is the opening (`Posledný výpis`) line
+  or a summary line (see below), in which case it is left alone. A
+  continuation block with no previous record keeps the "Blok sa nepodarilo
+  spracovať" warning, as before.
+- **Glued summary.** When the last transaction on a page has no separator
+  before the closing subtotal (`SPOLU`/`CR:`/`DT:`, the closing-balance
+  line, the overdraft line, the savings-goal line), `split_summary` cuts the
+  block at the first such line, so the closing balance is still read the
+  same way as an already-separated closing block.
+
+## Fee records and E-COMM cards
+
+A description whose folded text starts with `poplat` (`Poplatok za účet`,
+`Poplatky za transakcie`) is a recognized fee record: kind stays `Other`
+(a dedicated `Fee` kind is deferred, see `KNOWN_ISSUES.md`), but it no
+longer warns as an unknown transaction type. `card::is_card` also accepts
+`nakup e-comm`; an E-COMM purchase with `zahr` in the description is
+`CardForeign` through the existing rule, otherwise it is a plain `Card`.

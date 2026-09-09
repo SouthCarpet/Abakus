@@ -17,10 +17,13 @@ fn d(y: i32, m: u32, day: u32) -> NaiveDate { NaiveDate::from_ymd_opt(y, m, day)
     assert_eq!(s.transactions.iter().map(|t| t.kind).collect::<Vec<_>>(), vec![TxKind::Card, TxKind::TransferIn, TxKind::Refund, TxKind::TransferOut, TxKind::Atm, TxKind::StandingOrder, TxKind::CardForeign, TxKind::Other]);
     assert_eq!(s.transactions.iter().map(|t| t.amount_cents).collect::<Vec<_>>(), vec![-199, 1000, 4300, -4000, -18_000, -8000, -1369, -700]);
 }
-#[test] fn personal_checksum_is_ok_and_the_only_warning_is_the_unknown_fee_kind() {
+// A "Poplatok ..." description used to warn as an unknown transaction type; the 2026-09-09
+// continuation fix (parser::statement::is_fee) recognizes the "poplat" prefix as a fee record
+// (kind Other, deferred dedicated Fee kind, see KNOWN_ISSUES.md) and no longer warns on it.
+#[test] fn personal_checksum_is_ok_and_the_known_fee_produces_no_warning() {
     let s = load("personal-2026-06.txt");
     assert_eq!(s.checksum(), Checksum::Ok);
-    assert_eq!(s.warnings.len(), 1, "{:?}", s.warnings); assert!(s.warnings[0].starts_with("Neznámy typ transakcie"), "{:?}", s.warnings); assert!(s.warnings[0].contains("Poplatok"));
+    assert_eq!(s.warnings.len(), 0, "{:?}", s.warnings);
 }
 #[test] fn other_block_keeps_its_description_as_merchant() {
     assert_eq!(load("personal-2026-06.txt").transactions[7].merchant_raw, "Poplatok za vedenie účtu");
@@ -76,4 +79,27 @@ fn d(y: i32, m: u32, day: u32) -> NaiveDate { NaiveDate::from_ymd_opt(y, m, day)
     assert_eq!(s.iban, "SK8911000000000055555555"); assert_eq!(s.account_kind, AccountKind::Personal); assert_eq!(s.number, 1);
     assert_eq!(s.transactions.len(), 0);
     assert_eq!(s.checksum(), Checksum::Ok);
+}
+
+/// Continuation-block and summary-split fix (2026-09-09, real-statement continuation): every
+/// synthetic fixture's own transaction count, opening, closing and checksum, snapshotted from
+/// today's code before that fix, must stay byte-identical after it. None of these fixtures has
+/// a page break inside a block or a summary glued onto the last transaction, so neither new
+/// pipeline step should touch them.
+#[test] fn every_fixture_keeps_its_count_opening_closing_and_checksum() {
+    let snapshots: &[(&str, usize, Option<i64>, Option<i64>)] = &[
+        ("business-2026-06.txt", 4, Some(221_063), Some(208_832)),
+        ("personal-2026-06.txt", 8, Some(69_392), Some(42_424)),
+        ("edge-cases/empty-2026-07.txt", 0, Some(25_000), Some(25_000)),
+        ("edge-cases/split-block-2026-07.txt", 1, Some(30_000), Some(29_500)),
+        ("edge-cases/unknown-account-2026-07.txt", 0, Some(10_000), Some(10_000)),
+        ("edge-cases/wrapped-closing-2026-07.txt", 0, Some(18_000), Some(18_000)),
+    ];
+    for &(name, count, opening, closing) in snapshots {
+        let s = load(name);
+        assert_eq!(s.transactions.len(), count, "{name}");
+        assert_eq!(s.opening_cents, opening, "{name}");
+        assert_eq!(s.closing_cents, closing, "{name}");
+        assert_eq!(s.checksum(), Checksum::Ok, "{name}");
+    }
 }
