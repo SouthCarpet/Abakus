@@ -46,7 +46,7 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 ## Ako to funguje
 
 1. V **Nastaveniach** pridajte účty. Zadajte IBAN alebo zápis `kód banky/prefix-číslo účtu`.
-2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu.
+2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu. Ak výpis patrí účtu, ktorý appka ešte nepozná, otvorí sa hneď dialóg na jeho nastavenie s druhom účtu a prípadným heslom. Nastavenia zostávajú druhou cestou, ako účet pridať aj bez importu.
 3. V **Transakciách** skontrolujte navrhnuté kategórie. Odhad potvrdíte jedným kliknutím.
 4. V **Prehľade** uvidíte príjmy, výdavky, kategórie, pravidelné platby a vývoj v čase.
 
