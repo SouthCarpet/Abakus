@@ -67,6 +67,35 @@ pub fn extract_pages(path: &Path, password: Option<&str>) -> Result<Vec<Vec<Stri
 
 pub fn parse_pdf(path: &Path, password: Option<&str>) -> Result<Statement, ParseError> { parse_pages(&extract_pages(path, password)?) }
 
+fn rect_text(r: Result<PdfRect, PdfiumError>) -> String {
+    match r {
+        Ok(b) => format!("{:.2},{:.2},{:.2},{:.2}", b.left().value, b.bottom().value, b.width().value, b.height().value),
+        Err(_) => "err".to_string(),
+    }
+}
+
+/// Diagnostic only (`abakus-cli geometry`): one text row per character of page 1,
+/// digits masked, with every geometry value PDFium offers for it.
+pub fn char_geometry(path: &Path, password: Option<&str>, limit: usize) -> Result<Vec<String>, ParseError> {
+    let pdfium = bind()?;
+    let _guard = CALL_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let doc = pdfium.load_pdf_from_file(path, password).map_err(|e| if is_password_error(&e) { ParseError::Encrypted } else { ParseError::Pdf(e.to_string()) })?;
+    let page = doc.pages().first().map_err(|e| ParseError::Pdf(e.to_string()))?;
+    let text = page.text().map_err(|e| ParseError::Pdf(e.to_string()))?;
+    let mut rows = Vec::new();
+    for (i, c) in text.chars().iter().enumerate().take(limit) {
+        let ch = c.unicode_char().unwrap_or(' ');
+        let shown = if ch.is_ascii_digit() { '#' } else { ch };
+        let origin = c.origin().map(|(x, y)| format!("{:.2},{:.2}", x.value, y.value)).unwrap_or_else(|_| "err".into());
+        rows.push(format!(
+            "{i:>3} | {shown:?} | {} | {} | {} | {:.2}/{:.2} | {}",
+            rect_text(c.loose_bounds()), rect_text(c.tight_bounds()), origin,
+            c.scaled_font_size().value, c.unscaled_font_size().value, c.font_name()
+        ));
+    }
+    Ok(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

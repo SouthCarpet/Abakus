@@ -15,6 +15,6 @@ pub mod pdfium;
 
 pub use model::*;
 pub use statement::{parse_pages, parse_text};
-pub use pdfium::{extract_pages, parse_pdf};
+pub use pdfium::{char_geometry, extract_pages, parse_pdf};
 
 pub type Cents = i64;

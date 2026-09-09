@@ -25,8 +25,10 @@ fn password_from_args(args: &[String]) -> Option<String> {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let (Some(cmd), Some(path)) = (args.get(1), args.get(2)) else { usage() };
-    if cmd != "check" { eprintln!("unknown command {cmd}"); std::process::exit(2); }
     let password = password_from_args(&args);
+    if cmd == "lines" { print_masked_head(Path::new(path), password.as_deref()); return; }
+    if cmd == "geometry" { print_char_geometry(Path::new(path), password.as_deref()); return; }
+    if cmd != "check" { eprintln!("unknown command {cmd}"); std::process::exit(2); }
     match parse_pdf(Path::new(path), password.as_deref()) {
         Ok(st) => report(Path::new(path), password.as_deref(), &st),
         Err(ParseError::Encrypted) => { println!("encrypted: password missing or wrong (pass --password-stdin)"); std::process::exit(1) }
@@ -50,6 +52,38 @@ fn report(path: &Path, password: Option<&str>, st: &parser::Statement) {
         }
     }
     for w in &st.warnings { println!("warning: {w}"); }
+}
+
+/// Diagnostic for a statement the header parser refuses: the first 25 lines of
+/// page 1 as the extractor sees them, with every digit replaced by `#` so the
+/// output can be shared without account numbers, amounts or dates.
+fn print_masked_head(path: &Path, password: Option<&str>) {
+    match parser::extract_pages(path, password) {
+        Ok(pages) => {
+            let page1 = pages.first().map(|p| p.as_slice()).unwrap_or(&[]);
+            println!("page 1: {} lines, pages: {}", page1.len(), pages.len());
+            for (i, l) in page1.iter().take(25).enumerate() {
+                let masked: String = l.chars().map(|c| if c.is_ascii_digit() { '#' } else { c }).collect();
+                println!("{:>2}: {masked}", i + 1);
+            }
+        }
+        Err(ParseError::Encrypted) => { println!("encrypted: password missing or wrong (pass --password-stdin)"); std::process::exit(1) }
+        Err(e) => { println!("error: {e}"); std::process::exit(1) }
+    }
+}
+
+/// Diagnostic for a page whose lines fall apart: the geometry PDFium reports for
+/// the first 60 characters of page 1 (loose bounds, tight bounds, origin, font
+/// size, font name), digits masked. Shows whether the bounds are degenerate.
+fn print_char_geometry(path: &Path, password: Option<&str>) {
+    match parser::char_geometry(path, password, 60) {
+        Ok(rows) => {
+            println!("idx | ch | loose x,y,w,h | tight x,y,w,h | origin x,y | font size scaled/unscaled | font");
+            for r in rows { println!("{r}"); }
+        }
+        Err(ParseError::Encrypted) => { println!("encrypted: password missing or wrong (pass --password-stdin)"); std::process::exit(1) }
+        Err(e) => { println!("error: {e}"); std::process::exit(1) }
+    }
 }
 
 fn print_tail(path: &Path, password: Option<&str>) {
