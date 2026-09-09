@@ -2,6 +2,14 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
+## 0.1.5 (2026-09-09)
+
+Opravuje inštalátor pri aktualizácii existujúcej inštalácie.
+
+- Sprievodca inštalátora teraz povie, že Abakus je už nainštalovaný, akú verziu má a kde. Pri staršej nainštalovanej verzii ponúkne aktualizáciu, pri rovnakej verzii sa spýta na preinštalovanie, pri novšej nainštalovanej verzii ponúkne nahradenie staršou (predvolene odmietne downgrade).
+- Pri aktualizácii alebo preinštalovaní sprievodca vynechá stránku s odkazmi (Start/plocha) a namiesto toho na uvítacej stránke napíše, z akej verzie na akú aktualizuje.
+- Dáta v `%LOCALAPPDATA%\Abakus` a heslá v Správcovi poverení zostanú nedotknuté.
+
 ## 0.1.4 (2026-09-08)
 
 Prvé vydanie s aktualizáciou v aplikácii, licenciou AGPL-3.0 a verejnou dokumentáciou. Zdrojový kód je na [GitHub](https://github.com/SouthCarpet/Abakus). Licencia je AGPL-3.0-or-later.

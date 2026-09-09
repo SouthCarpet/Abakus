@@ -38,8 +38,10 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 1. Otvorte [stránku vydaní](https://github.com/SouthCarpet/Abakus/releases/latest).
 2. Stiahnite `abakus-setup-<verzia>.exe`. Inštalátor je Inno Setup pre aktuálneho používateľa. Práva správcu nie sú potrebné.
 3. Spustite inštalátor. Windows SmartScreen môže varovať, lebo súbor nie je podpísaný. Ak dôverujete zdroju, zvoľte **Ďalšie informácie** a **Spustiť napriek tomu**.
-4. Appka potrebuje Microsoft Edge WebView2 Runtime. Inštalátor 0.1.4 ho vie skontrolovať a ponúkne stiahnutie, ak chýba. Windows 10 (2004 a novší) a Windows 11 ho často už majú.
+4. Appka potrebuje Microsoft Edge WebView2 Runtime. Inštalátor 0.1.5 ho vie skontrolovať a ponúkne stiahnutie, ak chýba. Windows 10 (2004 a novší) a Windows 11 ho často už majú.
 5. Appka sa nainštaluje do `%LOCALAPPDATA%\Programs\Abakus`. Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`.
+
+Ak Abakus už máte nainštalovaný, druhé spustenie inštalátora ho aktualizuje na mieste. Sprievodca povie, akú verziu má nainštalovanú a na akú ju aktualizuje. Dáta a heslá zostanú.
 
 Ďalšie podrobnosti o zostavení inštalátora sú v [packaging/INSTALL.md](packaging/INSTALL.md).
 
@@ -120,6 +122,8 @@ Kontrola aktualizácií je predvolene vypnutá. Zapnete ju v Nastaveniach voľbo
 
 Keď je na GitHub novšie vydanie, appka ukáže jeho poznámky k vydaniu. Ukáže aj tlačidlo `Aktualizovať na v<verzia>`. Až po kliknutí stiahne inštalátor. Sťahovanie overí voči `SHA256SUMS.txt` publikovanému s tým vydaním. Bez kliknutia sa nič nestiahne a nič sa nespustí.
 
+Inštalátor, ktorý appka takto spustí, je ten istý sprievodca ako pri ručnom stiahnutí: aktualizuje existujúcu inštaláciu na mieste a povie to.
+
 Každý pokus (kontrola aj sťahovanie) je v **Nastavenia > Sieťová aktivita**. Denník uvádza čas, adresu a výsledný stav.
 
 ## Súkromie a sieť
@@ -142,10 +146,10 @@ Od vydania 0.1.4 obsahuje každé vydanie na GitHub súbor `SHA256SUMS.txt`. Vyd
 Kontrola stiahnutého súboru v PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\abakus-setup-0.1.4.exe
+Get-FileHash -Algorithm SHA256 .\abakus-setup-0.1.5.exe
 ```
 
-Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.1.4 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
+Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.1.5 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
 
 Známe kontrolné súčty SHA-256 pre **0.1.3**:
 
