@@ -105,4 +105,11 @@
   nemajú.
 - **Tabuľka Sieťová aktivita sa počas sťahovania neobnovuje automaticky.**
   Dáta v `net_log` sú úplné, iba obrazovka ich nenačíta znova sama od seba.
+- **The monospace spacing path in `parser::lines` was tuned on one statement
+  from a new Tatra banka PDF generator (dated 2026-06-30).** `group_lines`
+  now handles a generator that reports identical loose and tight character
+  boxes (see `crates/parser/README.md`), fit to that one statement's own
+  `abakus-cli geometry` diagnostic. Other pages from the same generator are
+  not covered by an automated fixture; they are verified only by Michal's
+  own `abakus-cli check` runs on his real statements.
 

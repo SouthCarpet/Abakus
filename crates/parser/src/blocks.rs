@@ -3,7 +3,7 @@ use crate::fold::fold;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block { pub lines: Vec<String> }
 
-fn is_column_header(l: &str) -> bool { let f = fold(l); f.contains("datum sprac") && f.contains("suma") }
+pub(crate) fn is_column_header(l: &str) -> bool { let f = fold(l); f.contains("datum sprac") && f.contains("suma") }
 fn is_footer(l: &str) -> bool { let f = fold(l); f.starts_with("mena") && f.contains("strana") }
 
 pub fn body_lines(pages: &[Vec<String>]) -> Vec<String> {
