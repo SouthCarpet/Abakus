@@ -44,6 +44,25 @@ fn is_password_error(e: &PdfiumError) -> bool { format!("{e:?}").to_lowercase().
 /// serialize their own calls, which this lock does.
 static CALL_LOCK: Mutex<()> = Mutex::new(());
 
+/// PDFium reports loose bounds equal to tight bounds on both width AND height, to 2 decimal
+/// places, for every glyph on the generator behind the 2026-06-30 Tatra banka statement. The
+/// older Courier generator (`tests/gen`) and the app's own NotoSans report font both leave a
+/// real gap on at least one axis for every glyph (a wide letter like 'A' can have loose width
+/// equal to tight width while its loose height still carries the full line-height padding), so
+/// checking width alone wrongly flagged such letters as advance-unknown. Anything wider than this
+/// on either axis counts as a real advance box.
+const ADVANCE_EPSILON: f32 = 0.05;
+
+fn char_from_pdfium(c: PdfPageTextChar<'_>) -> Char {
+    let loose = c.loose_bounds().unwrap_or(PdfRect::new_from_values(0.0, 0.0, 0.0, 0.0));
+    let tight = c.tight_bounds().unwrap_or(loose);
+    let (origin_x, origin_y) = c.origin().map(|(x, y)| (x.value, y.value)).unwrap_or((loose.left().value, loose.bottom().value));
+    let width_gap = (loose.width().value - tight.width().value).abs();
+    let height_gap = (loose.height().value - tight.height().value).abs();
+    let advance = (width_gap > ADVANCE_EPSILON || height_gap > ADVANCE_EPSILON).then(|| loose.width().value);
+    Char { x: loose.left().value, y: origin_y, w: loose.width().value, h: loose.height().value, ch: c.unicode_char().unwrap_or(' '), origin_x, size: c.scaled_font_size().value, advance }
+}
+
 pub fn extract_pages(path: &Path, password: Option<&str>) -> Result<Vec<Vec<String>>, ParseError> {
     if !path.exists() { return Err(ParseError::Pdf(format!("no such file: {}", path.display()))); }
     let pdfium = bind()?;
@@ -52,14 +71,7 @@ pub fn extract_pages(path: &Path, password: Option<&str>) -> Result<Vec<Vec<Stri
     let mut pages = Vec::new();
     for page in doc.pages().iter() {
         let text = page.text().map_err(|e| ParseError::Pdf(e.to_string()))?;
-        let chars: Vec<Char> = text
-            .chars()
-            .iter()
-            .map(|c| {
-                let b = c.loose_bounds().unwrap_or(PdfRect::new_from_values(0.0, 0.0, 0.0, 0.0));
-                Char { x: b.left().value, y: b.bottom().value, w: b.width().value.max(0.1), h: b.height().value.max(1.0), ch: c.unicode_char().unwrap_or(' ') }
-            })
-            .collect();
+        let chars: Vec<Char> = text.chars().iter().map(char_from_pdfium).collect();
         pages.push(group_lines(&chars).into_iter().map(|l| l.text).collect());
     }
     Ok(pages)

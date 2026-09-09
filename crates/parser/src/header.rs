@@ -42,4 +42,21 @@ mod tests {
     #[test] fn missing_iban_is_not_a_statement() {
         assert!(matches!(parse_header(&p(&["hello", "world"])), Err(ParseError::NotAStatement(_))));
     }
+
+    /// The 2026-06-30 statement's own header shape, run through `group_lines` first (the
+    /// diagnostic geometry, `lines::fixtures`): "Osobný účet ... Dátum 30.06.2026" plus
+    /// "IBAN SK97 ...". The statement number line is not part of that diagnostic, so it is added
+    /// as plain text here; only the IBAN, account kind and date come from the grouped geometry.
+    #[test] fn new_generator_line_pair_after_grouping_parses_iban_kind_and_date() {
+        use crate::lines::{fixtures::{header_line1, header_line2}, group_lines};
+        let mut chars = header_line1();
+        chars.extend(header_line2());
+        let grouped = group_lines(&chars);
+        let mut page: Vec<String> = grouped.into_iter().map(|l| l.text).collect();
+        page.push("Výpis číslo: 6".to_string());
+        let h = parse_header(&page).unwrap();
+        assert_eq!(h.iban, "SK9711000000002935301887");
+        assert_eq!(h.account_kind, AccountKind::Personal);
+        assert_eq!(h.date, chrono::NaiveDate::from_ymd_opt(2026, 6, 30).unwrap());
+    }
 }
