@@ -14,8 +14,17 @@
   #define WebView2Check "run"
 #endif
 
+; 0.1.5: /DAppIdGuid=<guid> on the ISCC command line swaps in a throwaway
+; AppId for acceptance testing (packaging\INSTALL.md, developer-only), so a
+; test run of the update/reinstall/downgrade check never touches the real
+; Abakus install or its uninstall registry key. Unset (the default release
+; build) keeps the real AppId below, unchanged from every earlier release.
+#ifndef AppIdGuid
+  #define AppIdGuid "73E010FC-F7F9-4927-8EB9-7BD06C13DC67"
+#endif
+
 [Setup]
-AppId={{73E010FC-F7F9-4927-8EB9-7BD06C13DC67}
+AppId={{{#AppIdGuid}}
 AppName=Abakus
 AppVersion={#AppVersion}
 AppPublisher=SouthCarpet
@@ -110,23 +119,54 @@ begin
   Result := '{#WebView2Check}' = 'skip';
 end;
 
-// Runs before the wizard shows any page. Never requires admin: the
-// Evergreen bootstrapper installs per-user when run unelevated, matching
-// PrivilegesRequired=lowest above. A decline or a failure both continue the
-// setup with a warning rather than stopping it: Michal's spec is "a working
-// install", and refusing to install Abakus at all over a missing runtime
-// the user can still add later would be worse than installing it and
-// saying so. `SuppressibleMsgBox` (not `MsgBox`) throughout, so a
-// /VERYSILENT run never blocks waiting for a click nobody will make; its
-// `Default` result is what a silent run gets instead of asking.
-function InitializeSetup(): Boolean;
+// 0.1.5 (Michal 2026-09-09): a second run of this installer over an
+// existing install must say so, instead of silently updating, reinstalling
+// or downgrading without a word. The fixed AppId means Inno already
+// updates the same {AppId}_is1 registry key and files in place; this reads
+// what is already there so the wizard can name it.
+const
+  UninstallKeyName = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{#AppIdGuid}}_is1';
+
+var
+  ExistingInstallFound: Boolean;
+  ExistingInstallVersionStr: String;
+  ExistingInstallDir: String;
+
+// DisplayVersion and InstallLocation are both written automatically by
+// Inno Setup's own uninstall registration (no [Code] on our side writes
+// them). False means no previous install was found under this AppId.
+function ExistingInstallVersion(var OldVersion, OldDir: String): Boolean;
+begin
+  Result := RegQueryStringValue(HKCU, UninstallKeyName, 'DisplayVersion', OldVersion) and
+    RegQueryStringValue(HKCU, UninstallKeyName, 'InstallLocation', OldDir);
+  if Result then
+    Log('Existing install check: found DisplayVersion=' + OldVersion + ', InstallLocation=' + OldDir)
+  else
+    Log('Existing install check: no existing install found under HKCU\' + UninstallKeyName);
+end;
+
+// Unchanged from 0.1.4 (Michal's WebView2 spec below), moved out of
+// InitializeSetup into its own procedure in 0.1.5 so its own early `Exit`
+// calls only stop this WebView2 sub-check, not the whole of
+// InitializeSetup, now that InitializeSetup also runs the existing-install
+// check further down.
+//
+// Never requires admin: the Evergreen bootstrapper installs per-user when
+// run unelevated, matching PrivilegesRequired=lowest above. A decline or a
+// failure both continue the setup with a warning rather than stopping it:
+// Michal's spec is "a working install", and refusing to install Abakus at
+// all over a missing runtime the user can still add later would be worse
+// than installing it and saying so. `SuppressibleMsgBox` (not `MsgBox`)
+// throughout, so a /VERYSILENT run never blocks waiting for a click nobody
+// will make; its `Default` result is what a silent run gets instead of
+// asking.
+procedure CheckWebView2();
 var
   ResultCode: Integer;
   DownloadedBytes: Int64;
   BootstrapperPath: String;
   Choice: Integer;
 begin
-  Result := True;
   if WantsWebView2CheckSkipped() then
   begin
     Log('WebView2 check: skipped (/DWebView2Check=skip)');
@@ -187,6 +227,106 @@ begin
       'Modul WebView2 Runtime sa aj po inštalácii nepodarilo overiť. Abakus sa nemusí spustiť.',
       mbError, MB_OK, IDOK);
   end;
+end;
+
+// Runs before the wizard shows any page: first the WebView2 check above,
+// unchanged, then the existing-install check added in 0.1.5. Fresh install
+// (no previous install found): Result stays True, nothing else changes.
+// Existing install found: names the old version and folder and asks
+// (update: OK/Cancel, default OK; same version: Yes/No, default Yes;
+// installed copy newer than this installer: Yes/No, default No, so a
+// downgrade is refused by default). `SuppressibleMsgBox` throughout, so a
+// /VERYSILENT run gets the stated Default instead of asking.
+function InitializeSetup(): Boolean;
+var
+  Choice: Integer;
+  OldVer, NewVer: Int64;
+  Cmp: Integer;
+begin
+  Result := True;
+  CheckWebView2();
+
+  ExistingInstallFound := ExistingInstallVersion(ExistingInstallVersionStr, ExistingInstallDir);
+  if not ExistingInstallFound then
+    Exit;
+
+  if not StrToVersion(ExistingInstallVersionStr, OldVer) then
+  begin
+    Log('Existing install check: could not parse existing DisplayVersion "' +
+      ExistingInstallVersionStr + '" as a version number, skipping the update/reinstall/downgrade check');
+    Exit;
+  end;
+  if not StrToVersion('{#AppVersion}', NewVer) then
+  begin
+    Log('Existing install check: could not parse installer AppVersion "{#AppVersion}" as a version number, ' +
+      'skipping the update/reinstall/downgrade check');
+    Exit;
+  end;
+
+  Cmp := ComparePackedVersion(OldVer, NewVer);
+  if Cmp < 0 then
+  begin
+    Log('Existing install check: older install ' + ExistingInstallVersionStr + ' at ' +
+      ExistingInstallDir + ' -> update to {#AppVersion}');
+    Choice := SuppressibleMsgBox(
+      'Abakus ' + ExistingInstallVersionStr + ' je už nainštalovaný v ' + ExistingInstallDir + '. ' +
+      'Inštalátor ho aktualizuje na {#AppVersion}. Údaje v %LOCALAPPDATA%\Abakus a heslá v ' +
+      'Správcovi poverení zostanú.',
+      mbInformation, MB_OKCANCEL, IDOK);
+    if Choice = IDCANCEL then
+    begin
+      Log('Existing install check: user cancelled the update');
+      Result := False;
+    end;
+  end
+  else if Cmp = 0 then
+  begin
+    Log('Existing install check: same version ' + ExistingInstallVersionStr + ' at ' +
+      ExistingInstallDir + ' -> asking to reinstall');
+    Choice := SuppressibleMsgBox(
+      'Abakus ' + ExistingInstallVersionStr + ' je už nainštalovaný v ' + ExistingInstallDir + '. ' +
+      'Chcete ho preinštalovať?',
+      mbConfirmation, MB_YESNO, IDYES);
+    if Choice = IDNO then
+    begin
+      Log('Existing install check: user declined the reinstall');
+      Result := False;
+    end;
+  end
+  else
+  begin
+    Log('Existing install check: installed version ' + ExistingInstallVersionStr + ' at ' +
+      ExistingInstallDir + ' is newer than installer {#AppVersion}');
+    Choice := SuppressibleMsgBox(
+      'Nainštalovaná verzia ' + ExistingInstallVersionStr + ' je novšia ako {#AppVersion}. ' +
+      'Chcete ju nahradiť staršou verziou?',
+      mbConfirmation, MB_YESNO, IDNO);
+    if Choice = IDNO then
+    begin
+      Log('Existing install check: user kept the newer installed version, cancelling setup');
+      Result := False;
+    end;
+  end;
+end;
+
+// The tasks page (startmenuicon/desktopicon) is the redundant page from
+// Michal's report: Inno's own UsePreviousTasks already keeps the previous
+// choice on an update or reinstall, so asking again shows a page whose
+// answer is thrown away. Fresh install: not skipped, unchanged.
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := ExistingInstallFound and (PageID = wpSelectTasks);
+end;
+
+// Names what this run will do on the Welcome page itself, instead of a
+// generic welcome screen that never says an install already exists.
+// Fresh install: not touched, wording unchanged.
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpWelcome) and ExistingInstallFound then
+    WizardForm.WelcomeLabel2.Caption :=
+      'Aktualizácia Abakus ' + ExistingInstallVersionStr + ' na {#AppVersion}.' + #13#10 +
+      ExistingInstallDir;
 end;
 
 // Deletes every Windows Credential Manager entry the app wrote. secrets.rs uses

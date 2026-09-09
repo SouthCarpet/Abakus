@@ -82,6 +82,41 @@ Obe majú predvolenú odpoveď **Nie**, takže bez potvrdenia sa nič nezmaže.
    `%LOCALAPPDATA%\Abakus` s databázou. Databáza obsahuje aj nastavenia
    uložené v appke a sieťový denník, takže táto voľba ich vymaže tiež.
 
+## Aktualizácia existujúcej inštalácie
+
+`AppId` v `packaging\abakus.iss` je pevný, takže Inno Setup druhý spustený
+inštalátor automaticky aktualizuje tú istú inštaláciu (rovnaký priečinok,
+rovnaký záznam `HKCU\...\Uninstall\{AppId}_is1`), nevytvorí druhú kópiu.
+
+Od verzie 0.1.5 sprievodca navyše sám prečíta, čo je už nainštalované
+(`DisplayVersion`, `InstallLocation` z uvedeného záznamu) a povie to skôr,
+než čokoľvek zmení:
+
+- **Staršia nainštalovaná verzia.** Hlásenie s tlačidlami OK/Zrušiť
+  (predvolené OK): pokračovanie aktualizuje na novú verziu, dáta v
+  `%LOCALAPPDATA%\Abakus` a heslá v Správcovi poverení zostanú. Zrušenie
+  inštaláciu ukončí bez zmeny.
+- **Rovnaká verzia.** Hlásenie Áno/Nie (predvolené Áno), pýta sa, či
+  preinštalovať. Nie inštaláciu ukončí.
+- **Novšia nainštalovaná verzia ako inštalátor.** Hlásenie Áno/Nie
+  (predvolené **Nie**), pýta sa, či nahradiť novšiu verziu staršou.
+  Predvolené Nie znamená, že **tichá inštalácia (`/VERYSILENT`) downgrade
+  odmietne**: sprievodca skončí s nenulovým návratovým kódom a nič
+  nezmení.
+
+Pri aktualizácii alebo preinštalovaní sprievodca navyše vynechá stránku s
+odkazmi (Start/plocha), pretože Inno si predchádzajúcu voľbu už pamätá
+(`UsePreviousTasks`), a na uvítacej stránke napíše, z akej verzie na akú
+aktualizuje. Pri prvej (čistej) inštalácii sa nič z tohto nezobrazí.
+
+### Vývojárska voľba: testovací `AppId`
+
+`ISCC /DAppIdGuid=<guid> packaging\abakus.iss` skompiluje inštalátor s iným
+(testovacím) `AppId`, takže testovacia inštalácia/odinštalácia nikdy
+nezasiahne skutočnú inštaláciu Abakusu ani jej záznam v registri. Bez tohto
+prepínača (bežný release build) sa použije skutočný pevný `AppId`,
+nezmenený od predchádzajúcich vydaní.
+
 ## WebView2
 
 Abakus je Tauri appka a na Windows potrebuje modul Microsoft Edge WebView2
@@ -120,7 +155,7 @@ Každý krok kontroly sa zapíše do inštalačného denníka (`Log(...)` v
 Skúšobná inštalácia mimo skutočného `%LOCALAPPDATA%\Programs\Abakus`:
 
 ```powershell
-abakus-setup-0.1.4.exe /VERYSILENT /DIR="C:\cesta\scratch" /MERGETASKS="!startmenuicon,!desktopicon"
+abakus-setup-0.1.5.exe /VERYSILENT /DIR="C:\cesta\scratch" /MERGETASKS="!startmenuicon,!desktopicon"
 ```
 
 `/NOICONS` nevypne vlastné úlohy `[Tasks]` `startmenuicon` a `desktopicon`
