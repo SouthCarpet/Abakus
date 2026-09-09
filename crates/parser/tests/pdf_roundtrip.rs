@@ -1,5 +1,4 @@
 mod gen;
-use parser::fold::fold;
 use parser::lines::from_text;
 use parser::{extract_pages, parse_pages, parse_text, Checksum, ParseError};
 
@@ -24,12 +23,11 @@ fn synthetic_pdf_parses_like_its_text_source() {
     assert_eq!(from_pdf.checksum(), Checksum::Ok);
     assert_eq!(from_pdf.transactions[0].merchant_raw, "ALDI SUED");
     assert_eq!(from_pdf.transactions[1].counterparty_iban, from_txt.transactions[1].counterparty_iban);
-    // fixtures_txt.rs (personal_checksum_is_ok_and_the_only_warning_is_the_unknown_fee_kind) says
-    // this fixture carries exactly one warning, the unclassified fee record; the PDF path keeps
-    // it too. Compared through `fold` because the synthetic PDF's labels are ASCII-folded
-    // (`strip_marks`, Courier/WinAnsi cannot encode the diacritics in "účtu").
-    assert_eq!(from_pdf.warnings.len(), from_txt.warnings.len(), "{:?} vs {:?}", from_pdf.warnings, from_txt.warnings);
-    assert_eq!(fold(&from_pdf.warnings[0]), fold(&from_txt.warnings[0]));
+    // fixtures_txt.rs (personal_checksum_is_ok_and_the_known_fee_produces_no_warning) says this
+    // fixture's fee record ("Poplatok za vedenie účtu") is now a recognized shape and carries no
+    // warning (2026-09-09 continuation fix); the PDF path must agree.
+    assert_eq!(from_pdf.warnings, Vec::<String>::new(), "{:?}", from_pdf.warnings);
+    assert_eq!(from_txt.warnings, Vec::<String>::new(), "{:?}", from_txt.warnings);
 }
 
 #[test]

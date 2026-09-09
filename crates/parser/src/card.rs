@@ -6,7 +6,7 @@ use crate::money::{parse_amount, parse_date_short, parse_rate};
 
 pub fn is_card(description: &str) -> bool {
     let f = fold(description);
-    f.contains("nakup pos") || f.contains("nakup zahr") || f.contains("navrat pos") || f.contains("bankomat") || f.contains("vyb.hotov")
+    f.contains("nakup pos") || f.contains("nakup zahr") || f.contains("nakup e-comm") || f.contains("navrat pos") || f.contains("bankomat") || f.contains("vyb.hotov")
 }
 
 fn kind_of(description: &str, block: &Block) -> TxKind {
@@ -69,7 +69,15 @@ mod tests {
         assert_eq!(t.tx_date, t.posted_date);
     }
     #[test] fn is_card_matches_all_pos_forms() {
-        for d in ["EUR AP nákup POS", "EUR NÁKUP POS", "AP nákup POS", "POS nákup zahr.", "EUR NÁVRAT POS", "EUR VYB.HOTOV. BANKOMAT"] { assert!(is_card(d), "{d}"); }
+        for d in ["EUR AP nákup POS", "EUR NÁKUP POS", "AP nákup POS", "POS nákup zahr.", "EUR NÁVRAT POS", "EUR VYB.HOTOV. BANKOMAT", "EUR AP nákup E-COMM", "AP nákup E-COMM zahr."] { assert!(is_card(d), "{d}"); }
         assert!(!is_card("Platba 0200/000000-5230000001")); assert!(!is_card("TPP 1100/000000-0098765432"));
+    }
+    #[test] fn ecomm_purchase_is_card_with_merchant_from_miesto_platby() {
+        let t = parse(&["04.06.2026    EUR AP nákup E-COMM                                  5.00-", "   Miesto platby:    Internet              SHOP ONLINE"]);
+        assert_eq!(t.kind, TxKind::Card); assert_eq!(t.merchant_raw, "SHOP ONLINE");
+    }
+    #[test] fn ecomm_zahr_is_card_foreign() {
+        let t = parse(&["04.06.2026    AP nákup E-COMM zahr.                                 5.00-", "   Miesto platby:    Internet              SHOP ONLINE"]);
+        assert_eq!(t.kind, TxKind::CardForeign);
     }
 }

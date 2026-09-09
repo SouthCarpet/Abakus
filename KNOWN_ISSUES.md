@@ -112,4 +112,10 @@
   `abakus-cli geometry` diagnostic. Other pages from the same generator are
   not covered by an automated fixture; they are verified only by Michal's
   own `abakus-cli check` runs on his real statements.
+- **Fee records (`Poplatok za účet`, `Poplatky za transakcie`, and any
+  description folding to start with `poplat`) use `TxKind::Other`, not a
+  dedicated `Fee` kind.** A dedicated kind is deferred; today they only stop
+  warning as an unknown transaction type (`parser::statement::is_fee`,
+  2026-09-09 continuation fix). The UI cannot filter or chart them apart
+  from other unclassified transactions yet.
 
