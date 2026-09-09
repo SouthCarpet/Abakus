@@ -104,10 +104,15 @@ než čokoľvek zmení:
   odmietne**: sprievodca skončí s nenulovým návratovým kódom a nič
   nezmení.
 
-Pri aktualizácii alebo preinštalovaní sprievodca navyše vynechá stránku s
-odkazmi (Start/plocha), pretože Inno si predchádzajúcu voľbu už pamätá
-(`UsePreviousTasks`), a na uvítacej stránke napíše, z akej verzie na akú
-aktualizuje. Pri prvej (čistej) inštalácii sa nič z tohto nezobrazí.
+Po hlásení (Zrušenie/Nie ho zastaví, inak pokračuje) sprievodca pri
+aktualizácii alebo preinštalovaní vynechá stránku s odkazmi (Start/plocha),
+pretože Inno si predchádzajúcu voľbu už pamätá (`UsePreviousTasks`). Text o
+aktualizácii (z akej verzie na akú a do akého priečinka) sa zapíše na
+stránku **Inštalácia je pripravená**, poslednú stránku pred kliknutím na
+Inštalovať. Uvítacia stránka sa v tomto prípade nezobrazuje (overené
+spustením sprievodcu), takže na nej text o aktualizácii nemá zmysel
+zapisovať. Pri prvej (čistej) inštalácii sa nič z tohto nezobrazí, stránka
+**Inštalácia je pripravená** má pôvodný text.
 
 ### Vývojárska voľba: testovací `AppId`
 

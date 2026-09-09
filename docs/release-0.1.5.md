@@ -1,7 +1,9 @@
 # Abakus 0.1.5
 
-Oprava inštalátora. Rozsah: len `packaging/abakus.iss`, žiadny Rust ani UI
-kód appky sa nemenil.
+Oprava inštalátora a zvýšenie verzie na 0.1.5. Rozsah: `packaging/abakus.iss`
+a súbory s číslom verzie (`package.json`, `package-lock.json`, `Cargo.toml`,
+`Cargo.lock`, `src-tauri/tauri.conf.json`). Žiadny Rust ani UI kód appky sa
+nemenil.
 
 ## Čo sa zmenilo
 
@@ -12,7 +14,9 @@ kód appky sa nemenil.
   inštalácii.
 - Pri aktualizácii alebo preinštalovaní sprievodca vynechá stránku s
   odkazmi (Start/plocha), pretože predchádzajúcu voľbu si Inno Setup už
-  pamätá, a na uvítacej stránke napíše, z akej verzie na akú aktualizuje.
+  pamätá, a na stránke **Inštalácia je pripravená** (posledná stránka pred
+  Inštalovať) napíše, z akej verzie na akú aktualizuje. Uvítacia stránka sa
+  pri existujúcej inštalácii nezobrazuje, preto na nej nič nepíše.
 - `AppId` má nový vývojársky prepínač `/DAppIdGuid=<guid>` (packaging/INSTALL.md,
   developer-only), ktorý testovaciu inštaláciu/odinštaláciu izoluje od
   skutočnej. Bežný release build ho nepoužíva; skutočný `AppId` je

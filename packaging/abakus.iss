@@ -316,17 +316,29 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := ExistingInstallFound and (PageID = wpSelectTasks);
+  if Result then
+    Log('ShouldSkipPage: skipping wpSelectTasks (existing install found, previous task choices are kept)');
 end;
 
-// Names what this run will do on the Welcome page itself, instead of a
-// generic welcome screen that never says an install already exists.
-// Fresh install: not touched, wording unchanged.
+// Names what this run will do. NOT wpWelcome: on an update or reinstall,
+// InitializeSetup's own message box already ends Setup on Cancel/No before
+// the wizard shows any page, and Inno never shows wpWelcome again after
+// that message box, it goes straight to wpReady, so a caption written to
+// WelcomeLabel2 here would be dead code (found by independent review with
+// a UI run and a screenshot, 2026-09-09). wpReady is the page that always
+// shows next, both for a fresh install and for an update/reinstall, so
+// that is where this text belongs. Fresh install: not touched, wording
+// unchanged.
 procedure CurPageChanged(CurPageID: Integer);
 begin
-  if (CurPageID = wpWelcome) and ExistingInstallFound then
-    WizardForm.WelcomeLabel2.Caption :=
+  if (CurPageID = wpReady) and ExistingInstallFound then
+  begin
+    WizardForm.ReadyLabel.Caption :=
       'Aktualizácia Abakus ' + ExistingInstallVersionStr + ' na {#AppVersion}.' + #13#10 +
       ExistingInstallDir;
+    Log('CurPageChanged: rewrote ReadyLabel caption for update/reinstall (' +
+      ExistingInstallVersionStr + ' -> {#AppVersion})');
+  end;
 end;
 
 // Deletes every Windows Credential Manager entry the app wrote. secrets.rs uses
