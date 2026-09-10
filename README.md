@@ -15,7 +15,7 @@ Lokálna desktopová appka na PDF výpisy z Tatra banky.
 
 Abakus is a local Windows desktop app for Tatra banka PDF statements. It imports statements, checks checksums, assigns categories with learned rules, tracks recurring payments, stores notes, and builds PDF reports with charts. Bank data stays on your computer. The only network use is an opt-in update check and a user-triggered installer download from GitHub Releases. Both are written to the in-app network log. There is no telemetry.
 
-Version 0.1.4 is the first release with the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
+Version 0.1.6 is the current release. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
 
 ## Čo to je
 
@@ -23,7 +23,7 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 ## Stav
 
-**0.1.4.** Toto je prvé vydanie s aktualizáciou v aplikácii, licenciou AGPL-3.0 a verejnou dokumentáciou. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+**0.1.6.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Prečo
 
