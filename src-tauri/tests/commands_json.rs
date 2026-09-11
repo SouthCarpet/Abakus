@@ -501,13 +501,15 @@ fn statement_history_row_serializes_snake_case() {
     let r = StatementHistoryRow {
         statement_id: 9, account_id: 1, account_label: "Osobný".into(), account_kind: AccountKind::Personal,
         number: 6, period_start: NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(), period_end: NaiveDate::from_ymd_opt(2026, 6, 30).unwrap(),
-        opening_cents: Some(69_392), closing_cents: None, checksum: Checksum::NotVerifiable,
+        opening_cents: Some(69_392), closing_cents: None, transaction_count: 3, total_cents: -2_696, checksum: Checksum::NotVerifiable,
     };
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["statement_id"], json!(9));
     assert_eq!(v["account_label"], json!("Osobný"));
     assert_eq!(v["opening_cents"], json!(69_392));
     assert_eq!(v["closing_cents"], json!(null));
+    assert_eq!(v["transaction_count"], json!(3));
+    assert_eq!(v["total_cents"], json!(-2_696));
     assert_eq!(v["checksum"], json!({"status": "not_verifiable"}));
     assert!(v.get("statementId").is_none(), "StatementHistoryRow keeps snake_case field names, no camelCase");
 }

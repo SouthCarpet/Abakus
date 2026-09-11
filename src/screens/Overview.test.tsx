@@ -192,7 +192,7 @@ describe('Overview keeps insights visible when the transaction summary is empty'
     vi.mocked(api.recentStatements).mockResolvedValueOnce([])
     vi.mocked(api.listAccounts).mockResolvedValueOnce([{ id: 1, iban: 'SK00', kind: 'personal', label: 'Osobný', has_password: false }])
     vi.mocked(api.statementHistory).mockResolvedValueOnce([
-      { statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 3, period_start: '2026-06-01', period_end: '2026-06-30', opening_cents: 1000, closing_cents: 2000, checksum: { status: 'ok' } },
+      { statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 3, period_start: '2026-06-01', period_end: '2026-06-30', opening_cents: 1000, closing_cents: 2000, transaction_count: 1, total_cents: 1000, checksum: { status: 'ok' } },
     ])
     render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
     expect(await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')).toBeInTheDocument()

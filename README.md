@@ -192,6 +192,11 @@ npm test
 cargo clippy --workspace --all-targets
 ```
 
+Backend pripravovanej verzie 0.2.0 rozširuje existujúci výsledok
+`statement_history` o povinné polia `transaction_count` a `total_cents`.
+Polia opisujú uložené transakcie, ktoré patria danému výpisu. Zapojenie do
+používateľského rozhrania je ešte otvorená úloha plánu 091.
+
 Inštalátor (Inno Setup 6):
 
 ```powershell
@@ -207,6 +212,7 @@ Skript zostaví frontend cez `tsc` a `vite`, potom `tauri build --no-bundle` a n
 - [docs/](docs/): interné poznámky k dráham a vydaniam, vrátane [docs/release-0.1.2.md](docs/release-0.1.2.md) a [docs/release-0.1.3.md](docs/release-0.1.3.md).
 - [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): backendový kontrakt úpravy a náhľadu zmazania pravidiel pre pripravovanú verziu 0.2.0.
 - [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre pripravovanú verziu 0.2.0.
+- [docs/plan-091-statement-history.md](docs/plan-091-statement-history.md): backendový kontrakt počtu a podpísaného súčtu uložených transakcií vo výsledku histórie výpisov.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.

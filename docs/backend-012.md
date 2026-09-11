@@ -15,6 +15,10 @@ worktrees were touched.
   given), sorted `account_id, period_start, period_end, statement_id`
   ascending. Read-only, separate from the existing `recent_statements`
   (newest-first, capped, Import screen only).
+  Plan 091 later added required `transaction_count` and `total_cents` fields
+  to each row. They count and sum the retained stored transactions owned by
+  that statement. The sum uses each stored integer-cent amount with its sign
+  and includes every transaction kind.
 - `crates/store/src/notes.rs` (new): `Store::save_transaction_note(id, note)`.
   Validates BEFORE writing (a U+0000 byte, over `NOTE_MAX_CHARS` = 2000
   Unicode code points via `note.chars().count()`, or an id that does not
@@ -148,6 +152,11 @@ the brief.
   "Posledný výpis"/closing line reports `None`/`None`/`Checksum::NotVerifiable`
   instead of a defaulted zero; an ordinary statement reports its real
   cents and `Checksum::Ok`.
+  The plan 091 extension also covers an empty statement, mixed signed amounts
+  across every current transaction kind, account and filter isolation, one
+  result row despite multiple transactions, fingerprint-deduplicated
+  re-exports, and SQLite integer-sum overflow as an error instead of a
+  wrapped value.
 - **Backup** (`crates/store/tests/backup.rs`): a snapshot of a REAL seeded
   database (an imported statement, a learned exact rule from `assign`, a
   note, a changed setting) opens independently and keeps all four; a write
@@ -179,6 +188,8 @@ the brief.
   `save_transaction_note`; `{path}` for `backup_database`; `StatementHistoryRow`
   and `BackupOutcome` serialize the fields the UI reads; `TxRow`'s existing
   round-trip test extended with `note`.
+  The plan 091 DTO check makes `transaction_count` and `total_cents` present
+  as required snake_case JSON fields.
 
 ## Commands and results (080-backup-final, 2026-09-07)
 
@@ -245,6 +256,11 @@ to fail in this pass's runs.
   signature exactly (no limit parameter is specified), but is worth flagging
   for the parent/Insights lane if a very large multi-year history ever makes
   an unbounded history screen worth paginating.
+- `transaction_count` and `total_cents` describe retained database rows owned
+  by the statement. They are not totals copied from the original PDF. A
+  re-export with a new file hash creates a statement row, but fingerprint
+  deduplication can leave that row with `0` transactions and `0` cents while
+  the first import keeps ownership of the stored rows.
 
 ## Integration notes for the parent
 

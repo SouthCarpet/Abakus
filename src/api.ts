@@ -19,7 +19,7 @@ export interface ImportReport { path: string; status: ImportStatus; accountLabel
 export interface Summary { income_cents: number; expense_cents: number; transfer_cents: number; net_cents: number; unassigned_count: number; suggested_count: number; by_category: { category_id: number; name: string; parent_name: string | null; cents: number }[]; by_month: { month: string; income_cents: number; expense_cents: number }[]; by_month_category: { month: string; category_id: number; name: string; cents: number }[]; top_merchants: { merchant: string; cents: number; count: number }[] }
 export interface BadChecksum { statement_id: number; number: number; account_label: string; off_by_cents: number }
 export interface RecentStatement { statement_id: number; number: number; period_end: string; account_label: string; transaction_count: number; checksum: Checksum }
-export interface StatementHistoryRow { statement_id: number; account_id: number; account_label: string; account_kind: AccountKind; number: number; period_start: string; period_end: string; opening_cents: number | null; closing_cents: number | null; checksum: Checksum }
+export interface StatementHistoryRow { statement_id: number; account_id: number; account_label: string; account_kind: AccountKind; number: number; period_start: string; period_end: string; opening_cents: number | null; closing_cents: number | null; transaction_count: number; total_cents: number; checksum: Checksum }
 export interface BackupOutcome { path: string; bytes: number }
 export interface Release {
   tag: string
