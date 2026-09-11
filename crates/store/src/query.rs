@@ -169,9 +169,9 @@ fn filter_by_text(rows: Vec<TxRow>, needle: &str) -> Vec<TxRow> {
 }
 
 fn row_matches_text(r: &TxRow, folded_needle: &str) -> bool {
-    fold(&r.merchant_raw).contains(folded_needle)
+    let merchant_and_place = fold(&format!("{} {}", r.merchant_raw, r.place.as_deref().unwrap_or_default()));
+    merchant_and_place.contains(folded_needle)
         || fold(&r.note).contains(folded_needle)
-        || r.place.as_deref().is_some_and(|s| fold(s).contains(folded_needle))
         || r.counterparty_name.as_deref().is_some_and(|s| fold(s).contains(folded_needle))
 }
 

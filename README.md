@@ -111,6 +111,7 @@ Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, *
 
 ## Filtre a CSV
 
+- **Vyhľadávanie** spája obchodníka s miestom, takže `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku, zjednotí nadbytočné medzery a ponechá pôvodné hľadanie v poznámke a názve protistrany. Znaky `%` a `_` sú doslovné. Podrobnosti sú v [technickom kontrakte vyhľadávania](docs/plan-091-transaction-search.md).
 - **Exportovať filtrované CSV** v Transakciách exportuje aktuálne obdobie, účet, druh účtu, kategóriu, stav, hľadaný text aj obmedzenie na konkrétny výpis. Použije text viditeľný pri kliknutí, aj keď tabuľka ešte čaká na dokončenie hľadania. Filter sa zachytí pri kliknutí. CSV číta údaje z databázy pri exporte. Zrušenie výberu súboru nič neexportuje. Zlyhanie zápisu sa zobrazí. Pôvodný export v Nastaveniach naďalej používa iba uložené obdobie.
 - **Filter kategórie** umožňuje vybrať aj nadradenú kategóriu s podkategóriami a zobrazuje kategóriu prevzatú z grafu. Archivovaný alebo nedostupný výber zostáva označený. Neznamená Všetky kategórie.
 - **Vymazať všetky filtre** zobrazí všetky obdobia, účty, druhy, kategórie a stavy bez vyhľadávania a bez obmedzenia na výpis. Vymaže aj hromadný výber. Obdobie Všetko sa uloží pre ďalšie obrazovky.
@@ -213,6 +214,7 @@ Skript zostaví frontend cez `tsc` a `vite`, potom `tauri build --no-bundle` a n
 - [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): backendový kontrakt úpravy a náhľadu zmazania pravidiel pre pripravovanú verziu 0.2.0.
 - [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre pripravovanú verziu 0.2.0.
 - [docs/plan-091-statement-history.md](docs/plan-091-statement-history.md): backendový kontrakt počtu a podpísaného súčtu uložených transakcií vo výsledku histórie výpisov.
+- [docs/plan-091-transaction-search.md](docs/plan-091-transaction-search.md): kontrakt doslovného vyhľadávania cez obchodníka a miesto bez zmeny API alebo databázy.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.
