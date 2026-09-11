@@ -198,6 +198,11 @@ Backend pripravovanej verzie 0.2.0 rozširuje existujúci výsledok
 Polia opisujú uložené transakcie, ktoré patria danému výpisu. Zapojenie do
 používateľského rozhrania je ešte otvorená úloha plánu 091.
 
+Pomocná funkcia `yearComparisonRanges` pripravuje celý mesiac alebo tri celé
+mesiace a rovnaké kalendárne obdobie vlani. Oba rozsahy obsahujú začiatok aj
+koniec. Voľba obdobia a zobrazenie rozsahov v UI ešte čakajú na zapojenie.
+Kontrakt: [porovnanie s vlaňajškom](docs/plan-091-year-comparison.md).
+
 Inštalátor (Inno Setup 6):
 
 ```powershell
