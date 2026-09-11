@@ -203,8 +203,8 @@ pub fn assign(state: State<AppState>, ids: Vec<i64>, category_id: i64, apply_to_
 }
 
 #[tauri::command]
-pub fn confirm(state: State<AppState>, ids: Vec<i64>) -> Result<usize, String> {
-    lock(&state)?.confirm(&ids).map_err(|e| e.to_string())
+pub fn confirm(state: State<AppState>, ids: Vec<i64>, apply_to_matching: Option<bool>) -> Result<store::AssignOutcome, String> {
+    lock(&state)?.confirm(&ids, apply_to_matching.unwrap_or(false)).map_err(|e| e.to_string())
 }
 
 /// A17/F3: `accountKind` covers EVERY account of that kind. The screen used to

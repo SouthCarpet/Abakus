@@ -97,6 +97,33 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
   row that referred to the deleted rule loses `rule_id`, because the foreign
   key target no longer exists.
 
+### Atomic bulk confirmation (`crates/store/src/assign.rs`)
+
+- `Store::confirm(ids, apply_to_matching) -> Result<AssignOutcome>` confirms
+  every unique selected suggestion in one SQLite transaction. An unknown id or
+  SQL failure rolls back transaction rows, learned rules and `rule_sources`.
+- Selected confirmed and unassigned rows are no-ops. Selected transfer ids are
+  never changed and appear once in `skipped_transfers`, even when the request
+  repeats an id.
+- Optional matching reads one stable pre-write snapshot. Card-like rows match
+  only the same non-empty normalized merchant and the same normalized place.
+  `NULL` and a concrete place are different. Transfer-in, transfer-out and
+  standing-order rows match only the same non-empty counterparty IBAN.
+- Matching can confirm only `suggested` or `unassigned` rows. A row with a
+  different concrete category, any confirmed row and any transfer row stays
+  unchanged. Conflicting selected categories do not create a broad merchant
+  rule and cannot make the result depend on selection order.
+- `AssignOutcome.updated` now includes unique matching rows changed by both
+  `assign` and `confirm`. `rules_created` and `skipped_transfers` retain their
+  existing meanings. The Tauri `confirm` response changed from a number to
+  this existing object shape.
+- Existing `assign(..., apply_to_matching: true)` remains merchant-wide for
+  compatibility. The new exact merchant-place or account match applies only
+  to `confirm(..., apply_to_matching: true)`.
+- The optional Tauri argument `applyToMatching` defaults to `false`. An older
+  request containing only `ids` therefore keeps its previous narrow behavior.
+  The bulk-confirmation UI is pending.
+
 ### Spotify fresh seed and legacy repair
 
 - `crates/store/src/seed_categories.rs`: `Predplatné` now seeds a `Spotify`
@@ -225,6 +252,12 @@ persistence. No production command changed.
 - `src-tauri/tests/category_json.rs` (10 cases): the wire-contract drift gate
   for the five category workflow commands and their request/response shapes, same pattern
   as `commands_json.rs`.
+- `crates/store/tests/bulk_confirmation.rs` (10 cases): public `Store` tests
+  for duplicate ids, merchant/place and counterparty matching, protected
+  rows, category conflicts, selection order, rollback, retry and persistence.
+- `src-tauri/tests/commands_json.rs`: the `confirm` request covers the new
+  optional field and the omitted-field default. `AssignOutcome` pins the new
+  response shape.
 - `src/components/CategoryDialog.test.tsx` (5 cases), `CategoryPicker.test.tsx`
   (+3 cases for `onCreate`), `screens/Categories.test.tsx` (+3 cases for the
   edit/preview/confirm flow).

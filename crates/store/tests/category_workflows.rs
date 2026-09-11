@@ -66,7 +66,7 @@ fn c01_moving_and_promoting_a_leaf_preserves_identity_and_history() {
     let auto = find(&cats, "Auto/doprava").id;
     let potraviny = find(&cats, "potraviny").id;
     let aldi = id_of(&s, "ALDI SUED");
-    s.confirm(&[aldi]).unwrap();
+    s.confirm(&[aldi], false).unwrap();
 
     let moved = s.update_category(&CategoryUpdateRequest { id: potraviny, parent_id: Some(auto), name: "potraviny".into(), kind: CategoryKind::Expense, acknowledge_kind_change: false }).unwrap();
     assert_eq!(moved.parent_id, Some(auto));
@@ -172,7 +172,7 @@ fn c02_fixture() -> C02Fixture {
     s.archive_category(find(&cats, "objednávky").id).unwrap();
     let aldi = id_of(&s, "ALDI SUED");
     let lidl = id_of(&s, "LIDL");
-    s.confirm(&[aldi, lidl]).unwrap();
+    s.confirm(&[aldi, lidl], false).unwrap();
     let _mcdonalds = id_of(&s, "MCDONALDS"); // left as the natural seed-suggested third row
     let req = CategoryUpdateRequest { id: jedlo, parent_id: None, name: "Jedlo".into(), kind: CategoryKind::Income, acknowledge_kind_change: false };
     C02Fixture { store: s, jedlo, aldi, req }
@@ -298,7 +298,7 @@ fn c05_seed_rule_pointer_and_redirect_reclassifies_only_open_rows() {
     // An unrelated, already-confirmed row (a different merchant entirely, so
     // confirming it cannot learn a rule that shadows the spotify seed rule).
     let aldi_confirmed = id_of(&s, "ALDI SUED");
-    s.confirm(&[aldi_confirmed]).unwrap();
+    s.confirm(&[aldi_confirmed], false).unwrap();
     let aldi_category = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == aldi_confirmed).unwrap().category_id.unwrap();
     let netflix = id_of(&s, "NETFLIX");
     let netflix_category = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == netflix).unwrap().category_id.unwrap();

@@ -91,7 +91,10 @@ struct ArchiveCategoryArgs { id: i64 }
 struct DeleteRuleArgs { id: i64 }
 
 #[derive(serde::Deserialize)]
-struct ConfirmArgs { ids: Vec<i64> }
+struct ConfirmArgs {
+    ids: Vec<i64>,
+    #[serde(default, rename = "applyToMatching")] apply_to_matching: bool,
+}
 
 #[derive(serde::Deserialize)]
 struct ExportCsvArgs { filter: TxFilter, path: String }
@@ -279,8 +282,16 @@ fn delete_rule_args_match_the_ui_call() {
 
 #[test]
 fn confirm_args_match_the_ui_call() {
+    let args: ConfirmArgs = serde_json::from_value(json!({"ids": [1, 2, 3], "applyToMatching": true})).unwrap();
+    assert_eq!(args.ids, vec![1, 2, 3]);
+    assert!(args.apply_to_matching);
+}
+
+#[test]
+fn confirm_apply_to_matching_defaults_to_false_for_old_requests() {
     let args: ConfirmArgs = serde_json::from_value(json!({"ids": [1, 2, 3]})).unwrap();
     assert_eq!(args.ids, vec![1, 2, 3]);
+    assert!(!args.apply_to_matching);
 }
 
 #[test]

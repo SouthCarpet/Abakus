@@ -104,7 +104,7 @@ fn blank_merchants_never_learn_match_or_sweep_other_blank_rows() {
 /// `suggested` fails this test.
 #[test] fn confirm_turns_a_suggestion_into_a_rule() {
     let mut s = loaded(); let aldi = id_of(&s, "ALDI SUED");
-    assert_eq!(s.confirm(&[aldi]).unwrap(), 1);
+    assert_eq!(s.confirm(&[aldi], false).unwrap().updated, 1);
     let row = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == aldi).unwrap();
     assert_eq!(row.status, Status::Confirmed);
     assert!(s.list_rules().unwrap().iter().any(|r| r.kind == RuleKind::Exact && r.key == "aldi sued" && r.place.as_deref() == Some("neuss")));
@@ -144,9 +144,10 @@ Mena    EUR                                          Výpis číslo:        7   
     let of = id_of(&s, "OF");
     s.import_statement(&fixture_from(AMAZON_JULY), "amz-extra").unwrap();
     let cat = s.category_by_path("Nákupy/obchod").unwrap().unwrap();
-    let first = id_of(&s, "AMAZON* AB1111CD2");
-    s.assign(&[first], cat, true).unwrap();
+    let first = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|row| row.merchant_raw == "AMAZON* AB1111CD2").unwrap().id;
+    let outcome = s.assign(&[first], cat, true).unwrap();
     let rows = s.list_transactions(&TxFilter::default()).unwrap();
+    assert_eq!(outcome.updated, 3, "the selected row and both open normalized-merchant matches are counted");
     assert!(rows.iter().filter(|r| r.merchant_raw.starts_with("AMAZON")).all(|r| r.category_id == Some(cat)));
     let second = rows.iter().find(|r| r.merchant_raw == "AMAZON* XY2222ZZ3").unwrap();
     assert_eq!((second.status, second.category_id), (Status::Confirmed, Some(cat)));
@@ -293,7 +294,8 @@ Mena    EUR                                          Výpis číslo:        1   
 #[test] fn confirm_never_touches_a_transfer_row() {
     let mut s = loaded();
     let transfer_row = s.list_transactions(&TxFilter { status: Some(Status::Transfer), ..Default::default() }).unwrap().into_iter().next().unwrap();
-    assert_eq!(s.confirm(&[transfer_row.id]).unwrap(), 0);
+    let outcome = s.confirm(&[transfer_row.id], false).unwrap();
+    assert_eq!((outcome.updated, outcome.skipped_transfers), (0, 1));
     let after = s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.id == transfer_row.id).unwrap();
     assert_eq!(after.status, Status::Transfer);
     assert_eq!(after.category_id, None);

@@ -6,7 +6,7 @@ use std::collections::HashSet;
 #[derive(Deserialize)] struct SeedFile { rule: Vec<SeedRule> }
 #[derive(Deserialize)] struct SeedRule { key: String, category: String }
 
-fn kind_str(k: RuleKind) -> &'static str { match k { RuleKind::Exact => "exact", RuleKind::Merchant => "merchant", RuleKind::CounterpartyAccount => "counterparty_account", RuleKind::Seed => "seed" } }
+pub(crate) fn kind_str(k: RuleKind) -> &'static str { match k { RuleKind::Exact => "exact", RuleKind::Merchant => "merchant", RuleKind::CounterpartyAccount => "counterparty_account", RuleKind::Seed => "seed" } }
 fn kind_parse(s: &str) -> RuleKind { match s { "exact" => RuleKind::Exact, "merchant" => RuleKind::Merchant, "counterparty_account" => RuleKind::CounterpartyAccount, _ => RuleKind::Seed } }
 
 impl Store {

@@ -33,6 +33,7 @@ export interface Release {
 export interface DownloadedUpdate { path: string; sha256: string }
 export interface NetLogRow { id: number; started_at: string; url: string; status: string; duration_ms: number; bytes_in: number }
 export interface AuditFailure { at: string; url: string; error: string }
+export interface AssignOutcome { updated: number; rules_created: number; skipped_transfers: number }
 
 export const api = {
   importStatements: (paths: string[]) => invoke<ImportReport[]>('import_statements', { paths }),
@@ -55,8 +56,8 @@ export const api = {
   backupDatabase: (path: string) => invoke<BackupOutcome>('backup_database', { path }),
   statementHistory: (accountId: number | null = null, accountKind: AccountKind | null = null) =>
     invoke<StatementHistoryRow[]>('statement_history', { accountId, accountKind }),
-  assign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<{ updated: number; rules_created: number; skipped_transfers: number }>('assign', { ids, categoryId, applyToMatching }),
-  confirm: (ids: number[]) => invoke<number>('confirm', { ids }),
+  assign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<AssignOutcome>('assign', { ids, categoryId, applyToMatching }),
+  confirm: (ids: number[], applyToMatching = false) => invoke<AssignOutcome>('confirm', { ids, applyToMatching }),
   summary: (from: string | null, to: string | null, accountId: number | null, accountKind: AccountKind | null = null) =>
     invoke<Summary>('summary', { from, to, accountId, accountKind }),
   exportCsv: (filter: TxFilter, path: string) => invoke<number>('export_csv', { filter, path }),
