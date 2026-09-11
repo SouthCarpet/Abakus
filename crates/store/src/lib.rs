@@ -30,7 +30,7 @@ pub use import::ImportOutcome;
 pub use net_log::NetLogRow;
 pub use notes::NOTE_MAX_CHARS;
 pub use query::{RecentStatement, TxFilter, TxRow};
-pub use rules_repo::{RuleRedirectOutcome, RuleView};
+pub use rules_repo::{RuleDeletePreview, RuleRedirectOutcome, RuleView};
 pub use summary::*;
 
 use rusqlite::Connection;

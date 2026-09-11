@@ -1,11 +1,9 @@
-//! Section 9 category workflow acceptance: C01 move/promote, C02 kind-change
-//! acknowledgement, C03 name validation and duplicates, C05 seed rule
-//! redirect. Fixtures go through the real parser/import/classify path
-//! (`import_statement`) wherever the validated API can build the state; the
-//! one exception (C03's pre-existing legacy duplicate, which the validated
-//! create path now refuses to construct) uses the same file-backed
-//! independent-`rusqlite::Connection` pattern already established in
-//! `tests/migration.rs`, never `Store` internals.
+//! Category workflow acceptance: C01 move/promote, C02 kind-change
+//! acknowledgement, C03 name validation and duplicates, C05 seed redirect,
+//! and plan 091 C14 rule editing and deletion preview. Fixtures go through the
+//! real parser/import/classify path wherever the public API can build the
+//! state. C03's legacy duplicate and C14's failure injection use a file-backed
+//! independent `rusqlite::Connection`, never private `Store` internals.
 use parser::{parse_text, AccountKind};
 use rules::{RuleKind, Status};
 use store::{Category, CategoryKind, CategoryUpdateRequest, Store, StoreError, TxFilter};
@@ -37,6 +35,10 @@ Dátum sprac.  Popis                                     Dátum zúčt.         
               Miesto platby:    Internet              SPOTIFY AB
               Dátum:  04.07.26  Čas:  12:00:00        Suma:           9.99- EUR
 --------------------------------------------------------------------------------------------------
+05.07.2026    EUR AP nákup POS                                                                   7.00-
+              Miesto platby:    Neuss                 SPOTIFY AB
+              Dátum:  05.07.26  Čas:  12:00:00        Suma:           7.00- EUR
+--------------------------------------------------------------------------------------------------
 06.07.2026    EUR AP nákup POS                                                                  12.99-
               Miesto platby:    Internet              NETFLIX
               Dátum:  06.07.26  Čas:  12:00:00        Suma:          12.99- EUR
@@ -53,6 +55,7 @@ fn loaded() -> Store {
     s
 }
 fn id_of(s: &Store, merchant: &str) -> i64 { s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|r| r.merchant_raw == merchant).unwrap().id }
+fn id_of_place(s: &Store, merchant: &str, place: &str) -> i64 { s.list_transactions(&TxFilter::default()).unwrap().into_iter().find(|row| row.merchant_raw == merchant && row.place.as_deref() == Some(place)).unwrap().id }
 fn find(cats: &[Category], name: &str) -> Category { cats.iter().find(|c| c.name == name).unwrap().clone() }
 
 // C01: move an active leaf between expense parents, then promote it to root.
@@ -344,14 +347,157 @@ fn c05_redirect_is_refused_for_a_root_with_active_children_but_allowed_with_only
 }
 
 #[test]
-fn c05_redirect_is_limited_to_seed_rules() {
+fn c14_exact_merchant_and_counterparty_rules_can_change_target() {
     let mut s = loaded();
     let potraviny = s.category_by_path("Jedlo/potraviny").unwrap().unwrap();
     let restauracia = s.category_by_path("Jedlo/reštaurácia").unwrap().unwrap();
-    let aldi = id_of(&s, "ALDI SUED");
-    s.assign(&[aldi], potraviny, false).unwrap();
-    let learned = s.list_rules().unwrap().into_iter().find(|r| r.kind == RuleKind::Exact).unwrap().id;
+    let exact = s.insert_rule(RuleKind::Exact, "test exact", Some("neuss"), potraviny).unwrap();
+    let merchant = s.insert_rule(RuleKind::Merchant, "test merchant", None, potraviny).unwrap();
+    let counterparty = s.insert_rule(RuleKind::CounterpartyAccount, "SK0281800000007000000001", None, potraviny).unwrap();
 
-    let e = s.update_rule_category(learned, restauracia).unwrap_err();
-    assert!(matches!(e, StoreError::Parse(_)));
+    s.update_rule_category(exact, restauracia).unwrap();
+    s.update_rule_category(merchant, restauracia).unwrap();
+    s.update_rule_category(counterparty, restauracia).unwrap();
+
+    let rules = s.list_rules().unwrap();
+    assert_eq!(rules.iter().find(|rule| rule.id == exact).unwrap().category_id, restauracia);
+    assert_eq!(rules.iter().find(|rule| rule.id == merchant).unwrap().category_id, restauracia);
+    assert_eq!(rules.iter().find(|rule| rule.id == counterparty).unwrap().category_id, restauracia);
+}
+
+#[test]
+fn c14_learned_rule_edit_reclassifies_open_rows_through_existing_precedence() {
+    let mut s = loaded();
+    let potraviny = s.category_by_path("Jedlo/potraviny").unwrap().unwrap();
+    let restauracia = s.category_by_path("Jedlo/reštaurácia").unwrap().unwrap();
+    let netflix = s.category_by_path("Predplatné/Netflix").unwrap().unwrap();
+    let merchant = s.insert_rule(RuleKind::Merchant, "spotify ab", None, potraviny).unwrap();
+    let exact = s.insert_rule(RuleKind::Exact, "spotify ab", Some("neuss"), restauracia).unwrap();
+
+    let outcome = s.update_rule_category(merchant, netflix).unwrap();
+
+    let rows = s.list_transactions(&TxFilter::default()).unwrap();
+    let exact_row = rows.iter().find(|row| row.id == id_of_place(&s, "SPOTIFY AB", "Neuss")).unwrap();
+    let merchant_row = rows.iter().find(|row| row.id == id_of_place(&s, "SPOTIFY AB", "Internet")).unwrap();
+    assert_eq!((exact_row.status, exact_row.category_id, exact_row.source.as_str()), (Status::Confirmed, Some(restauracia), "exact_rule"), "the exact rule keeps precedence over the edited merchant rule");
+    assert_eq!((merchant_row.status, merchant_row.category_id, merchant_row.source.as_str()), (Status::Suggested, Some(netflix), "merchant_rule"), "the remaining open row follows the edited merchant rule");
+    assert_eq!((outcome.rule_id, outcome.category_id, outcome.updated), (merchant, netflix, 1));
+    assert_eq!(s.list_rules().unwrap().into_iter().find(|rule| rule.id == exact).unwrap().category_id, restauracia);
+}
+
+#[test]
+fn c14_learned_rule_edit_rejects_unknown_system_and_archived_targets_without_writing() {
+    let mut s = loaded();
+    let cats = s.list_categories().unwrap();
+    let potraviny = find(&cats, "potraviny").id;
+    let system = find(&cats, "Hotovosť").id;
+    let archived = find(&cats, "Faktúry").id;
+    let rule = s.insert_rule(RuleKind::Merchant, "test merchant", None, potraviny).unwrap();
+    s.archive_category(archived).unwrap();
+
+    let unknown_error = s.update_rule_category(rule, 999_999).unwrap_err();
+    assert!(matches!(unknown_error, StoreError::UnknownCategory { id: 999_999 }));
+    let system_error = s.update_rule_category(rule, system).unwrap_err();
+    assert_eq!(system_error.to_string(), "Cieľová kategória nie je použiteľná.");
+    let archived_error = s.update_rule_category(rule, archived).unwrap_err();
+    assert_eq!(archived_error.to_string(), "Cieľová kategória nie je použiteľná.");
+    assert_eq!(s.list_rules().unwrap().into_iter().find(|candidate| candidate.id == rule).unwrap().category_id, potraviny, "all refused targets leave the rule unchanged");
+}
+
+#[test]
+fn c14_failed_reclassification_rolls_back_a_learned_rule_edit() {
+    let path = std::env::temp_dir().join(format!("abakus-rule-edit-rollback-{}.db", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let mut s = Store::open(&path).unwrap();
+    s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    s.import_statement(&parse_text(STATEMENT_TEXT).unwrap(), "rollback-fixture").unwrap();
+    let potraviny = s.category_by_path("Jedlo/potraviny").unwrap().unwrap();
+    let netflix = s.category_by_path("Predplatné/Netflix").unwrap().unwrap();
+    let rule = s.insert_rule(RuleKind::Merchant, "spotify ab", None, potraviny).unwrap();
+    let before = s.list_transactions(&TxFilter::default()).unwrap();
+    rusqlite::Connection::open(&path).unwrap().execute_batch("CREATE TRIGGER fail_rule_reclassification BEFORE UPDATE OF status, category_id, rule_id, source ON transactions BEGIN SELECT RAISE(ABORT, 'forced reclassification failure'); END;").unwrap();
+
+    let error = s.update_rule_category(rule, netflix).unwrap_err();
+
+    assert!(matches!(error, StoreError::Db(_)));
+    assert_eq!(s.list_rules().unwrap().into_iter().find(|candidate| candidate.id == rule).unwrap().category_id, potraviny, "the rule target rolls back with the failed row updates");
+    assert_eq!(s.list_transactions(&TxFilter::default()).unwrap(), before, "all transaction state also rolls back");
+    rusqlite::Connection::open(&path).unwrap().execute_batch("DROP TRIGGER fail_rule_reclassification;").unwrap();
+    let retry = s.update_rule_category(rule, netflix).unwrap();
+    assert_eq!((retry.rule_id, retry.category_id), (rule, netflix), "the same connection accepts a valid edit after rollback");
+    drop(s);
+    std::fs::remove_file(path).ok();
+}
+
+#[test]
+fn c14_delete_preview_counts_open_references_separately_from_visible_changes() {
+    let path = std::env::temp_dir().join(format!("abakus-rule-delete-preview-{}.db", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let mut s = Store::open(&path).unwrap();
+    s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    s.import_statement(&parse_text(STATEMENT_TEXT).unwrap(), "delete-preview-fixture").unwrap();
+    let spotify_category = s.category_by_path("Predplatné/Spotify").unwrap().unwrap();
+    let rule = s.insert_rule(RuleKind::Merchant, "spotify ab", None, spotify_category).unwrap();
+    s.reclassify_open().unwrap();
+    let confirmed_id = id_of_place(&s, "SPOTIFY AB", "Neuss");
+    let transfer_id = id_of(&s, "LIDL");
+    rusqlite::Connection::open(&path).unwrap().execute_batch(&format!("UPDATE transactions SET status='confirmed', category_id={spotify_category}, rule_id={rule}, source='merchant_rule' WHERE id={confirmed_id}; UPDATE transactions SET status='transfer', category_id=NULL, rule_id=NULL, source='own_account' WHERE id={transfer_id};")).unwrap();
+
+    let preview = s.rule_delete_preview(rule).unwrap();
+
+    assert_eq!(preview.rule_id, rule);
+    assert_eq!(preview.open_rule_references, 1, "the confirmed rule reference and transfer row are outside the open-row count");
+    assert_eq!(preview.open_classification_changes, 0, "the remaining open row falls back to the same-status, same-category Spotify seed suggestion");
+
+    s.delete_rule(rule).unwrap();
+    let rows = s.list_transactions(&TxFilter::default()).unwrap();
+    let confirmed = rows.iter().find(|row| row.id == confirmed_id).unwrap();
+    let transfer = rows.iter().find(|row| row.id == transfer_id).unwrap();
+    assert_eq!((confirmed.status, confirmed.category_id, confirmed.source.as_str()), (Status::Confirmed, Some(spotify_category), "merchant_rule"), "deletion preserves the confirmed assignment and source label");
+    assert_eq!((transfer.status, transfer.category_id, transfer.source.as_str()), (Status::Transfer, None, "own_account"), "deletion preserves transfer classification");
+    let detached: Option<i64> = rusqlite::Connection::open(&path).unwrap().query_row("SELECT rule_id FROM transactions WHERE id = ?1", [confirmed_id], |row| row.get(0)).unwrap();
+    assert_eq!(detached, None, "the deleted foreign-key target requires confirmed provenance detachment");
+    drop(s);
+    std::fs::remove_file(path).ok();
+}
+
+#[test]
+fn c14_failed_delete_reclassification_restores_the_rule_and_its_references() {
+    let path = std::env::temp_dir().join(format!("abakus-rule-delete-rollback-{}.db", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let mut s = Store::open(&path).unwrap();
+    s.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Osobný").unwrap();
+    s.import_statement(&parse_text(STATEMENT_TEXT).unwrap(), "delete-rollback-fixture").unwrap();
+    let spotify_category = s.category_by_path("Predplatné/Spotify").unwrap().unwrap();
+    let rule = s.insert_rule(RuleKind::Merchant, "spotify ab", None, spotify_category).unwrap();
+    s.reclassify_open().unwrap();
+    let referenced_id = id_of_place(&s, "SPOTIFY AB", "Internet");
+    let before = s.list_transactions(&TxFilter::default()).unwrap();
+    rusqlite::Connection::open(&path).unwrap().execute_batch("CREATE TRIGGER fail_delete_reclassification BEFORE UPDATE OF status, category_id, source ON transactions BEGIN SELECT RAISE(ABORT, 'forced delete reclassification failure'); END;").unwrap();
+
+    let error = s.delete_rule(rule).unwrap_err();
+
+    assert!(matches!(error, StoreError::Db(_)));
+    assert!(s.list_rules().unwrap().iter().any(|candidate| candidate.id == rule), "the deleted rule is restored by rollback");
+    assert_eq!(s.list_transactions(&TxFilter::default()).unwrap(), before, "all visible transaction state is restored");
+    let restored_reference: Option<i64> = rusqlite::Connection::open(&path).unwrap().query_row("SELECT rule_id FROM transactions WHERE id = ?1", [referenced_id], |row| row.get(0)).unwrap();
+    assert_eq!(restored_reference, Some(rule), "the foreign-key reference detachment is also rolled back");
+    rusqlite::Connection::open(&path).unwrap().execute_batch("DROP TRIGGER fail_delete_reclassification;").unwrap();
+    s.delete_rule(rule).unwrap();
+    assert!(!s.list_rules().unwrap().iter().any(|candidate| candidate.id == rule), "the same connection accepts a valid delete after rollback");
+    drop(s);
+    std::fs::remove_file(path).ok();
+}
+
+#[test]
+fn c14_unknown_rule_preview_and_delete_are_errors_without_side_effects() {
+    let mut s = loaded();
+    let before = s.list_transactions(&TxFilter::default()).unwrap();
+
+    let preview_error = s.rule_delete_preview(999_999).unwrap_err();
+    let delete_error = s.delete_rule(999_999).unwrap_err();
+
+    assert!(matches!(preview_error, StoreError::UnknownRule { id: 999_999 }));
+    assert!(matches!(delete_error, StoreError::UnknownRule { id: 999_999 }));
+    assert_eq!(s.list_transactions(&TxFilter::default()).unwrap(), before);
 }

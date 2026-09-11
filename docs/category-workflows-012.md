@@ -68,7 +68,7 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
   free. Creation (`id: None`) goes through the same name validation and
   duplicate check via a small dedicated `create_category` path.
 
-### Seed rule provenance and redirect (`crates/store/src/rules_repo.rs`)
+### Rule provenance, redirect and delete preview (`crates/store/src/rules_repo.rs`)
 
 - `Store::seed_rule_for_transaction(transaction_id) -> Result<Option<RuleView>>`:
   the actual `transactions.rule_id` joined to a `match_kind = 'seed'` rule,
@@ -76,16 +76,26 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
   an error; a transaction with no seed pointer (learned rule, or none at all)
   is `Ok(None)`.
 - `Store::update_rule_category(rule_id, category_id) -> Result<RuleRedirectOutcome>`:
-  limited to seed rules this release (refused for any other rule kind). The
-  target must be a usable, non-system, non-archived category: a leaf, or a
-  root with no *active* children (an archived child does not block it).
+  supports seed, exact, merchant and counterparty-account rules. The target
+  must be a usable, non-system, non-archived category: a leaf, or a root with
+  no *active* children (an archived child does not block it).
   Atomic: the whole operation, including a mid-write failure, rolls back.
   Reclassifies through the existing `reclassify_open` (which already
   implements full rule precedence), so it only ever touches `suggested`/
-  `unassigned` rows for which the redirected rule genuinely wins; confirmed
-  and transfer rows are left byte-for-byte unchanged. A higher-priority
-  learned rule that already shadowed the seed rule for some row keeps
-  shadowing it.
+  `unassigned` rows. Confirmed and transfer assignments keep their category,
+  status and source. A higher-priority rule keeps winning where it applies.
+- `Store::rule_delete_preview(rule_id) -> Result<RuleDeletePreview>` returns
+  `open_rule_references` and `open_classification_changes`. The first count is
+  the number of open rows whose current `rule_id` points to the selected rule.
+  The second simulates the existing classifier without that rule and counts
+  rows whose status or category would change. A fallback that keeps both
+  values does not count as a visible classification change, even if its rule
+  pointer or source differs.
+- `Store::delete_rule` now rejects an unknown rule and performs reference
+  detachment, deletion and open-row reclassification in one transaction.
+  Confirmed and transfer rows keep category, status and source. A confirmed
+  row that referred to the deleted rule loses `rule_id`, because the foreign
+  key target no longer exists.
 
 ### Spotify fresh seed and legacy repair
 
@@ -198,7 +208,7 @@ persistence. No production command changed.
 - `crates/store/tests/spotify_repair.rs` (3 cases): the public-boundary half.
   A fresh `Store::open_in_memory()` already has `Predplatné/Spotify` and
   the `spotify` seed rule pointing at it, through nothing but the public API.
-- `crates/store/tests/category_workflows.rs` (15 cases, mapped to acceptance
+- `crates/store/tests/category_workflows.rs` (23 cases, mapped to acceptance
   IDs C01/C02/C03/C05): move, promote-to-root, refuse-reparent-with-children,
   self/descendant/missing/archived/system parent refusals, the protected
   Hotovosť subtree, kind-change preview/ack/propagation with exact counts,
@@ -206,13 +216,14 @@ persistence. No production command changed.
   edit (via a real file-backed fixture, same `rusqlite::Connection` pattern as
   `tests/migration.rs`, since the validated create path can no longer
   construct one), seed rule provenance, and redirect (including the
-  active-vs-archived-children target rule and the seed-only restriction).
+  active-vs-archived-children target rule, learned-rule redirects, precedence,
+  rollback, delete preview and confirmed/transfer preservation).
   Fixtures go through the real parser/import/classify path
   (`import_statement`, `assign`, `confirm`) wherever possible, per the local
   acceptance rule against calling production logic to compute expected
   values.
-- `src-tauri/tests/category_json.rs` (8 cases): the wire-contract drift gate
-  for the four new commands and their request/response shapes, same pattern
+- `src-tauri/tests/category_json.rs` (10 cases): the wire-contract drift gate
+  for the five category workflow commands and their request/response shapes, same pattern
   as `commands_json.rs`.
 - `src/components/CategoryDialog.test.tsx` (5 cases), `CategoryPicker.test.tsx`
   (+3 cases for `onCreate`), `screens/Categories.test.tsx` (+3 cases for the
@@ -222,7 +233,7 @@ persistence. No production command changed.
 
 ```
 cargo test --jobs 4 -p store --lib                     # 36 passed (incl. 10 seed_repair)
-cargo test --jobs 4 -p store --test category_workflows # 14 passed
+cargo test --jobs 4 -p store --test category_workflows # 23 passed
 cargo test --jobs 4 -p store --test spotify_repair     # 3 passed
 cargo test --jobs 4 --workspace                        # all green, see lane report
 cargo clippy --jobs 4 --workspace --all-targets -- -D warnings

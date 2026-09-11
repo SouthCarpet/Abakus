@@ -2,7 +2,7 @@
 //! the exact JSON the UI's `categoryApi` sends against the real Rust types,
 //! and serialize the real response structs to check their field names.
 use serde_json::json;
-use store::{Category, CategoryKind, CategoryUpdatePreview, CategoryUpdateRequest, RuleRedirectOutcome};
+use store::{Category, CategoryKind, CategoryUpdatePreview, CategoryUpdateRequest, RuleDeletePreview, RuleRedirectOutcome};
 
 #[derive(serde::Deserialize)]
 struct CategoryUpdatePreviewArgs { request: CategoryUpdateRequest }
@@ -19,6 +19,11 @@ struct SeedRuleForTransactionArgs {
 struct UpdateRuleCategoryArgs {
     #[serde(rename = "ruleId")] rule_id: i64,
     #[serde(rename = "categoryId")] category_id: i64,
+}
+
+#[derive(serde::Deserialize)]
+struct RuleDeletePreviewArgs {
+    #[serde(rename = "ruleId")] rule_id: i64,
 }
 
 #[test]
@@ -56,6 +61,12 @@ fn update_rule_category_args_match_the_ui_call() {
 }
 
 #[test]
+fn rule_delete_preview_args_match_the_ui_call() {
+    let args: RuleDeletePreviewArgs = serde_json::from_value(json!({"ruleId": 9})).unwrap();
+    assert_eq!(args.rule_id, 9);
+}
+
+#[test]
 fn category_update_preview_serializes_snake_case() {
     let p = CategoryUpdatePreview { effective_kind: CategoryKind::Income, affected_categories: 3, transaction_count: 5, confirmed_count: 2, requires_confirmation: true };
     let v = serde_json::to_value(p).unwrap();
@@ -67,6 +78,13 @@ fn rule_redirect_outcome_serializes_snake_case() {
     let o = RuleRedirectOutcome { rule_id: 9, category_id: 4, updated: 2 };
     let v = serde_json::to_value(o).unwrap();
     assert_eq!(v, json!({"rule_id": 9, "category_id": 4, "updated": 2}));
+}
+
+#[test]
+fn rule_delete_preview_serializes_exact_counts() {
+    let preview = RuleDeletePreview { rule_id: 9, open_rule_references: 4, open_classification_changes: 2 };
+    let value = serde_json::to_value(preview).unwrap();
+    assert_eq!(value, json!({"rule_id": 9, "open_rule_references": 4, "open_classification_changes": 2}));
 }
 
 /// Round-trips the response `update_category` and `category_update_preview`

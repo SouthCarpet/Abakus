@@ -23,9 +23,16 @@ export interface RuleRedirectOutcome {
   updated: number
 }
 
+export interface RuleDeletePreview {
+  rule_id: number
+  open_rule_references: number
+  open_classification_changes: number
+}
+
 export const categoryApi = {
   preview: (request: CategoryUpdateRequest) => invoke<CategoryUpdatePreview>('category_update_preview', { request }),
   update: (request: CategoryUpdateRequest) => invoke<Category>('update_category', { request }),
   seedRuleForTransaction: (transactionId: number) => invoke<RuleView | null>('seed_rule_for_transaction', { transactionId }),
   redirectRule: (ruleId: number, categoryId: number) => invoke<RuleRedirectOutcome>('update_rule_category', { ruleId, categoryId }),
+  previewRuleDelete: (ruleId: number) => invoke<RuleDeletePreview>('rule_delete_preview', { ruleId }),
 }

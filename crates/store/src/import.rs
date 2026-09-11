@@ -88,7 +88,7 @@ impl Store {
         let cash = self.cash_category_id()?;
         let mut changed = 0;
         for id in ids {
-            let a = self.classify_one(*id, &own, &rule_list, cash)?;
+            let a = self.classify_with_rules(*id, &own, &rule_list, cash)?;
             self.conn.execute("UPDATE transactions SET status = ?2, category_id = ?3, rule_id = ?4, source = ?5 WHERE id = ?1", rusqlite::params![id, status_str(a.status), a.category_id, a.rule_id, serde_json::to_value(a.source).unwrap().as_str().unwrap()])?;
             if let Some(r) = a.rule_id { self.touch_rule(r)?; }
             changed += 1;
@@ -96,7 +96,10 @@ impl Store {
         Ok(changed)
     }
 
-    fn classify_one(&self, id: i64, own: &HashSet<String>, rule_list: &[rules::Rule], cash: Option<i64>) -> Result<rules::Assignment> {
+    /// Computes one assignment against the supplied rule snapshot. This does
+    /// not write the transaction or touch hit counts; each caller owns those
+    /// effects when its operation requires them.
+    pub(crate) fn classify_with_rules(&self, id: i64, own: &HashSet<String>, rule_list: &[rules::Rule], cash: Option<i64>) -> Result<rules::Assignment> {
         let (kind, merchant_norm, place_norm, iban): (String, String, Option<String>, Option<String>) = self.conn.query_row("SELECT kind, merchant_norm, place_norm, counterparty_iban FROM transactions WHERE id = ?1", [id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?;
         let lookup = |m: &str| self.last_confirmed_category(m);
         Ok(classify(&Facts { kind: serde_json::from_value(serde_json::Value::String(kind)).unwrap(), merchant_norm: &merchant_norm, place_norm: place_norm.as_deref(), counterparty_iban: iban.as_deref() }, &Context { own_ibans: own, rules: rule_list, cash_category: cash, refund_lookup: &lookup }))

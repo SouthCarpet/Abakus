@@ -25,6 +25,8 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 **0.1.6.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
+Vo vývojovej vetve 0.2.0 je pripravený backend na zmenu cieľa naučených pravidiel a presný náhľad dopadu zmazania pravidla. Ovládanie v tabuľke pravidiel ešte nie je hotové. Technický kontrakt je v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md).
+
 ## Prečo
 
 - Bankové PDF spracujete offline.
@@ -203,6 +205,7 @@ Skript zostaví frontend cez `tsc` a `vite`, potom `tauri build --no-bundle` a n
 - [CHANGELOG.md](CHANGELOG.md): poznámky k vydaniu, ktoré appka ukáže ako **Poznámky k vydaniu**.
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md): známe obmedzenia.
 - [docs/](docs/): interné poznámky k dráham a vydaniam, vrátane [docs/release-0.1.2.md](docs/release-0.1.2.md) a [docs/release-0.1.3.md](docs/release-0.1.3.md).
+- [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): backendový kontrakt úpravy a náhľadu zmazania pravidiel pre pripravovanú verziu 0.2.0.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.

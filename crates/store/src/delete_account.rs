@@ -192,7 +192,7 @@ mod tests {
 
     /// A REFUND's suggested category comes from `refund_lookup`, i.e. the
     /// most recent CONFIRMED purchase for the same merchant, wherever it
-    /// lives (see `crate::import::classify_one`). The confirmed purchase here
+    /// lives (see `Store::classify_with_rules`). The confirmed purchase here
     /// is written directly with SQL rather than through `assign`, because
     /// `assign` always also teaches a rule for the merchant, and that rule
     /// would then match the refund directly (Exact/Merchant beat the

@@ -29,3 +29,8 @@ pub fn seed_rule_for_transaction(state: State<AppState>, transaction_id: i64) ->
 pub fn update_rule_category(state: State<AppState>, rule_id: i64, category_id: i64) -> Result<store::RuleRedirectOutcome, String> {
     lock(&state)?.update_rule_category(rule_id, category_id).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn rule_delete_preview(state: State<AppState>, rule_id: i64) -> Result<store::RuleDeletePreview, String> {
+    lock(&state)?.rule_delete_preview(rule_id).map_err(|e| e.to_string())
+}

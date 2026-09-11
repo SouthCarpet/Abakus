@@ -54,6 +54,7 @@ pub fn run() {
             category_commands::update_category,
             category_commands::seed_rule_for_transaction,
             category_commands::update_rule_category,
+            category_commands::rule_delete_preview,
             commands::list_rules,
             commands::delete_rule,
             commands::list_transactions,
