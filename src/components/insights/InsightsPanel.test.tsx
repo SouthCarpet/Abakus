@@ -38,7 +38,7 @@ const statement = (overrides: Partial<StatementHistoryRow> = {}): StatementHisto
 })
 
 const emptySummary: Summary = {
-  income_cents: 0, expense_cents: 0, transfer_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0,
+  income_cents: 0, expense_cents: 0, transfer_cents: 0, fee_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0,
   by_category: [], by_month: [], by_month_category: [], top_merchants: [],
 }
 

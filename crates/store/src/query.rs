@@ -3,7 +3,7 @@ use crate::import::{checksum_from_cols, status_parse};
 use crate::{Result, Store};
 use chrono::NaiveDate;
 use parser::fold::fold;
-use parser::{AccountKind, Checksum};
+use parser::{AccountKind, Checksum, TxKind};
 use rules::Status;
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +18,9 @@ pub struct TxFilter {
     pub account_kind: Option<AccountKind>,
     pub category_id: Option<i64>,
     pub status: Option<Status>,
+    /// Exact parser transaction kind. Absent in older callers.
+    #[serde(default)]
+    pub kind: Option<TxKind>,
     pub text: Option<String>,
     pub statement_id: Option<i64>,
 }
@@ -100,6 +103,11 @@ pub(crate) fn where_clause(f: &TxFilter) -> (String, Vec<Box<dyn rusqlite::ToSql
     if let Some(s) = f.status {
         let k = push_param(&mut params, Box::new(crate::import::status_str(s).to_string()));
         conds.push(format!("t.status = ?{k}"));
+    }
+    if let Some(kind) = f.kind {
+        let value = serde_json::to_value(kind).expect("TxKind always serializes as a string");
+        let k = push_param(&mut params, Box::new(value.as_str().expect("TxKind is string-valued").to_string()));
+        conds.push(format!("t.kind = ?{k}"));
     }
     // `text` is deliberately NOT a SQL condition here: 0.1.2 extends the
     // search to `note`, and the contract wants fold()-based (diacritic- and

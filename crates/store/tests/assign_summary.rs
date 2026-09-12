@@ -226,6 +226,7 @@ Mena    EUR                                          Výpis číslo:        1   
         account_kind: Some(AccountKind::Personal),
         category_id: Some(cat),
         status: Some(Status::Suggested),
+        kind: None,
         text: Some("ALDI".into()),
         statement_id: Some(personal_outcome.statement_id),
     };

@@ -191,7 +191,7 @@ fn tx_row_and_summary_serialize_snake_case() {
     assert_eq!(v["note"], json!("kúpiť darček"));
     assert!(v.get("accountId").is_none(), "TxRow keeps snake_case field names, no camelCase");
 
-    let summary = Summary { income_cents: 0, expense_cents: 199, transfer_cents: 0, net_cents: -199, unassigned_count: 0, suggested_count: 1, by_category: Vec::new(), by_month: Vec::new(), by_month_category: Vec::new(), top_merchants: Vec::new() };
+    let summary = Summary { income_cents: 0, expense_cents: 199, transfer_cents: 0, fee_cents: 0, net_cents: -199, unassigned_count: 0, suggested_count: 1, by_category: Vec::new(), by_month: Vec::new(), by_month_category: Vec::new(), top_merchants: Vec::new() };
     let sv = serde_json::to_value(&summary).unwrap();
     assert_eq!(sv["expense_cents"], json!(199));
     assert!(sv.get("expenseCents").is_none(), "Summary keeps snake_case field names, no camelCase");

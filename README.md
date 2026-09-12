@@ -213,6 +213,12 @@ mesiace a rovnaké kalendárne obdobie vlani. Oba rozsahy obsahujú začiatok aj
 koniec. Voľba obdobia a zobrazenie rozsahov v UI ešte čakajú na zapojenie.
 Kontrakt: [porovnanie s vlaňajškom](docs/plan-091-year-comparison.md).
 
+Bankové poplatky majú druh `fee`. Voliteľný filter `TxFilter.kind` sa kombinuje
+s ostatnými filtrami a exportom CSV. Súhrn a mesačné riadky vracajú
+`fee_cents`, podpísanú časť už započítaných výdavkov. Migrácia schémy na verziu
+5 mení iba druh rozpoznaných starších poplatkov. Ovládanie filtra a graf v UI
+ešte čakajú na zapojenie. Kontrakt: [bankové poplatky](docs/plan-091-fees.md).
+
 Inštalátor (Inno Setup 6):
 
 ```powershell
@@ -235,6 +241,8 @@ a Inno Setup sú build nástroje, používateľ ich nepotrebuje.
 - [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre pripravovanú verziu 0.2.0.
 - [docs/plan-091-statement-history.md](docs/plan-091-statement-history.md): backendový kontrakt počtu a podpísaného súčtu uložených transakcií vo výsledku histórie výpisov.
 - [docs/plan-091-transaction-search.md](docs/plan-091-transaction-search.md): kontrakt doslovného vyhľadávania cez obchodníka a miesto bez zmeny API alebo databázy.
+- [docs/plan-091-fees.md](docs/plan-091-fees.md): rozpoznanie poplatkov, filter,
+  súhrny a migrácia schémy na verziu 5 pre pripravovanú verziu 0.2.0.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.

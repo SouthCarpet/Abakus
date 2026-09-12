@@ -248,7 +248,7 @@ describe('other audited screen boundaries', () => {
     expect(within(dialog).getByRole('button', { name: 'Archivovať' })).toBeEnabled()
   })
   it('shows overview query failure and recovers after a period click', async () => {
-    vi.mocked(api.summary).mockRejectedValueOnce(new Error('Súhrn zlyhal')).mockResolvedValue({ income_cents: 0, expense_cents: 0, transfer_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0, by_category: [], by_month: [], by_month_category: [], top_merchants: [] })
+    vi.mocked(api.summary).mockRejectedValueOnce(new Error('Súhrn zlyhal')).mockResolvedValue({ income_cents: 0, expense_cents: 0, transfer_cents: 0, fee_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0, by_category: [], by_month: [], by_month_category: [], top_merchants: [] })
     render(<Overview onNavigateToImport={vi.fn()} onNavigateToTransactions={vi.fn()} />)
     expect(await screen.findByRole('alert')).toHaveTextContent('Súhrn zlyhal')
     fireEvent.click(screen.getByRole('button', { name: 'Minulý mesiac' }))
@@ -275,7 +275,7 @@ describe('other audited screen boundaries', () => {
 it('returns from a checksum statement drill-down to ordinary transactions through the rail', async () => {
   localStorage.setItem('abakus.period', '{"kind":"all"}')
   vi.mocked(api.badChecksums).mockResolvedValue([{ statement_id: 42, number: 3, account_label: 'Test', off_by_cents: 100 }])
-  vi.mocked(api.summary).mockResolvedValue({ income_cents: 0, expense_cents: 0, transfer_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0, by_category: [], by_month: [], by_month_category: [], top_merchants: [] })
+  vi.mocked(api.summary).mockResolvedValue({ income_cents: 0, expense_cents: 0, transfer_cents: 0, fee_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0, by_category: [], by_month: [], by_month_category: [], top_merchants: [] })
   render(<App />)
   fireEvent.click(await screen.findByRole('button', { name: 'Zobraziť transakcie' }))
   await waitFor(() => expect(api.listTransactions).toHaveBeenLastCalledWith(expect.objectContaining({ statement_id: 42, from: null, to: null })))

@@ -12,6 +12,9 @@
 //! for a brand-new database too (`Store::init` never creates these tables
 //! via `schema.sql`'s unconditional `CREATE TABLE IF NOT EXISTS`), so a
 //! fresh install and an upgraded one reach v4 by the identical code path.
+//! Version 5 classifies legacy `other` rows as `fee` only when their stored
+//! raw block passes the current parser fee predicate. Transfer rows are never
+//! eligible, and no column except `kind` changes.
 //!
 //! `Store::init` wraps `schema.sql` (base table creation) and this whole
 //! function in ONE `BEGIN IMMEDIATE`/`COMMIT`: a failure anywhere from the
@@ -22,7 +25,7 @@
 use crate::{Result, Store, StoreError};
 
 const VERSION_KEY: &str = "schema_version";
-pub(crate) const SCHEMA_VERSION: i64 = 4;
+pub(crate) const SCHEMA_VERSION: i64 = 5;
 
 const V4_DDL: &str = "\
 CREATE TABLE recurring_decisions (
@@ -71,6 +74,9 @@ impl Store {
             self.conn.execute_batch(V4_DDL)?;
             self.repair_spotify_seed_tx()?;
         }
+        if from < 5 {
+            self.backfill_fee_kinds()?;
+        }
         Ok(())
     }
 
@@ -118,6 +124,21 @@ impl Store {
              WHERE t.rule_id IS NOT NULL AND r.match_kind <> 'seed'",
             [],
         )?;
+        Ok(())
+    }
+
+    fn backfill_fee_kinds(&mut self) -> Result<()> {
+        let fee_ids = {
+            let mut statement = self.conn.prepare("SELECT id, raw_block FROM transactions WHERE kind = 'other' AND status <> 'transfer'")?;
+            let rows = statement.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+                .into_iter()
+                .filter_map(|(id, raw_block)| parser::raw_block_is_fee(&raw_block).then_some(id))
+                .collect::<Vec<_>>()
+        };
+        for id in fee_ids {
+            self.conn.execute("UPDATE transactions SET kind = 'fee' WHERE id = ?1", [id])?;
+        }
         Ok(())
     }
 }

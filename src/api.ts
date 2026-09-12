@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 
 export type AccountKind = 'personal' | 'business'
+export type TxKind = 'card' | 'card_foreign' | 'refund' | 'atm' | 'transfer_in' | 'transfer_out' | 'standing_order' | 'fee' | 'other'
 export type CategoryKind = 'expense' | 'income'
 export type Status = 'transfer' | 'confirmed' | 'suggested' | 'unassigned'
 export type Checksum = { status: 'ok' } | { status: 'off_by'; off_by: number } | { status: 'not_verifiable' }
@@ -13,10 +14,10 @@ export interface StatementDeletePreview { statement_id: number; number: number; 
 export interface StatementDeleteOutcome { statement_id: number; number: number; transactions_deleted: number; rules_deleted: number; open_rows_reclassified: number }
 export interface Category { id: number; parent_id: number | null; name: string; kind: CategoryKind; sort: number; system: boolean; archived: boolean }
 export interface RuleView { id: number; kind: 'exact' | 'merchant' | 'counterparty_account' | 'seed'; key: string; place: string | null; category_id: number; category_name: string; parent_name: string | null; hit_count: number }
-export interface TxFilter { from?: string | null; to?: string | null; account_id?: number | null; account_kind?: AccountKind | null; category_id?: number | null; status?: Status | null; text?: string | null; statement_id?: number | null }
+export interface TxFilter { from?: string | null; to?: string | null; account_id?: number | null; account_kind?: AccountKind | null; category_id?: number | null; status?: Status | null; kind?: TxKind | null; text?: string | null; statement_id?: number | null }
 export interface TxRow { id: number; account_id: number; account_kind: AccountKind; statement_number: number; posted_date: string; tx_date: string; kind: string; amount_cents: number; orig_amount_cents: number | null; orig_currency: string | null; merchant_raw: string; place: string | null; counterparty_name: string | null; counterparty_iban: string | null; category_id: number | null; category_name: string | null; parent_name: string | null; status: Status; source: string; raw_block: string; note: string }
 export interface ImportReport { path: string; status: ImportStatus; accountLabel: string | null; accountKind: AccountKind | null; ibanMasked: string | null; iban: string | null; statementNumber: number | null; periodStart: string | null; periodEnd: string | null; inserted: number; duplicates: number; checksum: Checksum | null; warnings: string[]; message: string | null; statementId: number | null }
-export interface Summary { income_cents: number; expense_cents: number; transfer_cents: number; net_cents: number; unassigned_count: number; suggested_count: number; by_category: { category_id: number; name: string; parent_name: string | null; cents: number }[]; by_month: { month: string; income_cents: number; expense_cents: number }[]; by_month_category: { month: string; category_id: number; name: string; cents: number }[]; top_merchants: { merchant: string; cents: number; count: number }[] }
+export interface Summary { income_cents: number; expense_cents: number; transfer_cents: number; fee_cents: number; net_cents: number; unassigned_count: number; suggested_count: number; by_category: { category_id: number; name: string; parent_name: string | null; cents: number }[]; by_month: { month: string; income_cents: number; expense_cents: number; fee_cents: number }[]; by_month_category: { month: string; category_id: number; name: string; cents: number }[]; top_merchants: { merchant: string; cents: number; count: number }[] }
 export interface BadChecksum { statement_id: number; number: number; account_label: string; off_by_cents: number }
 export interface RecentStatement { statement_id: number; number: number; period_end: string; account_label: string; transaction_count: number; checksum: Checksum }
 export interface StatementHistoryRow { statement_id: number; account_id: number; account_label: string; account_kind: AccountKind; number: number; period_start: string; period_end: string; opening_cents: number | null; closing_cents: number | null; transaction_count: number; total_cents: number; checksum: Checksum }

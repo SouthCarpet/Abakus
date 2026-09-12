@@ -103,11 +103,12 @@ const nonEmptySummary: Summary = {
   income_cents: 0,
   expense_cents: 0,
   transfer_cents: 0,
+  fee_cents: 0,
   net_cents: 0,
   unassigned_count: 3,
   suggested_count: 1,
   by_category: [],
-  by_month: [{ month: '2026-06', income_cents: 0, expense_cents: 0 }],
+  by_month: [{ month: '2026-06', income_cents: 0, expense_cents: 0, fee_cents: 0 }],
   by_month_category: [],
   top_merchants: [],
 }

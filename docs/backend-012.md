@@ -262,6 +262,29 @@ to fail in this pass's runs.
   deduplication can leave that row with `0` transactions and `0` cents while
   the first import keeps ownership of the stored rows.
 
+## Plan 091 fee backend extension
+
+Plan 091 adds a dedicated `fee` transaction kind without changing the
+existing income, expense, transfer, net, history, or CSV contracts.
+`TxFilter.kind` is optional and intersects with every earlier filter,
+including the Rust-side literal text match. CSV export calls the same filtered
+query, so its rows stay equal to the transaction list.
+
+`Summary.fee_cents` and `MonthRow.fee_cents` are signed integer cents. Each is
+the expense contribution from rows whose stored kind is `fee` in the same
+account and inclusive date scope. The contribution is already included in
+`expense_cents`. A booked fee of `-250` contributes `250`; a positive fee
+correction in an expense category contributes a negative value. Fee rows do
+not add a second expense, income, transfer, or net contribution.
+
+Schema version 5 changes no table shape. Its one-time migration reads only
+legacy rows with `kind = 'other'` and a non-transfer status. It changes `kind`
+to `fee` only when the stored `raw_block` has a valid parser first line whose
+folded description starts with `poplat`. IDs, fingerprints, amounts,
+categories, status, rules, source, notes, and all other columns stay intact.
+The migration runs in the existing initialization transaction, is idempotent
+on reopen, and cannot recast a protected transfer row.
+
 ## Integration notes for the parent
 
 - `src/api.ts` needs three new declarations, shapes exactly as in
