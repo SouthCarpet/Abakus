@@ -97,6 +97,33 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
   row that referred to the deleted rule loses `rule_id`, because the foreign
   key target no longer exists.
 
+### Plan 091 category deletion (`crates/store/src/category_delete.rs`)
+
+- `category_delete_preview(category_id)` returns the exact root and descendant
+  rows plus transaction, confirmed, rule, rule-source and recurring-member
+  counts. Archived categories are valid deletion targets. System categories
+  and the protected subtree below a system category are refused.
+- `delete_category(CategoryDeleteRequest { preview })` recomputes the full
+  preview inside `BEGIN IMMEDIATE` and requires exact equality. A new category,
+  transaction, rule, provenance row or recurring membership makes the preview
+  stale and prevents every write.
+- Every affected non-transfer transaction, including `confirmed`, becomes the
+  existing unassigned representation (`category_id = NULL`, `status =
+  'unassigned'`, `rule_id = NULL`, `source = 'none'`). Rules that target the
+  subtree are deleted and their `rule_sources` rows follow the existing
+  cascade.
+- Recurring decisions and memberships are retained. They have no category
+  foreign key; the displayed category is derived again from the now-unassigned
+  transactions.
+- A transfer with an invalid category reference, or a transaction outside the
+  subtree that refers to a rule targeted into the subtree, stops preview and
+  apply. The backend does not silently mutate either row.
+- Any SQL failure rolls back transaction changes, rules, provenance and
+  categories. The same Store connection remains usable for a corrected retry.
+- The complete additive field and command inventory is in
+  `docs/plan-091-category-delete.md`. This batch is backend-only; the delete
+  icon and confirmation dialog are a separate UI lane.
+
 ### Atomic bulk confirmation (`crates/store/src/assign.rs`)
 
 - `Store::confirm(ids, apply_to_matching) -> Result<AssignOutcome>` confirms
@@ -162,7 +189,9 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
 ### Frontend seam (`src/lib/category-api.ts`, `src/components/CategoryDialog.tsx`, `src/components/CategoryPicker.tsx`)
 
 - `categoryApi` (new): `preview`, `update`, `seedRuleForTransaction`,
-  `redirectRule`, wired to the four new Tauri commands
+  `redirectRule`, `previewDelete`, and `deleteCategory`, wired to the existing
+  category workflow commands plus `category_delete_preview` and
+  `delete_category`
   (`category_update_preview`, `update_category`, `seed_rule_for_transaction`,
   `update_rule_category`).
 - `CategoryDialog` (new, shared seam): `{open, initialParentId?, initialKind?,
@@ -252,6 +281,12 @@ persistence. No production command changed.
 - `src-tauri/tests/category_json.rs` (10 cases): the wire-contract drift gate
   for the five category workflow commands and their request/response shapes, same pattern
   as `commands_json.rs`.
+- `crates/store/tests/category_delete.rs` (8 cases): public Store deletion
+  contract, including the exact-preview gate, confirmed rows, descendants,
+  archived/empty and unknown categories, system/transfer/reference protection,
+  rule provenance, retained recurring membership, rollback and retry.
+- `src-tauri/tests/category_json.rs` adds four deletion wire cases for command
+  arguments, required/unknown fields and the complete serialized preview.
 - `crates/store/tests/bulk_confirmation.rs` (10 cases): public `Store` tests
   for duplicate ids, merchant/place and counterparty matching, protected
   rows, category conflicts, selection order, rollback, retry and persistence.

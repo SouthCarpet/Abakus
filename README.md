@@ -25,7 +25,7 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 **0.1.6.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
-Vo vývojovej vetve 0.2.0 je pripravený backend na zmenu cieľa naučených pravidiel, náhľad dopadu zmazania pravidla a atómové hromadné potvrdenie návrhov. Hromadné potvrdenie vie voliteľne zahrnúť presné zhody obchodníka a miesta alebo účtu protistrany. Ovládanie týchto funkcií ešte nie je hotové. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
+Vo vývojovej vetve 0.2.0 je pripravený backend na zmenu cieľa naučených pravidiel, náhľad dopadu zmazania pravidla, explicitné zmazanie kategórie po potvrdení náhľadu a atómové hromadné potvrdenie návrhov. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Ovládanie týchto funkcií ešte nie je hotové. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
 ## Prečo
 
@@ -217,6 +217,7 @@ Skript zostaví frontend cez `tsc` a `vite`, potom `tauri build --no-bundle` a n
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md): známe obmedzenia.
 - [docs/](docs/): interné poznámky k dráham a vydaniam, vrátane [docs/release-0.1.2.md](docs/release-0.1.2.md) a [docs/release-0.1.3.md](docs/release-0.1.3.md).
 - [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): backendový kontrakt úpravy a náhľadu zmazania pravidiel pre pripravovanú verziu 0.2.0.
+- [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md): explicitný preview/apply kontrakt zmazania kategórie, jej potomkov, priradení a pravidiel.
 - [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre pripravovanú verziu 0.2.0.
 - [docs/plan-091-statement-history.md](docs/plan-091-statement-history.md): backendový kontrakt počtu a podpísaného súčtu uložených transakcií vo výsledku histórie výpisov.
 - [docs/plan-091-transaction-search.md](docs/plan-091-transaction-search.md): kontrakt doslovného vyhľadávania cez obchodníka a miesto bez zmeny API alebo databázy.

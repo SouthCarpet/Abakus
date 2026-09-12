@@ -51,6 +51,8 @@ pub fn run() {
             commands::save_category,
             commands::archive_category,
             category_commands::category_update_preview,
+            category_commands::category_delete_preview,
+            category_commands::delete_category,
             category_commands::update_category,
             category_commands::seed_rule_for_transaction,
             category_commands::update_rule_category,
