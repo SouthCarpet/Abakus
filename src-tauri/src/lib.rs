@@ -62,6 +62,8 @@ pub fn run() {
             commands::delete_rule,
             commands::list_transactions,
             commands::assign,
+            commands::bulk_assign,
+            commands::undo_last_assignment,
             commands::confirm,
             commands::summary,
             commands::export_csv,

@@ -6,6 +6,10 @@ use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
+mod undo;
+pub use undo::{BulkAssignOutcome, UndoAssignmentOutcome};
+pub(crate) use undo::AssignmentUndo;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum MatchKey {
     MerchantPlace {
@@ -60,6 +64,13 @@ struct AssignmentSource {
     category_id: i64,
 }
 
+struct AssignmentPlan {
+    sources: Vec<AssignmentSource>,
+    targets: Vec<MatchingTarget>,
+    policy: BatchPolicy,
+    skipped_transfers: usize,
+}
+
 struct MatchingTarget {
     id: i64,
     key: MatchKey,
@@ -71,6 +82,9 @@ struct MatchingRule {
     id: i64,
     source: &'static str,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct RuleIdentity { match_kind: &'static str, key: String, place: String }
 
 struct Learned {
     key: Option<MatchKey>,
@@ -162,22 +176,8 @@ impl Store {
         category_id: i64,
         apply_to_matching: bool,
     ) -> Result<AssignOutcome> {
-        let selected = self.load_selected(ids)?;
-        let skipped_transfers = selected
-            .iter()
-            .filter(|row| row.status == "transfer")
-            .count();
-        let sources = selected
-            .into_iter()
-            .filter(|row| row.status != "transfer")
-            .map(|row| AssignmentSource { row, category_id })
-            .collect::<Vec<_>>();
-        self.apply_assignment_sources(
-            sources,
-            skipped_transfers,
-            apply_to_matching,
-            MatchMode::Merchant,
-        )
+        let plan = self.prepare_assignment(ids, category_id, apply_to_matching)?;
+        self.apply_assignment_plan(&plan, MatchMode::Merchant)
     }
 
     /// Confirms selected suggestions atomically. Unknown ids fail the full
@@ -203,10 +203,14 @@ impl Store {
                     .map(|category_id| AssignmentSource { row, category_id })
             })
             .collect::<Vec<_>>();
+        let policy = BatchPolicy::from_sources(&sources, MatchMode::ExactIdentity);
+        let selected_ids = sources.iter().map(|source| source.row.id).collect::<HashSet<_>>();
+        let targets = self.matching_targets(&policy, &selected_ids, apply_to_matching, MatchMode::ExactIdentity)?;
         self.apply_assignment_sources(
-            sources,
+            &sources,
+            &targets,
+            &policy,
             skipped_transfers,
-            apply_to_matching,
             MatchMode::ExactIdentity,
         )
     }
@@ -249,34 +253,43 @@ impl Store {
             .ok_or(StoreError::UnknownTransaction { id })
     }
 
+    fn prepare_assignment(&self, ids: &[i64], category_id: i64, apply_to_matching: bool) -> Result<AssignmentPlan> {
+        let selected = self.load_selected(ids)?;
+        let skipped_transfers = selected.iter().filter(|row| row.status == "transfer").count();
+        let sources = selected.into_iter().filter(|row| row.status != "transfer").map(|row| AssignmentSource { row, category_id }).collect::<Vec<_>>();
+        let policy = BatchPolicy::from_sources(&sources, MatchMode::Merchant);
+        let selected_ids = sources.iter().map(|source| source.row.id).collect::<HashSet<_>>();
+        let targets = self.matching_targets(&policy, &selected_ids, apply_to_matching, MatchMode::Merchant)?;
+        Ok(AssignmentPlan { sources, targets, policy, skipped_transfers })
+    }
+
+    fn apply_assignment_plan(&mut self, plan: &AssignmentPlan, mode: MatchMode) -> Result<AssignOutcome> {
+        self.apply_assignment_sources(&plan.sources, &plan.targets, &plan.policy, plan.skipped_transfers, mode)
+    }
+
     fn apply_assignment_sources(
         &mut self,
-        sources: Vec<AssignmentSource>,
+        sources: &[AssignmentSource],
+        targets: &[MatchingTarget],
+        policy: &BatchPolicy,
         skipped_transfers: usize,
-        apply_to_matching: bool,
         mode: MatchMode,
     ) -> Result<AssignOutcome> {
-        let policy = BatchPolicy::from_sources(&sources, mode);
-        let selected_ids = sources
-            .iter()
-            .map(|source| source.row.id)
-            .collect::<HashSet<_>>();
-        let targets = self.matching_targets(&policy, &selected_ids, apply_to_matching, mode)?;
         let mut outcome = AssignOutcome {
             updated: 0,
             rules_created: 0,
             skipped_transfers,
         };
         let mut matching_rules = HashMap::new();
-        for source in &sources {
-            let learned = self.assign_one(source, &policy, mode)?;
+        for source in sources {
+            let learned = self.assign_one(source, policy, mode)?;
             outcome.updated += 1;
             outcome.rules_created += learned.created;
             if let (Some(key), Some(rule)) = (learned.key, learned.matching_rule) {
                 matching_rules.insert((key, source.category_id), rule);
             }
         }
-        outcome.updated += self.apply_matching_targets(&targets, &matching_rules)?;
+        outcome.updated += self.apply_matching_targets(targets, &matching_rules)?;
         Ok(outcome)
     }
 
@@ -350,28 +363,16 @@ impl Store {
         source: &AssignmentSource,
         policy: &BatchPolicy,
     ) -> Result<Learned> {
-        if source.row.merchant.is_empty() {
-            return Ok(Learned::none());
-        }
         let key = MatchKey::MerchantPlace {
             merchant: source.row.merchant.clone(),
             place: None,
         };
-        if policy.identity_category(&key) != Some(source.category_id) {
+        let identities = assignment_rule_identities(std::slice::from_ref(source), policy);
+        if identities.is_empty() {
             return Ok(Learned::none());
         }
-        let (exact, exact_created) = self.insert_learned_rule(
-            RuleKind::Exact,
-            &source.row.merchant,
-            source.row.place.as_deref(),
-            source.category_id,
-        )?;
-        let (merchant, merchant_created) = self.insert_learned_rule(
-            RuleKind::Merchant,
-            &source.row.merchant,
-            None,
-            source.category_id,
-        )?;
+        let (exact, exact_created) = self.insert_learned_identity(&identities[0], source.category_id)?;
+        let (merchant, merchant_created) = self.insert_learned_identity(&identities[1], source.category_id)?;
         Ok(Learned {
             key: Some(key),
             matching_rule: Some(MatchingRule {
@@ -463,6 +464,15 @@ impl Store {
             .exists(params![crate::rules_repo::kind_str(kind), key, place_value])?;
         let rule = self.insert_rule(kind, key, place, category_id)?;
         Ok((rule, usize::from(!existed)))
+    }
+
+    fn insert_learned_identity(&mut self, identity: &RuleIdentity, category_id: i64) -> Result<(i64, usize)> {
+        let kind = match identity.match_kind {
+            "exact" => RuleKind::Exact,
+            "merchant" => RuleKind::Merchant,
+            _ => return Err(StoreError::Db("unsupported assignment rule identity".into())),
+        };
+        self.insert_learned_rule(kind, &identity.key, (!identity.place.is_empty()).then_some(identity.place.as_str()), category_id)
     }
 
     fn confirm_selected(&mut self, id: i64, category_id: i64, learned: &Learned) -> Result<()> {
@@ -572,6 +582,23 @@ fn matching_target(
         key,
         category_id,
     })
+}
+
+fn affected_row_ids(plan: &AssignmentPlan) -> Vec<i64> {
+    plan.sources.iter().map(|source| source.row.id).chain(plan.targets.iter().map(|target| target.id)).collect()
+}
+
+fn assignment_rule_identities(sources: &[AssignmentSource], policy: &BatchPolicy) -> Vec<RuleIdentity> {
+    let mut seen = HashSet::new();
+    sources.iter()
+        .filter(|source| !source.row.merchant.is_empty())
+        .filter(|source| policy.identity_category(&MatchKey::MerchantPlace { merchant: source.row.merchant.clone(), place: None }) == Some(source.category_id))
+        .flat_map(|source| [
+            RuleIdentity { match_kind: "exact", key: source.row.merchant.clone(), place: source.row.place.clone().unwrap_or_default() },
+            RuleIdentity { match_kind: "merchant", key: source.row.merchant.clone(), place: String::new() },
+        ])
+        .filter(|identity| seen.insert(identity.clone()))
+        .collect()
 }
 
 fn read_stored_transaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredTransaction> {

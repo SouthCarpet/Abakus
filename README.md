@@ -227,6 +227,13 @@ upozornenia neznáme. Stav bez otvorených kontrol nepotvrdzuje úplnosť bankov
 dát. Používateľské rozhranie ešte nie je zapojené.
 [Kontrakt kontroly výpisu](docs/plan-091-statement-review.md).
 
+Backend hromadného priradenia teraz vráti identifikátor poslednej vratnej
+operácie. Vrátenie obnoví iba zmenené polia priradenia, naučené pravidlá a
+nové záznamy pôvodu. Starší alebo neplatný identifikátor novšiu operáciu
+nezruší. Možnosť v rozhraní ešte nie je hotová a zdrojové testy nepotvrdzujú
+správanie natívnej aplikácie.
+[Kontrakt vratného priradenia](docs/plan-091-assignment-undo.md).
+
 Inštalátor (Inno Setup 6):
 
 ```powershell

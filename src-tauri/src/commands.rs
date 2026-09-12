@@ -203,6 +203,16 @@ pub fn assign(state: State<AppState>, ids: Vec<i64>, category_id: i64, apply_to_
 }
 
 #[tauri::command]
+pub fn bulk_assign(state: State<AppState>, ids: Vec<i64>, category_id: i64, apply_to_matching: bool) -> Result<store::BulkAssignOutcome, String> {
+    lock(&state)?.assign_undoable(&ids, category_id, apply_to_matching).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn undo_last_assignment(state: State<AppState>, expected_undo_id: String) -> Result<Option<store::UndoAssignmentOutcome>, String> {
+    lock(&state)?.undo_last_assignment(&expected_undo_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn confirm(state: State<AppState>, ids: Vec<i64>, apply_to_matching: Option<bool>) -> Result<store::AssignOutcome, String> {
     lock(&state)?.confirm(&ids, apply_to_matching.unwrap_or(false)).map_err(|e| e.to_string())
 }

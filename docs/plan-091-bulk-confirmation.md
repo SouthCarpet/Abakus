@@ -30,6 +30,11 @@ does not change its behavior.
 The TypeScript method is `confirm(ids, applyToMatching = false)`. It returns
 `Promise<AssignOutcome>`.
 
+The companion undoable legacy assignment path is documented in
+[`plan-091-assignment-undo.md`](plan-091-assignment-undo.md). It adds separate
+`bulk_assign` and `undo_last_assignment` commands. The single-row assignment
+and this confirmation contract stay unchanged.
+
 ## Selection rules
 
 - Input ids are deduplicated before any count or write.

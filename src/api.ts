@@ -37,6 +37,8 @@ export interface DownloadedUpdate { path: string; sha256: string }
 export interface NetLogRow { id: number; started_at: string; url: string; status: string; duration_ms: number; bytes_in: number }
 export interface AuditFailure { at: string; url: string; error: string }
 export interface AssignOutcome { updated: number; rules_created: number; skipped_transfers: number }
+export interface BulkAssignOutcome { updated: number; rules_created: number; skipped_transfers: number; undo_id: string | null }
+export interface UndoAssignmentOutcome { restored_rows: number }
 
 export const api = {
   importStatements: (paths: string[]) => invoke<ImportReport[]>('import_statements', { paths }),
@@ -61,6 +63,8 @@ export const api = {
     invoke<StatementHistoryRow[]>('statement_history', { accountId, accountKind }),
   statementReview: (statementId: number) => invoke<StatementReview>('statement_review', { statementId }),
   assign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<AssignOutcome>('assign', { ids, categoryId, applyToMatching }),
+  bulkAssign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<BulkAssignOutcome>('bulk_assign', { ids, categoryId, applyToMatching }),
+  undoLastAssignment: (expectedUndoId: string) => invoke<UndoAssignmentOutcome | null>('undo_last_assignment', { expectedUndoId }),
   confirm: (ids: number[], applyToMatching = false) => invoke<AssignOutcome>('confirm', { ids, applyToMatching }),
   summary: (from: string | null, to: string | null, accountId: number | null, accountKind: AccountKind | null = null) =>
     invoke<Summary>('summary', { from, to, accountId, accountKind }),

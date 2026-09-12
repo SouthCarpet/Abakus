@@ -22,7 +22,7 @@ pub mod statement_review;
 pub mod summary;
 
 pub use accounts::Account;
-pub use assign::AssignOutcome;
+pub use assign::{AssignOutcome, BulkAssignOutcome, UndoAssignmentOutcome};
 pub use backup::BackupOutcome;
 pub use categories::{Category, CategoryKind, CategoryUpdatePreview, CategoryUpdateRequest};
 pub use category_delete::{CategoryDeleteItem, CategoryDeletePreview, CategoryDeleteRequest};
@@ -74,7 +74,7 @@ pub enum StoreError {
 impl From<rusqlite::Error> for StoreError { fn from(e: rusqlite::Error) -> Self { StoreError::Db(e.to_string()) } }
 pub type Result<T> = std::result::Result<T, StoreError>;
 
-pub struct Store { pub(crate) conn: Connection }
+pub struct Store { pub(crate) conn: Connection, pub(crate) assignment_undo: Option<assign::AssignmentUndo> }
 
 impl Store {
     pub fn open(path: &Path) -> Result<Self> { Self::init(Connection::open(path)?) }
@@ -86,7 +86,7 @@ impl Store {
     /// original version and never leaves a fresh database half initialized.
     fn init(conn: Connection) -> Result<Self> {
         conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-        let mut s = Store { conn };
+        let mut s = Store { conn, assignment_undo: None };
         s.conn.execute_batch("BEGIN IMMEDIATE")?;
         let init_result = s.initialize_tx();
         if let Err(error) = init_result {
