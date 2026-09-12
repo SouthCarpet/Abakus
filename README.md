@@ -131,6 +131,8 @@ Vlastné obdobie potrebuje dva platné dátumy so začiatkom najneskôr v deň k
 
 Kontrola aktualizácií je predvolene vypnutá. Zapnete ju v Nastaveniach voľbou **Kontrolovať aktualizácie (GitHub)**. Appka potom urobí jeden neautentifikovaný `GET` na najnovšie vydanie v GitHub Releases. Neposiela bankové údaje, heslá ani telemetriu.
 
+Voľba sa ukladá v databáze. Nastavenia ju pri každom otvorení znova načítajú. Prepínač je neaktívny, kým sa hodnota nenačíta. Ak načítanie zlyhá, zobrazí sa chyba. Ak sa vrátite do Nastavení počas ukladania, načítanie počká na dokončenie zápisu. Neúspešný zápis ponechá poslednú uloženú hodnotu. Podrobnosti a limity overenia sú v [docs/plan-091-update-preference.md](docs/plan-091-update-preference.md).
+
 Keď je na GitHub novšie vydanie, appka ukáže jeho poznámky k vydaniu. Ukáže aj tlačidlo `Aktualizovať na v<verzia>`. Až po kliknutí stiahne inštalátor. Sťahovanie overí voči `SHA256SUMS.txt` publikovanému s tým vydaním. Bez kliknutia sa nič nestiahne a nič sa nespustí.
 
 Inštalátor, ktorý appka takto spustí, je ten istý sprievodca ako pri ručnom stiahnutí: aktualizuje existujúcu inštaláciu na mieste a povie to.

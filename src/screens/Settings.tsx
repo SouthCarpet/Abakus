@@ -15,6 +15,7 @@ import { fromSkParts, maskIban } from '../lib/iban'
 import { periodRange, validPeriod } from '../lib/period'
 import { parseReleaseNotes } from '../lib/releaseNotes'
 import { type UpdatePhase, updateButtonLabel } from '../lib/updatePhase'
+import { readUpdatePreference, saveUpdatePreference } from '../lib/updatePreference'
 
 // 0.1.4 (Michal, 2026-09-08): the release notes are third-party text from a
 // GitHub release body, so this renders them as plain React text nodes only
@@ -223,6 +224,7 @@ export function Settings() {
   const [error, setError] = useState('')
   const [period] = usePeriod()
   const [checkUpdates, setCheckUpdates] = useState(false)
+  const [updatePreferenceLoaded, setUpdatePreferenceLoaded] = useState(false)
   const [release, setRelease] = useState<Release | null>(null)
   const [netLog, setNetLog] = useState<NetLogRow[]>([])
   const [auditFailures, setAuditFailures] = useState<AuditFailure[]>([])
@@ -255,29 +257,36 @@ export function Settings() {
     void api.dataDir().then(setDataDir).catch((e) => action.setError(String(e)))
     void refreshNetLog().catch((e) => action.setError(String(e)))
     const request = ++updateRequest.current
-    void loadUpdatePreference(request).catch((e) => action.setError(String(e)))
+    void loadUpdatePreference(request).catch((e) => {
+      if (request === updateRequest.current) action.setError(String(e))
+    })
     return () => { accountRequest.current++; netRequest.current++; updateRequest.current++ }
   }, [])
 
   async function loadUpdatePreference(request: number) {
-    const on = await api.getCheckUpdates()
+    const on = await readUpdatePreference()
     if (request !== updateRequest.current) return
     setCheckUpdates(on)
+    setUpdatePreferenceLoaded(true)
     if (!on) return
     const nextRelease = await api.checkUpdateNow()
-    if (request === updateRequest.current) setRelease(nextRelease)
+    if (request !== updateRequest.current) return
+    setRelease(nextRelease)
     await refreshNetLog()
   }
 
   async function toggleCheckUpdates(next: boolean) {
     const request = ++updateRequest.current
-    await api.setCheckUpdates(next)
+    await saveUpdatePreference(next)
+    if (request !== updateRequest.current) return
     setCheckUpdates(next)
     setRelease(null)
     try {
       const nextRelease = next ? await api.checkUpdateNow() : null
       if (request === updateRequest.current) setRelease(nextRelease)
-    } finally { await refreshNetLog() }
+    } finally {
+      if (request === updateRequest.current) await refreshNetLog()
+    }
   }
 
   async function scanNow() {
@@ -404,7 +413,7 @@ export function Settings() {
                 Výpisy: <span className="k-num">{statementCount}</span>
               </p>
               <label className="k-checkbox">
-                <input type="checkbox" checked={checkUpdates} onChange={(e) => void action.run(() => toggleCheckUpdates(e.target.checked))} />
+                <input type="checkbox" disabled={!updatePreferenceLoaded} checked={checkUpdates} onChange={(e) => void action.run(() => toggleCheckUpdates(e.target.checked))} />
                 Kontrolovať aktualizácie (GitHub)
               </label>
               <p>Sieťové volania: kontrola aktualizácií a stiahnutie inštalátora, obe len na tvoj pokyn; v predvolenom stave vypnuté.</p>

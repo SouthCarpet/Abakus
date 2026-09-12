@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Account, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
@@ -102,6 +102,143 @@ function deferred<T>() {
   const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
   return { promise, resolve, reject }
 }
+
+// Plan 091 point 5: the database owns the preference. Deferred owned API
+// stubs exercise read/write completion order without a network or native app.
+describe('Settings: saved update preference lifecycle', () => {
+  it('prevents a write before the saved true preference has loaded', async () => {
+    const read = deferred<boolean>()
+    mockApi({ getCheckUpdates: vi.fn().mockReturnValue(read.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    expect(box).toBeDisabled()
+    await act(async () => read.resolve(true))
+    expect(box).toBeChecked()
+    expect(box).toBeEnabled()
+  })
+
+  it('keeps an unreadable preference disabled and reports the read error', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockRejectedValue('Preference unreadable') })
+    render(<Settings />)
+    await screen.findByText('Preference unreadable')
+    expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeDisabled()
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
+  })
+
+  it('reads the saved opt-in again after Settings unmounts and remounts', async () => {
+    let saved = false
+    mockApi({
+      getCheckUpdates: vi.fn(async () => saved),
+      setCheckUpdates: vi.fn(async (next: boolean) => { saved = next }),
+    })
+    const first = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    await waitFor(() => expect(box).toBeChecked())
+    first.unmount()
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeChecked())
+    expect(saved).toBe(true)
+  })
+
+  it('retains the saved true value when saving false fails', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), setCheckUpdates: vi.fn().mockRejectedValue('Save refused') })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    await screen.findByText('Save refused')
+    expect(box).toBeChecked()
+    expect(box).toBeEnabled()
+  })
+
+  it('waits for a pending save from the previous mount before reading the preference', async () => {
+    const save = deferred<void>()
+    let saved = false
+    mockApi({
+      getCheckUpdates: vi.fn(async () => saved),
+      setCheckUpdates: vi.fn(async (next: boolean) => { await save.promise; saved = next }),
+    })
+    const first = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    first.unmount()
+    render(<Settings />)
+    await act(async () => save.resolve())
+    expect(saved).toBe(true)
+    expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeChecked()
+    expect(api.checkUpdateNow).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the saved true value after a previous mount fails to save false', async () => {
+    const save = deferred<void>()
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
+    const first = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    first.unmount()
+    render(<Settings />)
+    await act(async () => save.reject('Write failed'))
+    const remountedBox = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    expect(remountedBox).toBeChecked()
+    expect(remountedBox).toBeEnabled()
+    expect(screen.queryByText('Write failed')).not.toBeInTheDocument()
+  })
+
+  it('serializes rapid clicks until the pending save completes', async () => {
+    const save = deferred<void>()
+    mockApi({ setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    fireEvent.click(box)
+    expect(box).toBeDisabled()
+    expect(api.setCheckUpdates).toHaveBeenCalledTimes(1)
+    await act(async () => save.resolve())
+    expect(box).toBeChecked()
+    expect(box).toBeEnabled()
+  })
+
+  it('ignores a stale check error after the user saves opt-out', async () => {
+    const check = deferred<Release | null>()
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockReturnValue(check.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    await waitFor(() => expect(box).not.toBeChecked())
+    await act(async () => check.reject('Old check failed'))
+    expect(screen.queryByText('Old check failed')).not.toBeInTheDocument()
+  })
+
+  it('ignores a stale release after the user saves opt-out', async () => {
+    const check = deferred<Release | null>()
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockReturnValue(check.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    await waitFor(() => expect(box).not.toBeChecked())
+    await act(async () => check.resolve(release))
+    expect(screen.queryByText('Dostupná aktualizácia 0.2.0')).not.toBeInTheDocument()
+  })
+
+  it('does not start a check when a save completes after Settings unmounts', async () => {
+    const save = deferred<void>()
+    mockApi({ setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
+    const view = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    view.unmount()
+    await act(async () => save.resolve())
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
+  })
+})
 
 describe('Settings: update button (0.1.4)', () => {
   it('shows only the quiet line and the link, no button, when the release has no installer asset', async () => {
