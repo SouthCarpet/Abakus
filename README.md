@@ -219,6 +219,12 @@ s ostatnými filtrami a exportom CSV. Súhrn a mesačné riadky vracajú
 5 mení iba druh rozpoznaných starších poplatkov. Ovládanie filtra a graf v UI
 ešte čakajú na zapojenie. Kontrakt: [bankové poplatky](docs/plan-091-fees.md).
 
+Backend kontroly výpisu vracia uloženú kontrolu zostatku, upozornenia parsera
+a aktuálne počty nezaradených a navrhnutých riadkov. Pri starších importoch sú
+upozornenia neznáme. Stav bez otvorených kontrol nepotvrdzuje úplnosť bankových
+dát. Používateľské rozhranie ešte nie je zapojené.
+[Kontrakt kontroly výpisu](docs/plan-091-statement-review.md).
+
 Inštalátor (Inno Setup 6):
 
 ```powershell

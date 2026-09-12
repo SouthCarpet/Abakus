@@ -50,8 +50,9 @@ impl Store {
 
     fn insert_statement(&mut self, account: &Account, st: &Statement, file_hash: &str) -> Result<i64> {
         let (status, off) = checksum_cols(st.checksum());
-        self.conn.execute("INSERT INTO statements (account_id, number, period_start, period_end, opening_cents, closing_cents, checksum_status, checksum_off_by, file_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            rusqlite::params![account.id, st.number as i64, st.period_start.to_string(), st.period_end.to_string(), st.opening_cents, st.closing_cents, status, off, file_hash])?;
+        let warnings = serde_json::to_string(&st.warnings).map_err(|error| StoreError::Parse(error.to_string()))?;
+        self.conn.execute("INSERT INTO statements (account_id, number, period_start, period_end, opening_cents, closing_cents, checksum_status, checksum_off_by, file_hash, parser_warnings_json) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![account.id, st.number as i64, st.period_start.to_string(), st.period_end.to_string(), st.opening_cents, st.closing_cents, status, off, file_hash, warnings])?;
         Ok(self.conn.last_insert_rowid())
     }
 

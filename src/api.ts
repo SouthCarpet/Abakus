@@ -22,6 +22,8 @@ export interface BadChecksum { statement_id: number; number: number; account_lab
 export interface RecentStatement { statement_id: number; number: number; period_end: string; account_label: string; transaction_count: number; checksum: Checksum }
 export interface StatementHistoryRow { statement_id: number; account_id: number; account_label: string; account_kind: AccountKind; number: number; period_start: string; period_end: string; opening_cents: number | null; closing_cents: number | null; transaction_count: number; total_cents: number; checksum: Checksum }
 export interface BackupOutcome { path: string; bytes: number }
+export type StatementReviewStatus = 'needs_attention' | 'evidence_incomplete' | 'no_open_checks'
+export interface StatementReview { statement_id: number; checksum: Checksum; parser_warnings: string[] | null; unassigned_count: number; suggested_count: number; status: StatementReviewStatus }
 export interface Release {
   tag: string
   url: string
@@ -57,6 +59,7 @@ export const api = {
   backupDatabase: (path: string) => invoke<BackupOutcome>('backup_database', { path }),
   statementHistory: (accountId: number | null = null, accountKind: AccountKind | null = null) =>
     invoke<StatementHistoryRow[]>('statement_history', { accountId, accountKind }),
+  statementReview: (statementId: number) => invoke<StatementReview>('statement_review', { statementId }),
   assign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<AssignOutcome>('assign', { ids, categoryId, applyToMatching }),
   confirm: (ids: number[], applyToMatching = false) => invoke<AssignOutcome>('confirm', { ids, applyToMatching }),
   summary: (from: string | null, to: string | null, accountId: number | null, accountKind: AccountKind | null = null) =>

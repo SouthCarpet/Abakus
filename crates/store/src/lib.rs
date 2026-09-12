@@ -18,6 +18,7 @@ pub mod rules_repo;
 pub mod seed_categories;
 pub mod seed_repair;
 pub mod settings;
+pub mod statement_review;
 pub mod summary;
 
 pub use accounts::Account;
@@ -33,6 +34,7 @@ pub use net_log::NetLogRow;
 pub use notes::NOTE_MAX_CHARS;
 pub use query::{RecentStatement, TxFilter, TxRow};
 pub use rules_repo::{RuleDeletePreview, RuleRedirectOutcome, RuleView};
+pub use statement_review::{StatementReview, StatementReviewStatus};
 pub use summary::*;
 
 use rusqlite::Connection;

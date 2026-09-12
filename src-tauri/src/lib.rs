@@ -8,6 +8,7 @@ pub mod report;
 pub mod report_commands;
 pub mod secrets;
 pub mod state;
+pub mod statement_review_commands;
 pub mod update;
 pub mod update_install;
 
@@ -68,6 +69,7 @@ pub fn run() {
             commands::data_dir,
             commands::recent_statements,
             commands::statement_history,
+            statement_review_commands::statement_review,
             commands::save_transaction_note,
             commands::backup_database,
             commands::statement_delete_preview,

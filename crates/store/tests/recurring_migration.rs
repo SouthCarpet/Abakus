@@ -58,7 +58,7 @@ fn m01_a_v3_database_gains_recurring_tables_and_keeps_every_row() {
 
     let raw = Connection::open(&db.0).unwrap();
     let version: String = raw.query_row("SELECT value FROM settings WHERE key = 'schema_version'", [], |r| r.get(0)).unwrap();
-    assert_eq!(version, "5");
+    assert_eq!(version, "6");
     let recurring_tables: i64 = raw.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('recurring_decisions','recurring_members')", [], |r| r.get(0)).unwrap();
     assert_eq!(recurring_tables, 2);
 
@@ -254,7 +254,7 @@ fn m03_backup_carries_recurring_decisions_and_ignored_items() {
     assert_eq!(member, "fp-2");
     assert_eq!(backed_up_note, snapshot_note);
     assert_eq!(provenance, 1);
-    assert_eq!((version.as_str(), check_updates.as_str()), ("5", "1"));
+    assert_eq!((version.as_str(), check_updates.as_str()), ("6", "1"));
     assert_eq!(backup.list_transactions(&store::TxFilter::default()).unwrap().len(), 2);
     assert!(s.list_transactions(&store::TxFilter::default()).unwrap().iter().any(|row| row.note == "source changed after snapshot"), "the source remains usable after backup");
     let _ = std::fs::remove_file(&dest);

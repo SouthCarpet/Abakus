@@ -4,6 +4,11 @@ Point 19 extends the existing `statement_history` result. It does not add a
 database migration, endpoint, history limit, or visual change. The UI work is
 still pending.
 
+Point 21 adds a separate [statement review API](plan-091-statement-review.md).
+It reports stored parser warnings and live retained-row open counts. Legacy
+warning evidence stays unknown. It does not add fields to the history DTO,
+and a clean checklist does not establish bank-data completeness.
+
 ## Contract
 
 Each `StatementHistoryRow` contains the count and signed integer-cent sum of

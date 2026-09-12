@@ -15,6 +15,8 @@
 //! Version 5 classifies legacy `other` rows as `fee` only when their stored
 //! raw block passes the current parser fee predicate. Transfer rows are never
 //! eligible, and no column except `kind` changes.
+//! Version 6 adds nullable parser warning evidence to statements. Legacy
+//! imports remain NULL; a known empty parser result is saved as JSON [].
 //!
 //! `Store::init` wraps `schema.sql` (base table creation) and this whole
 //! function in ONE `BEGIN IMMEDIATE`/`COMMIT`: a failure anywhere from the
@@ -25,7 +27,7 @@
 use crate::{Result, Store, StoreError};
 
 const VERSION_KEY: &str = "schema_version";
-pub(crate) const SCHEMA_VERSION: i64 = 5;
+pub(crate) const SCHEMA_VERSION: i64 = 6;
 
 const V4_DDL: &str = "\
 CREATE TABLE recurring_decisions (
@@ -74,8 +76,15 @@ impl Store {
             self.conn.execute_batch(V4_DDL)?;
             self.repair_spotify_seed_tx()?;
         }
+        self.migrate_statement_evidence_tx(from)
+    }
+
+    fn migrate_statement_evidence_tx(&mut self, from: i64) -> Result<()> {
         if from < 5 {
             self.backfill_fee_kinds()?;
+        }
+        if from < 6 {
+            self.add_parser_warnings_column()?;
         }
         Ok(())
     }
@@ -103,6 +112,14 @@ impl Store {
             .exists([])?;
         if !has_note {
             self.conn.execute_batch("ALTER TABLE transactions ADD COLUMN note TEXT NOT NULL DEFAULT ''")?;
+        }
+        Ok(())
+    }
+
+    fn add_parser_warnings_column(&mut self) -> Result<()> {
+        let exists = self.conn.prepare("SELECT 1 FROM pragma_table_info('statements') WHERE name='parser_warnings_json'")?.exists([])?;
+        if !exists {
+            self.conn.execute_batch("ALTER TABLE statements ADD COLUMN parser_warnings_json TEXT")?;
         }
         Ok(())
     }

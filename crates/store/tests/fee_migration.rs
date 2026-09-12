@@ -100,7 +100,7 @@ fn v5_backfills_only_recognized_non_transfer_fees_and_preserves_every_other_colu
     after[0][6] = Value::Text("other".into());
     assert_eq!(after, before, "ID, fingerprint, category, status, rule, note, amount and every other column stay byte-for-byte equivalent");
     let version: String = connection.query_row("SELECT value FROM settings WHERE key = 'schema_version'", [], |row| row.get(0)).unwrap();
-    assert_eq!(version, "5");
+    assert_eq!(version, "6");
     drop(connection);
 
     let reopened = Store::open(&database.0).unwrap();

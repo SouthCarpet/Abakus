@@ -10,6 +10,13 @@ worktrees were touched.
 
 ## What shipped
 
+Plan 091 now also provides a separate [statement review API](plan-091-statement-review.md)
+at schema version 6. It stores parser warnings for new imports and reads live
+open counts from retained transactions owned by one statement. Old warning
+evidence remains unknown. Its status does not establish bank-data completeness.
+Current initialization, seeding, migrations and the final schema marker share
+one transaction. The release history below describes the earlier 0.1.2 work.
+
 - `crates/store/src/history.rs` (new): `Store::statement_history(account_id,
   account_kind)`, both filters optional and independent (AND when both are
   given), sorted `account_id, period_start, period_end, statement_id`
