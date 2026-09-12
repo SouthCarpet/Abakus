@@ -213,6 +213,8 @@ mesiace a rovnaké kalendárne obdobie vlani. Oba rozsahy obsahujú začiatok aj
 koniec. Voľba obdobia a zobrazenie rozsahov v UI ešte čakajú na zapojenie.
 Kontrakt: [porovnanie s vlaňajškom](docs/plan-091-year-comparison.md).
 
+Abakus pripravuje konzervatívne zoskupenie viditeľných nezaradených transakcií podľa obchodníka a miesta. Helper zachováva poradie, vracia iba explicitné ID a nepredpokladá backendové rozšírenie zhody; presný kontrakt a hranice zobrazenia opisuje [dokumentácia skupín transakcií](docs/plan-091-transaction-groups.md).
+
 Bankové poplatky majú druh `fee`. Voliteľný filter `TxFilter.kind` sa kombinuje
 s ostatnými filtrami a exportom CSV. Súhrn a mesačné riadky vracajú
 `fee_cents`, podpísanú časť už započítaných výdavkov. Migrácia schémy na verziu
