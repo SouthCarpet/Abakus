@@ -234,6 +234,14 @@ nezruší. Možnosť v rozhraní ešte nie je hotová a zdrojové testy nepotvrd
 správanie natívnej aplikácie.
 [Kontrakt vratného priradenia](docs/plan-091-assignment-undo.md).
 
+Pomocná logika pripomienok kontroluje pokrytie minulého kalendárneho mesiaca.
+Upozornenie je splatné od 8. dňa, po siedmich dňoch tolerancie. Kontrola nezačne
+pred prvým platným výpisom účtu a oddeľuje účty aj ich druhy. Neplatné rozsahy
+vráti na samostatnú kontrolu a pripomienku daného účtu potlačí. Vyžaduje úplnú,
+úspešne načítanú históriu a platný lokálny dátum. Pokrytie Všetko nemení.
+Rozhranie ešte nie je pripojené.
+[Kontrakt pripomienok výpisov](docs/plan-091-statement-reminders.md).
+
 Inštalátor (Inno Setup 6):
 
 ```powershell
