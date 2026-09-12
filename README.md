@@ -40,7 +40,15 @@ Vo vývojovej vetve 0.2.0 je pripravený backend na zmenu cieľa naučených pra
 1. Otvorte [stránku vydaní](https://github.com/SouthCarpet/Abakus/releases/latest).
 2. Stiahnite `abakus-setup-<verzia>.exe`. Inštalátor je Inno Setup pre aktuálneho používateľa. Práva správcu nie sú potrebné.
 3. Spustite inštalátor. Windows SmartScreen môže varovať, lebo súbor nie je podpísaný. Ak dôverujete zdroju, zvoľte **Ďalšie informácie** a **Spustiť napriek tomu**.
-4. Appka potrebuje Microsoft Edge WebView2 Runtime. Inštalátor 0.1.6 ho vie skontrolovať a ponúkne stiahnutie, ak chýba. Windows 10 (2004 a novší) a Windows 11 ho často už majú.
+4. Appka potrebuje Windows 10 alebo novší, prostredie kompatibilné s x64
+   a Microsoft Edge WebView2 Runtime. Pripravovaný inštalátor overí balený
+   EXE a PDFium. Existujúci platný záznam WebView2 použije. Ak runtime chýba,
+   ponúkne jeho inštaláciu. Pri odmietnutí alebo chybe zostane Abakus
+   nainštalovaný bez ponuky spustenia. Tichá inštalácia bez runtime skončí
+   pred kopírovaním a nič nestiahne. Kontrola registra nie je test funkčnosti
+   WebView2. Podrobnosti sú v [inštalačnom návode](packaging/INSTALL.md).
+   [Natívne prijatie a ARM64](docs/plan-091-installer-dependencies.md)
+   zostávajú neoverené.
 5. Appka sa nainštaluje do `%LOCALAPPDATA%\Programs\Abakus`. Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`.
 
 Ak Abakus už máte nainštalovaný, druhé spustenie inštalátora ho aktualizuje na mieste. Sprievodca povie, akú verziu má nainštalovanú a na akú ju aktualizuje. Dáta a heslá zostanú.
@@ -210,6 +218,10 @@ Inštalátor (Inno Setup 6):
 ```
 
 Skript zostaví frontend cez `tsc` a `vite`, potom `tauri build --no-bundle` a nakoniec Inno Setup. Podrobnosti sú v [packaging/INSTALL.md](packaging/INSTALL.md).
+
+Aj `-SkipBuild` overuje PE, importy a dôveryhodný hash PDFium. Samotný hash
+EXE identifikuje súbor, nedokazuje správne zostavenie. Rust, Node, npm
+a Inno Setup sú build nástroje, používateľ ich nepotrebuje.
 
 ## Dokumentácia
 

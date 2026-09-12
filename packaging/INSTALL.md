@@ -14,7 +14,8 @@ Skript spraví toto:
 1. Zostaví frontend (`tsc -b`, potom `vite build` do `dist\`).
 2. Zostaví appku v režime release cez tauri-cli (`tauri build --no-bundle`,
    jobs 4).
-3. Skompiluje `packaging\abakus.iss` cez ISCC.
+3. Overí EXE, PDFium a ich importy. Zapíše výsledok kontroly.
+4. Skompiluje `packaging\abakus.iss` cez ISCC.
 
 Frontend aj tauri-cli sa spúšťajú priamo cez `node`, nie cez `npm run
 build` alebo `npm run tauri build`. Príkazové `.cmd` obaly týchto nástrojov
@@ -36,11 +37,11 @@ rovnaký zámok `.cmd` obalu. Skript preto do `tauri build` pridáva
 `--config packaging\tauri.build-override.json`, čo tento príkaz nahradí
 prázdnym reťazcom. Frontend v `dist\` je v tom momente už hotový z kroku 1,
 takže sa nič nestratí. `--no-bundle` iba vypína vlastné balenie tauri-cli
-(o balenie sa stará Inno Setup v kroku 3); `bundle.active` v
+(o balenie sa stará Inno Setup v kroku 4); `bundle.active` v
 `tauri.conf.json` je aj tak `false`.
 
 Ak už máte hotový release build, pridajte `-SkipBuild` a skript spustí iba
-krok 3:
+kroky 3 a 4:
 
 ```powershell
 .\packaging\build-installer.ps1 -SkipBuild
@@ -116,71 +117,102 @@ zapisovať. Pri prvej (čistej) inštalácii sa nič z tohto nezobrazí, stránk
 
 ### Vývojárska voľba: testovací `AppId`
 
-`ISCC /DAppIdGuid=<guid> packaging\abakus.iss` skompiluje inštalátor s iným
+Pridanie `/DAppIdGuid=<guid>` k overenej kompilácii nižšie vytvorí inštalátor s iným
 (testovacím) `AppId`, takže testovacia inštalácia/odinštalácia nikdy
 nezasiahne skutočnú inštaláciu Abakusu ani jej záznam v registri. Bez tohto
 prepínača (bežný release build) sa použije skutočný pevný `AppId`,
 nezmenený od predchádzajúcich vydaní.
 
+## Závislosti a kontrola balíka
+
+Podporovaná platforma je Windows 10 alebo novší a prostredie kompatibilné
+s x64. Inno používa `MinVersion=10.0` a existujúcu politiku
+`x64compatible`. Emulácia x64 na ARM64 tým nie je runtime testovaná.
+Rust uvádza Windows 10+ pre použitý cieľ
+[x86_64-pc-windows-msvc](https://doc.rust-lang.org/rustc/platform-support.html).
+
+Koncový používateľ potrebuje WebView2 Runtime. PDFium je súčasť balíka.
+SQLite je zabudovaný. Pre skontrolovaný EXE a PDFium nie je doložená potreba
+samostatného VC++ Redistributable, .NET, Javy alebo OpenSSL. Build nástroje
+sa používateľovi neinštalujú.
+
+Pred ISCC sa vždy spustí `packaging/check-payload.mjs`, aj s `-SkipBuild`.
+Kontroluje x64 PE hlavičky, rozsahy sekcií a importy proti overenému zoznamu
+Windows DLL. Nový import alebo delay import vyžaduje nové posúdenie.
+PDFium musí mať hash z `packaging/pdfium-pin.json`. Tento pin vznikol
+overením archívu proti `scripts/pdfium.sha256` a až potom rozbalením
+`bin/pdfium.dll`. Nový pin nesmie vzniknúť iba zahashovaním miestnej DLL.
+
+Výsledok je `packaging/output/abakus-payload-<verzia>.json`.
+Pre EXE aj PDFium obsahuje `machine`, `imports` a `sha256`.
+Hash EXE identifikuje súbor. Nedokazuje správne zostavenie, pôvod zdrojov
+ani neporušenosť ľubovoľných zmien jeho bajtov. Kontrola PE zachytí
+štrukturálne poškodenie. Kontrola zabudovaného frontendu zostáva samostatná.
+Inno pred balením znova porovná oba hashe, aby zachytil zmenu po kontrole.
+
+Po kopírovaní Inno overí hashe nainštalovaného EXE a PDFium.
+Zhodné PDFium nekopíruje znova. Chýbajúcu alebo odlišnú DLL nahradí
+overeným obsahom balíka. Ak záverečná kontrola zlyhá, vypne spustenie,
+zapíše chybu a skončí s kódom 4. Nespustený alebo nefunkčný runtime
+táto kontrola neopravuje.
+
 ## WebView2
 
-Abakus je Tauri appka a na Windows potrebuje modul Microsoft Edge WebView2
-Runtime. Windows 10 (verzia 2004 a novšie) a Windows 11 ho už majú
-predinštalovaný, takže na väčšine počítačov sa nič nestane.
+Kontrola sa spustí až po súhlase s aktualizáciou, preinštalovaním alebo
+downgrade. Číta `pv` z kľúča
+`SOFTWARE\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`.
+Použije explicitné pohľady `HKLM32`, `HKLM64`, `HKCU32`, `HKCU64`.
+Prijme štyri číselné časti a verziu väčšiu než `0.0.0.0`.
+Chýbajúci, nulový alebo neplatný údaj znamená nesplnenú kontrolu.
+Platný záznam nepotvrdzuje funkčnosť WebView2. Existujúci platný modul
+sa neinštaluje znova. WebView2 je na mnohých počítačoch už prítomný;
+inštalátor to vždy kontroluje.
 
-Od verzie 0.1.4 inštalátor kontroluje modul sám, ešte pred prvou obrazovkou
-sprievodcu (`InitializeSetup` v `packaging\abakus.iss`). Kontrola číta
-hodnotu `pv` z troch registrových kľúčov, v tomto poradí:
+- **Áno** pri interaktívnej otázke stiahne existujúci oficiálny
+  [Evergreen bootstrapper](https://go.microsoft.com/fwlink/p/?LinkId=2124703),
+  spustí ho s `/silent /install` a pri návratovom kóde 0 znova overí register.
+  Malý bootstrapper sťahuje aj samotný runtime. Práva sa nezvyšujú.
+- **Nie** je predvolená odpoveď. Odmietnutie alebo chyba ponechá odloženú
+  inštaláciu Abakusu s upozornením. Ponuka spustenia nebude dostupná.
+  Používateľ musí doplniť WebView2 a zopakovať inštaláciu.
+- Spustenie sa ponúkne iba po úspešnej kontrole záznamu WebView2 a hashov
+  nainštalovaných súborov. Je to kontrola predpokladov, nie test funkčnosti.
 
-1. `HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
-2. `HKLM\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
-3. `HKCU\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}`
+### Tichá inštalácia
 
-Chýbajúca hodnota alebo `0.0.0.0` znamená, že modul nie je nainštalovaný.
-Vtedy inštalátor po slovensky zobrazí:
+`/SILENT` aj `/VERYSILENT`, samostatne aj s `/SUPPRESSMSGBOXES`,
+použijú rovnakú politiku našich kontrol. Chýbajúci alebo neplatný WebView2
+ukončí setup pred kopírovaním s kódom 1 (`InitializeSetup=False`).
+Kontrola nezobrazí dialóg a nestiahne runtime. Platný záznam pokračuje.
+Aktualizácia a preinštalovanie pokračujú, downgrade sa odmietne.
+Tichý režim appku nikdy nespúšťa.
 
-> Abakus potrebuje Microsoft Edge WebView2 Runtime. Stiahnuť a nainštalovať
-> teraz (asi 2 MB, vyžaduje internet)?
+Pridajte `/LOG="cesta.txt"`, aby sa zachovali dôvody a výsledky kontroly.
+Zlyhanie záverečnej integrity má kód 4. Interaktívne odloženie WebView2
+môže skončiť kódom 0, ale bez pripraveného spustenia. Natívne scenáre
+nových kontrol sú zatiaľ neoverené; pozrite
+[plán overenia](../docs/plan-091-installer-dependencies.md).
 
-- **Áno** stiahne oficiálny Evergreen bootstrapper
-  (`https://go.microsoft.com/fwlink/p/?LinkId=2124703`) do `{tmp}`, spustí
-  ho s `/silent /install` a znova skontroluje registrové kľúče. Nevyžaduje
-  práva správcu: bootstrapper sa spustí bez zvýšených práv, rovnako ako
-  samotný inštalátor Abakusu (`PrivilegesRequired=lowest`).
-- **Nie**, alebo zlyhanie sťahovania/inštalácie modulu, inštaláciu Abakusu
-  nezastaví. Zobrazí sa iba upozornenie, že appka sa bez modulu nespustí a
-  modul sa dá doinštalovať samostatne aj neskôr
-  (https://developer.microsoft.com/microsoft-edge/webview2/).
+`/NOICONS` nevypne naše úlohy odkazov. Použite
+`/MERGETASKS="!startmenuicon,!desktopicon"`. Skúšobný priečinok sám
+neizoluje registry: testovací inštalátor musí mať odlišný `AppIdGuid`.
 
-Každý krok kontroly sa zapíše do inštalačného denníka (`Log(...)` v
-`[Code]`), viditeľného pri behu s `/LOG="cesta.txt"`.
+### Vývojárska kompilácia
 
-### Tiché prepínače (overené na tomto počítači)
-
-Skúšobná inštalácia mimo skutočného `%LOCALAPPDATA%\Programs\Abakus`:
-
-```powershell
-abakus-setup-0.1.5.exe /VERYSILENT /DIR="C:\cesta\scratch" /MERGETASKS="!startmenuicon,!desktopicon"
-```
-
-`/NOICONS` nevypne vlastné úlohy `[Tasks]` `startmenuicon` a `desktopicon`
-z `packaging/abakus.iss`; použite `/MERGETASKS` s `!` pred názvom úlohy.
-`AppId` je pevný, takže druhá (skúšobná) inštalácia prepíše ten istý záznam
-`HKCU\...\Uninstall\{AppId}_is1` aj odkazy existujúcej inštalácie. Jej
-odinštalovanie potom zmaže tie isté odkazy a záznam.
-
-Odinštalovanie tej istej skúšobnej inštalácie:
+Bežný build spúšťajte cez `build-installer.ps1`. Pri priamom ISCC najprv
+spustite rovnakú kontrolu a použite jej výstup:
 
 ```powershell
-"C:\cesta\scratch\unins000.exe" /VERYSILENT
+$payload = node packaging/check-payload.mjs target/release/abakus.exe src-tauri/resources/pdfium/pdfium.dll
+if ($LASTEXITCODE -ne 0) { throw 'Payload validation failed' }
+$checked = ($payload -join "`n") | ConvertFrom-Json
+ISCC /DAppVersion=0.1.6 "/DExeSha256=$($checked.exe.sha256)" "/DPdfiumSha256=$($checked.pdfium.sha256)" packaging/abakus.iss
 ```
 
-### Vývojárska voľba: preskočenie kontroly
-
-`ISCC /DWebView2Check=skip packaging\abakus.iss` skompiluje inštalátor, ktorý
-kontrolu modulu úplne vynechá (iba do denníka zapíše, že bola preskočená).
-Slúži pre zostavenie bez siete alebo bez možnosti overiť registre (napríklad
-CI); bežný release build (bez tohto prepínača) kontrolu vždy spustí.
+`/DExeSha256` a `/DPdfiumSha256` sú povinné údaje z validátora.
+`/DAppIdGuid=<guid>` možno pridať pre izolovanú testovaciu identitu.
+`/DWebView2Check=skip` vynechá register a sťahovanie iba v testovacom
+builde. Taký build nikdy neponúkne spustenie a nesmie sa vydať používateľom.
 
 ## Inštalátor nie je podpísaný
 

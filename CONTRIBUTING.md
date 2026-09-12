@@ -43,4 +43,24 @@ Inštalátor (Inno Setup 6):
 .\packaging\build-installer.ps1
 ```
 
+Aj `-SkipBuild` kontroluje x64 PE, importy a dôveryhodný pin PDFium.
+Rust, Node, npm a Inno Setup sú build nástroje, nie závislosti používateľa.
+Podrobnosti, priama kompilácia a tiché režimy sú v
+[inštalačnom návode](packaging/INSTALL.md). Nový hash EXE je iba identita
+súboru. Vydanie vyžaduje vlastný záznam zostavenia a natívne overenie.
+
+Syntetické kontroly balíka bez spustenia appky:
+
+```powershell
+node --test packaging/check-payload.node-test.mjs
+node packaging/check-payload.mjs target/release/abakus.exe src-tauri/resources/pdfium/pdfium.dll
+```
+
+Pri zmene PDFium najprv overte presný archív proti schválenému pinu,
+potom hash rozbaleného `bin/pdfium.dll`. Spolu aktualizujte
+`scripts/pdfium.sha256`, `packaging/pdfium-pin.json` a dokumentáciu.
+Nikdy nevytvorte pin iba z neoverenej miestnej DLL. Nový import potrebuje
+nový inventár závislostí. [Matica overenia](docs/plan-091-installer-dependencies.md)
+oddeľuje statickú kontrolu od testu inštalácie na čistom stroji.
+
 Zmena správania má v tom istom pull requeste úpravu [CHANGELOG.md](CHANGELOG.md), ak ju používateľ uvidí.
