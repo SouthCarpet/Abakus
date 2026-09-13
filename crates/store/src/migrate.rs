@@ -29,6 +29,12 @@ use crate::{Result, Store, StoreError};
 const VERSION_KEY: &str = "schema_version";
 pub(crate) const SCHEMA_VERSION: i64 = 6;
 
+/// The schema version this build of Abakus writes and supports, exposed
+/// publicly (091/B10) so a restore preview can compare a backup's version
+/// against the running binary without a private accessor, and so tests can
+/// build an intentionally-too-new database without hardcoding the number.
+pub const CURRENT_SCHEMA_VERSION: i64 = SCHEMA_VERSION;
+
 const V4_DDL: &str = "\
 CREATE TABLE recurring_decisions (
  id INTEGER PRIMARY KEY,

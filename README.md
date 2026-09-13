@@ -68,7 +68,13 @@ Graf **Podľa kategórií** zachováva znamienko súčtu. Záporné hodnoty vľa
 
 Každý importovaný výpis má odznak kontrolného súčtu. Appka overí, či počiatočný zostatok a všetky transakcie dávajú konečný zostatok. Text **Kontrolný súčet nesedí** znamená, že sa tieto hodnoty líšia o uvedenú sumu. Výpis sa importuje. Ostane označený na kontrolu. Ak chýba potrebný zostatok, appka uvedie, že súčet nevie overiť.
 
-Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Zálohu databázy** a vyberte nový súbor. Appka uloží konzistentnú kópiu aj počas behu. Existujúci cieľový súbor neprepíše. Záloha obsahuje účty, výpisy, kategórie, naučené pravidlá, poznámky, voľby pravidelných platieb a nastavenia databázy. Nie je šifrovaná. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF. Obnova zo zálohy zatiaľ nemá ovládanie v appke.
+Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Zálohu databázy** a vyberte nový súbor. Appka uloží konzistentnú kópiu aj počas behu. Existujúci cieľový súbor neprepíše. Záloha obsahuje účty, výpisy, kategórie, naučené pravidlá, poznámky, voľby pravidelných platieb a nastavenia databázy. Nie je šifrovaná. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF.
+
+## Obnova zo zálohy
+
+V Nastaveniach, hneď pod zálohou, tlačidlo **Vybrať zálohu** otvorí súborový dialóg. Appka vybraný súbor najprv iba prečíta a ukáže náhľad: počet účtov, výpisov a transakcií v zálohe. Súbor, ktorý nie je zálohou Abakusu, alebo zálohu z novšej appky, appka odmietne so zrozumiteľnou správou a k obnove vôbec nepristúpi.
+
+Náhľad pripomenie, že heslá zo Správcu poverení v zálohe nie sú a obnovou sa nezmenia. Po potvrdení appka najprv vytvorí bezpečnostnú kópiu súčasnej databázy s časovou pečiatkou v priečinku s dátami (rovnaký mechanizmus ako **Zálohovať databázu**) a cestu k nej ukáže. Až potom nahradí databázu obsahom zálohy. Pri zlyhaní ktoréhokoľvek kroku appka vráti pôvodnú databázu a znova ju otvorí, takže appka nikdy neostane bez funkčnej databázy. Obnova je odmietnutá, kým prebieha import. Obnova nahradí všetky súčasné dáta, nedá sa čiastočne zlúčiť so zálohou, a bezpečnostné kópie appka nikdy sama nemaže.
 
 ## Ako sa appka učí
 
@@ -292,6 +298,9 @@ a Inno Setup sú build nástroje, používateľ ich nepotrebuje.
 - [docs/plan-091-fees.md](docs/plan-091-fees.md): rozpoznanie poplatkov, filter,
   súhrny a migrácia schémy na verziu 5 pre pripravovanú verziu 0.2.0; filter
   Druh a zobrazenie v Prehľade sú zapojené.
+- [docs/plan-091-backup-restore.md](docs/plan-091-backup-restore.md): kontrakt
+  náhľadu, bezpečnostnej kópie, zámeny súborov a rollbacku pri obnove databázy
+  pre pripravovanú verziu 0.2.0; ovládanie v Nastaveniach je zapojené.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.
@@ -303,7 +312,7 @@ Pozrite [CONTRIBUTING.md](CONTRIBUTING.md). Pull requesty idú do `main`. Texty 
 
 ## Známe obmedzenia
 
-Pozrite [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Pravidelné platby sú odhady z importov. Záloha nie je šifrovaná. Obnova zo zálohy v appke nie je. PDF report má limity veľkosti.
+Pozrite [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Pravidelné platby sú odhady z importov. Záloha nie je šifrovaná. Obnova nahradí celú databázu naraz, čiastočné zlúčenie nepodporuje. PDF report má limity veľkosti.
 
 ## Licencia
 

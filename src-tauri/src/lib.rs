@@ -74,6 +74,8 @@ pub fn run() {
             statement_review_commands::statement_review,
             commands::save_transaction_note,
             commands::backup_database,
+            commands::restore_preview,
+            commands::restore_database,
             commands::statement_delete_preview,
             commands::delete_statement,
             commands::get_check_updates,

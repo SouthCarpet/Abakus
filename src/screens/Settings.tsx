@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
 import { BackupSection } from '../components/BackupSection'
+import { RestoreSection } from '../components/RestoreSection'
 import { DeleteAccountDialog } from '../components/DeleteAccountDialog'
 import { SetPasswordDialog } from '../components/SetPasswordDialog'
 import type { Account, AccountKind, AuditFailure, NetLogRow, Release } from '../api'
@@ -424,6 +425,7 @@ export function Settings() {
               </Button>
             </Card>
             <BackupSection />
+            <RestoreSection />
           </div>
           <div>
             <Card title="Stav">

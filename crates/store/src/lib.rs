@@ -14,6 +14,7 @@ pub mod notes;
 pub mod query;
 pub mod recurring;
 pub mod report;
+pub mod restore;
 pub mod rules_repo;
 pub mod seed_categories;
 pub mod seed_repair;
@@ -33,6 +34,7 @@ pub use import::ImportOutcome;
 pub use net_log::NetLogRow;
 pub use notes::NOTE_MAX_CHARS;
 pub use query::{RecentStatement, TxFilter, TxRow};
+pub use restore::{BackupPreview, RestoreOutcome};
 pub use rules_repo::{RuleDeletePreview, RuleRedirectOutcome, RuleView};
 pub use statement_review::{StatementReview, StatementReviewStatus};
 pub use summary::*;
@@ -68,6 +70,16 @@ pub enum StoreError {
     NoteTooLong { max: usize, actual: usize },
     #[error("Cieľový súbor už existuje: {path}. Zvoľte iný názov.")]
     BackupTargetExists { path: String },
+    /// 091/B10: a candidate restore file that is not readable as SQLite at
+    /// all, or is missing one of the tables an Abakus database must have.
+    /// Refused before the live database is touched in any way.
+    #[error("Vybraný súbor nie je platná záloha Abakusu ({0}).")]
+    BackupInvalid(String),
+    /// 091/B10: a backup written by a NEWER Abakus than this binary. Refused
+    /// the same way `migrate_tx` refuses to open a too-new live database:
+    /// never guess at running unknown migrations backwards.
+    #[error("Záloha bola vytvorená novšou verziou Abakusu (schéma {found}). Táto aplikácia podporuje najviac schému {supported}. Aktualizujte Abakus.")]
+    BackupTooNew { found: i64, supported: i64 },
     #[error("{0}")]
     Parse(String),
 }

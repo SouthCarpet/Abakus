@@ -9,9 +9,9 @@ use parser::{AccountKind, Checksum};
 use rules::{RuleKind, Status};
 use serde_json::json;
 use store::{
-    Account, AssignOutcome, BackupOutcome, BadChecksum, Category, CategoryKind, NetLogRow,
-    RecentStatement, RuleView, StatementDeleteOutcome, StatementDeletePreview,
-    StatementHistoryRow, Summary, TxFilter, TxRow,
+    Account, AssignOutcome, BackupOutcome, BackupPreview, BadChecksum, Category, CategoryKind,
+    NetLogRow, RecentStatement, RestoreOutcome, RuleView, StatementDeleteOutcome,
+    StatementDeletePreview, StatementHistoryRow, Summary, TxFilter, TxRow,
 };
 
 /// Tauri deserializes each command argument from its own JSON field (there is
@@ -111,6 +111,15 @@ struct SaveTransactionNoteArgs { id: i64, note: String }
 
 #[derive(serde::Deserialize)]
 struct BackupDatabaseArgs { path: String }
+
+/// 091/B10: both restore commands take the backup file the user picked
+/// under `backupPath`, never `path` (that name is already `backup_database`'s
+/// destination argument, the opposite direction).
+#[derive(serde::Deserialize)]
+struct RestorePreviewArgs { #[serde(rename = "backupPath")] backup_path: String }
+
+#[derive(serde::Deserialize)]
+struct RestoreDatabaseArgs { #[serde(rename = "backupPath")] backup_path: String }
 
 #[test]
 fn import_statements_args_match_the_ui_call() {
@@ -535,6 +544,32 @@ fn backup_outcome_serializes_the_fields_the_ui_reads() {
     let o = BackupOutcome { path: "C:/zálohy/abakus.db".into(), bytes: 45_056 };
     let v = serde_json::to_value(&o).unwrap();
     assert_eq!(v, json!({"path": "C:/zálohy/abakus.db", "bytes": 45_056}));
+}
+
+#[test]
+fn restore_preview_args_match_the_ui_call() {
+    let args: RestorePreviewArgs = serde_json::from_value(json!({"backupPath": "C:/zálohy/abakus-zaloha.db"})).unwrap();
+    assert_eq!(args.backup_path, "C:/zálohy/abakus-zaloha.db");
+}
+
+#[test]
+fn restore_database_args_match_the_ui_call() {
+    let args: RestoreDatabaseArgs = serde_json::from_value(json!({"backupPath": "C:/zálohy/abakus-zaloha.db"})).unwrap();
+    assert_eq!(args.backup_path, "C:/zálohy/abakus-zaloha.db");
+}
+
+#[test]
+fn backup_preview_serializes_the_fields_the_ui_reads() {
+    let p = BackupPreview { accounts: 2, statements: 5, transactions: 120, schema_version: 6 };
+    let v = serde_json::to_value(&p).unwrap();
+    assert_eq!(v, json!({"accounts": 2, "statements": 5, "transactions": 120, "schema_version": 6}));
+}
+
+#[test]
+fn restore_outcome_serializes_the_fields_the_ui_reads() {
+    let o = RestoreOutcome { safety_copy_path: "C:/Users/x/AppData/Local/Abakus/abakus-pred-obnovou-2026-09-13-120000000.db".into() };
+    let v = serde_json::to_value(&o).unwrap();
+    assert_eq!(v, json!({"safety_copy_path": "C:/Users/x/AppData/Local/Abakus/abakus-pred-obnovou-2026-09-13-120000000.db"}));
 }
 
 #[derive(serde::Deserialize)]

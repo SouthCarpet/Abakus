@@ -20,8 +20,12 @@
   možno zmeniť v detaile ním zaradenej transakcie.
 
 - **Záloha je nešifrovaný súbor SQLite.** Obsahuje bankové údaje a poznámky.
-  Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Obnova nemá ovládanie
-  v appke; zálohovanie nemá plánovač.
+  Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Zálohovanie ani
+  obnova nemajú plánovač, obe treba spustiť ručne.
+- **Obnova nahradí celú databázu naraz.** Nedá sa vybrať len časť zálohy ani
+  zlúčiť zálohu so súčasnými dátami. Bezpečnostné kópie (pred obnovou aj
+  odložený pôvodný súbor pri zámene) appka nikdy sama nezmaže, takže sa v
+  priečinku s dátami postupne hromadia a treba ich mazať ručne.
 - **Pokrytie sa vzťahuje na obdobia výpisov.** Úplné pokrytie nie je dôkazom,
   že existujú všetky transakcie pre daný rozsah dátumov. Transakcia sa môže
   objaviť až vo výpise za neskorší mesiac. Historický zostatok je stav ku dňu

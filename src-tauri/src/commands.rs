@@ -4,6 +4,7 @@ use crate::import_flow::{self, import_path, ImportReport};
 use crate::secrets;
 use crate::state::AppState;
 use crate::{net, update};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::State;
 
@@ -11,17 +12,45 @@ fn lock<'a>(state: &'a State<AppState>) -> Result<std::sync::MutexGuard<'a, stor
     state.store.lock().map_err(|_| "store busy".to_string())
 }
 
+/// 091/B10: refuses immediately, without ever locking the store, while an
+/// import is running. Blocking on the store mutex instead would leave the
+/// restore button looking hung with no explanation until the import happens
+/// to finish.
+fn refuse_if_importing(import_in_progress: &AtomicBool) -> Result<(), String> {
+    if import_in_progress.load(Ordering::SeqCst) {
+        return Err("Obnovu nemožno spustiť, kým prebieha import. Počkajte, kým import skončí, a skúste znova.".into());
+    }
+    Ok(())
+}
+
+/// Sets `import_in_progress` for the guard's lifetime and always clears it on
+/// the way out: normal return, an early `?` return, or a panic unwind. A
+/// stuck flag would refuse every future restore forever, which is worse than
+/// refusing none.
+struct ImportGuard<'a>(&'a AtomicBool);
+impl<'a> ImportGuard<'a> {
+    fn start(flag: &'a AtomicBool) -> Self {
+        flag.store(true, Ordering::SeqCst);
+        Self(flag)
+    }
+}
+impl Drop for ImportGuard<'_> {
+    fn drop(&mut self) { self.0.store(false, Ordering::SeqCst); }
+}
+
 /// Note: `parser::parse_pdf` (via `import_flow::import_path`) serializes on
 /// pdfium's internal lock, so a batch import runs its PDF parsing one file at
 /// a time even though the loop below is sequential anyway.
 #[tauri::command]
 pub fn import_statements(state: State<AppState>, paths: Vec<String>) -> Result<Vec<ImportReport>, String> {
+    let _guard = ImportGuard::start(&state.import_in_progress);
     let mut s = lock(&state)?;
     Ok(paths.iter().map(|p| import_path(&mut s, std::path::Path::new(p), None, &secrets::get)).collect())
 }
 
 #[tauri::command]
 pub fn import_with_password(state: State<AppState>, path: String, password: String, remember: bool) -> Result<ImportReport, String> {
+    let _guard = ImportGuard::start(&state.import_in_progress);
     let mut s = lock(&state)?;
     let r = import_path(&mut s, std::path::Path::new(&path), Some(&password), &secrets::get);
     if remember { import_flow::remember_password(&mut s, &r, &password, &secrets::set)?; }
@@ -284,6 +313,25 @@ pub fn backup_database(state: State<AppState>, path: String) -> Result<store::Ba
     lock(&state)?.backup_to(std::path::Path::new(&path)).map_err(|e| e.to_string())
 }
 
+/// 091/B10: a read-only preview of a backup file the user picked, before
+/// anything about the live database is touched. Never needs the store lock:
+/// it only ever opens `backup_path` itself, read-only.
+#[tauri::command]
+pub fn restore_preview(backup_path: String) -> Result<store::BackupPreview, String> {
+    store::Store::preview_backup(std::path::Path::new(&backup_path)).map_err(|e| e.to_string())
+}
+
+/// 091/B10: swaps the live database for a previously previewed backup. A
+/// mandatory safety copy of the current live database is made first; see
+/// `store::Store::restore_from` for the full swap/rollback contract. Refused
+/// while an import is running (see `refuse_if_importing`).
+#[tauri::command]
+pub fn restore_database(state: State<AppState>, backup_path: String) -> Result<store::RestoreOutcome, String> {
+    refuse_if_importing(&state.import_in_progress)?;
+    let mut s = lock(&state)?;
+    s.restore_from(std::path::Path::new(&backup_path), &state.db_path).map_err(|e| e.to_string())
+}
+
 /// A17/F1: what a delete of this statement would remove, for the confirmation
 /// text. It runs the same rule query the delete runs, so the numbers the user
 /// confirms are the numbers the delete produces.
@@ -365,7 +413,46 @@ mod tests {
     use super::*;
     use parser::AccountKind;
     use std::cell::RefCell;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use store::Store;
+
+    /// 091/B10: `restore_database` must refuse to even try locking the
+    /// store while an import is running, rather than silently blocking on
+    /// the mutex until the import finishes (which would just leave the
+    /// button looking hung with no explanation).
+    #[test]
+    fn refuse_if_importing_blocks_only_while_the_flag_is_set() {
+        let flag = AtomicBool::new(false);
+        assert!(refuse_if_importing(&flag).is_ok());
+
+        flag.store(true, Ordering::SeqCst);
+        let e = refuse_if_importing(&flag).unwrap_err();
+        assert!(e.contains("import"), "the refusal must name the reason: {e}");
+
+        flag.store(false, Ordering::SeqCst);
+        assert!(refuse_if_importing(&flag).is_ok(), "the refusal must lift once the import is no longer running");
+    }
+
+    /// A stuck flag would refuse every future restore forever, which is
+    /// worse than refusing none: the guard must clear on every exit path,
+    /// including an early return AND a panic unwind mid-import.
+    #[test]
+    fn import_guard_clears_the_flag_on_normal_exit_and_on_a_panic() {
+        let flag = AtomicBool::new(false);
+        {
+            let _guard = ImportGuard::start(&flag);
+            assert!(flag.load(Ordering::SeqCst), "the flag must be set for the duration of the guard");
+        }
+        assert!(!flag.load(Ordering::SeqCst), "the flag must clear once the guard is dropped normally");
+
+        let panicking_flag = AtomicBool::new(false);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = ImportGuard::start(&panicking_flag);
+            panic!("simulated import crash");
+        }));
+        assert!(result.is_err(), "the simulated panic must actually unwind for this test to prove anything");
+        assert!(!panicking_flag.load(Ordering::SeqCst), "the flag must clear even when the guarded body panics");
+    }
 
     fn fixture(name: &str) -> parser::Statement {
         parser::parse_text(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/synthetic/").to_string() + name).unwrap()).unwrap()
