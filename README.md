@@ -255,7 +255,7 @@ zoznamom otvorených položiek.
 Backend hromadného priradenia teraz vráti identifikátor poslednej vratnej
 operácie. Vrátenie obnoví iba zmenené polia priradenia, naučené pravidlá a
 nové záznamy pôvodu. Starší alebo neplatný identifikátor novšiu operáciu
-nezruší. Možnosť v rozhraní ešte nie je hotová a zdrojové testy nepotvrdzujú
+nezruší. V Transakciách ju ovláda dočasné tlačidlo Späť po hromadnom priradení. Zdrojové testy nepotvrdzujú
 správanie natívnej aplikácie.
 [Kontrakt vratného priradenia](docs/plan-091-assignment-undo.md).
 
@@ -264,7 +264,7 @@ Upozornenie je splatné od 8. dňa, po siedmich dňoch tolerancie. Kontrola neza
 pred prvým platným výpisom účtu a oddeľuje účty aj ich druhy. Neplatné rozsahy
 vráti na samostatnú kontrolu a pripomienku daného účtu potlačí. Vyžaduje úplnú,
 úspešne načítanú históriu a platný lokálny dátum. Pokrytie Všetko nemení.
-Rozhranie ešte nie je pripojené.
+Rozhranie je pripojené ako pripomienkový pás navrchu Prehľadu.
 [Kontrakt pripomienok výpisov](docs/plan-091-statement-reminders.md).
 
 Inštalátor (Inno Setup 6):

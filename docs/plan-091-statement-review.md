@@ -73,7 +73,7 @@ upozornenia všetkých jeho výpisov. Iné výpisy si ponechajú svoje dôkazy.
 - `StatementReview.status`: odvodený `StatementReviewStatus` s troma hodnotami z tabuľky.
 - `Store::statement_review(statement_id)`: čítanie jedného výpisu alebo typovaná chyba.
 - Tauri `statement_review`: argument `statementId`, výsledok DTO alebo reťazec chyby.
-- TypeScript `StatementReview`, `StatementReviewStatus`, `api.statementReview(statementId)`: typovaný prístup bez zmeny UI.
+- TypeScript `StatementReview`, `StatementReviewStatus`, `api.statementReview(statementId)`: typovaný prístup; UI je zapojené v Import obrazovke (sekcia UI (bod 21) nižšie).
 
 ## Overenie
 
