@@ -31,7 +31,7 @@ components.
 - `Summary.fee_cents`: signed integer cents contributed by fee rows to the
   existing expense total in the selected account and inclusive date scope.
 - `Summary.by_month[].fee_cents`: the same signed fee contribution grouped by
-  transaction month. It is the backend series for a later graph.
+  transaction month. It feeds the Poplatky bar series in the IncomeExpense chart on the Overview screen.
 - Schema rule: version 5 changes only `transactions.kind` from `other` to
   `fee` when the stored raw block parses as a recognized fee and status is not
   `transfer`.
