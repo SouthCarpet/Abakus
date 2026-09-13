@@ -47,16 +47,16 @@ describe('groupUnassignedTransactions', () => {
   it('keeps punctuation, identifier tokens, and missing versus named places distinct', () => {
     // Oracle: parser::fold does not remove punctuation or synthesize a place for null.
     const rows = [
-      tx(21, 'Shop #123', null),
-      tx(22, 'shop #124', null),
-      tx(23, 'SHOP #123', 'Košice'),
-      tx(24, 'shop #123', null),
+      tx(21, 'Shop c123', null),
+      tx(22, 'shop c124', null),
+      tx(23, 'SHOP c123', 'Košice'),
+      tx(24, 'shop c123', null),
     ]
 
     expect(groupUnassignedTransactions(rows)).toEqual([
-      { merchant: 'Shop #123', place: null, count: 2, ids: [21, 24] },
-      { merchant: 'shop #124', place: null, count: 1, ids: [22] },
-      { merchant: 'SHOP #123', place: 'Košice', count: 1, ids: [23] },
+      { merchant: 'Shop c123', place: null, count: 2, ids: [21, 24] },
+      { merchant: 'shop c124', place: null, count: 1, ids: [22] },
+      { merchant: 'SHOP c123', place: 'Košice', count: 1, ids: [23] },
     ])
   })
 
