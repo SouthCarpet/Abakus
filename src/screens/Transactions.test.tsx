@@ -1,7 +1,33 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api } from '../api'
+import { api, type TxRow } from '../api'
 import { Transactions, TransactionRow } from './Transactions'
+
+function makeTxRow(overrides: Partial<TxRow> & { id: number }): TxRow {
+  return {
+    account_id: 1,
+    account_kind: 'personal',
+    statement_number: 1,
+    posted_date: '2026-05-01',
+    tx_date: '2026-05-01',
+    kind: 'card',
+    amount_cents: -500,
+    orig_amount_cents: null,
+    orig_currency: null,
+    merchant_raw: 'Obchod',
+    place: null,
+    counterparty_name: null,
+    counterparty_iban: null,
+    category_id: null,
+    category_name: null,
+    parent_name: null,
+    status: 'unassigned',
+    source: 'pdf',
+    raw_block: '',
+    note: '',
+    ...overrides,
+  }
+}
 
 afterEach(() => cleanup())
 
@@ -440,5 +466,88 @@ describe('Transactions integration: a successful note write with a failed refres
     await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.length).toBeGreaterThanOrEqual(3))
 
     expect(api.saveTransactionNote).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Point 2: unassigned rows sharing a merchant are frequent and hard to tell
+// apart one row at a time. The group strip surfaces them at the top of the
+// table and hands the exact ids straight to the existing bulk selection.
+describe('Transactions unassigned merchant groups (point 2)', () => {
+  afterEach(() => {
+    vi.mocked(api.listTransactions).mockReset().mockResolvedValue(DEFAULT_ROWS)
+  })
+
+  const TWITCH_ROWS = Array.from({ length: 15 }, (_, i) => makeTxRow({ id: 100 + i, merchant_raw: 'Twitch' }))
+
+  it('shows a group strip for repeated unassigned merchants and selects the group rows on click', async () => {
+    vi.mocked(api.listTransactions).mockResolvedValueOnce(TWITCH_ROWS)
+    render(<Transactions />)
+
+    const groupButton = await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
+    fireEvent.click(groupButton)
+
+    expect(await screen.findByText('15 vybraných')).toBeInTheDocument()
+  })
+
+  it('hides the group strip once there are no unassigned rows left', async () => {
+    vi.mocked(api.listTransactions).mockResolvedValueOnce([makeTxRow({ id: 5, status: 'confirmed' })])
+    render(<Transactions />)
+    await screen.findByText('Obchod')
+    expect(screen.queryByRole('region', { name: 'Skupiny nezaradených platieb' })).not.toBeInTheDocument()
+  })
+})
+
+// Point 12: keyboard control of the table. Arrow keys move a roving row
+// highlight and Enter confirms that row's suggestion, but never when focus
+// sits in the search field, a note, or the CategoryPicker's own search.
+describe('Transactions keyboard row navigation (point 12)', () => {
+  afterEach(() => {
+    vi.mocked(api.listTransactions).mockReset().mockResolvedValue(DEFAULT_ROWS)
+    vi.mocked(api.confirm).mockReset().mockResolvedValue({ updated: 0, rules_created: 0, skipped_transfers: 0 })
+  })
+
+  const SUGGESTED_ROWS = [
+    makeTxRow({ id: 5, merchant_raw: 'Prvy', status: 'suggested' }),
+    makeTxRow({ id: 6, merchant_raw: 'Druhy', status: 'suggested' }),
+  ]
+
+  it('moves the row highlight with arrow keys and confirms the focused suggestion on Enter', async () => {
+    vi.mocked(api.listTransactions).mockResolvedValueOnce(SUGGESTED_ROWS)
+    vi.mocked(api.confirm).mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0 })
+    render(<Transactions />)
+    await screen.findByText('Prvy')
+
+    const table = screen.getByRole('region', { name: 'Transakcie' })
+    fireEvent.keyDown(table, { key: 'ArrowDown' })
+    fireEvent.keyDown(table, { key: 'ArrowDown' })
+    fireEvent.keyDown(table, { key: 'Enter' })
+
+    await waitFor(() => expect(vi.mocked(api.confirm)).toHaveBeenCalledWith([6], false))
+  })
+
+  it('ignores arrow keys and Enter typed in the search field', async () => {
+    vi.mocked(api.listTransactions).mockResolvedValueOnce(SUGGESTED_ROWS)
+    render(<Transactions />)
+    await screen.findByText('Prvy')
+
+    const search = screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    fireEvent.keyDown(search, { key: 'Enter' })
+
+    expect(vi.mocked(api.confirm)).not.toHaveBeenCalled()
+  })
+
+  it('ignores arrow keys and Enter fired from a category picker search inside the table', async () => {
+    vi.mocked(api.listTransactions).mockResolvedValueOnce(SUGGESTED_ROWS)
+    render(<Transactions />)
+    await screen.findByText('Prvy')
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Kategória transakcie 5' }))
+    const search = screen.getByRole('searchbox', { name: 'Hľadať kategóriu' })
+    fireEvent.keyDown(search, { key: 'ArrowDown' })
+    fireEvent.keyDown(search, { key: 'Enter' })
+
+    expect(vi.mocked(api.confirm)).not.toHaveBeenCalled()
   })
 })

@@ -27,4 +27,4 @@ Zobrazované `merchant` a `place` sa zámerne neprepisujú zloženou podobou. Pr
 
 ## Stav integrácie
 
-UI napojenie je samostatná, zatiaľ neimplementovaná práca. Budúce UI môže backendu odovzdať iba explicitné `ids` z vybranej skupiny. Žiadne rozšírenie zhody na backende nie je týmto helperom implicitné.
+UI napojenie je hotové. `Transactions.tsx` vykreslí pás skupín nad tabuľkou, keď `groupUnassignedTransactions` vráti aspoň jednu skupinu. Klik na skupinu odovzdá backendu iba jej explicitné `ids` cez existujúci hromadný výber. Žiadne rozšírenie zhody na backende nie je týmto helperom implicitné.

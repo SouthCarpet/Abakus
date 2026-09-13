@@ -82,6 +82,10 @@ Vo výbere transakcií pribudlo tlačidlo **Potvrdiť vybrané**. Potvrdí odhad
 
 Po hromadnom priradení kategórie sa na chvíľu zobrazí tlačidlo **Späť**. Vráti práve vykonané priradenie a obnoví tabuľku. Späť platí len pre poslednú takú akciu v tomto behu appky: zmizne po použití alebo keď ho nahradí ďalšie hromadné priradenie. Hromadné potvrdenie zatiaľ vrátiť nemožno.
 
+Keď má tabuľka nezaradené platby, appka nad ňou ukáže ich skupiny podľa obchodníka, napríklad „Twitch, 15 platieb, nepriradené“. Kliknutie na skupinu vyberie presne jej riadky, takže ich hneď môžete hromadne priradiť alebo potvrdiť. Skupiny zmiznú, keď nezaradené platby v tabuľke nie sú.
+
+V tabuľke Transakcií fungujú aj šípky hore a dole. Presúvajú zvýraznený riadok. Enter potvrdí odhad zvýrazneného riadku rovnako ako tlačidlo **Potvrdiť**. Šípky a Enter nič nerobia, keď je fokus v poli na hľadanie, v poznámke alebo vo vyhľadávaní kategórie.
+
 ## Pravidelné platby a kategórie
 
 V **Prehľade** nájdete pravidelné výdavky aj príjmy s mesačným, štvrťročným alebo ročným opakovaním. Odhady sú oddelené od platieb, ktoré potvrdíte. Detail ukáže konkrétne platby, ďalší očakávaný termín a prípadnú ustálenú zmenu ceny. Výpočty rozlišujú pôvodnú menu a prepočet do eur.

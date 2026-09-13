@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Account, AccountKind, Category, RuleView, Status, TxFilter, TxKind, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
@@ -15,6 +15,7 @@ import { formatDate } from '../lib/format'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
 import { periodRange, validPeriod } from '../lib/period'
+import { groupUnassignedTransactions, type TransactionDisplayGroup } from '../lib/transaction-groups'
 
 const TEXT_DEBOUNCE_MS = 300
 const STATUSES: Status[] = ['transfer', 'confirmed', 'suggested', 'unassigned']
@@ -54,6 +55,46 @@ function countMatchingUnconfirmed(rows: TxRow[], row: TxRow): number {
       (candidate.status === 'suggested' || candidate.status === 'unassigned') &&
       matchesForConfirm(candidate, row),
   ).length
+}
+
+// Point 2: unassigned rows sharing a merchant (and place) are frequent and
+// hard to tell apart one row at a time. `groupUnassignedTransactions` already
+// computes the groups; this only decides the display sentence and wires a
+// click straight into the existing bulk selection below.
+function groupLabel(group: TransactionDisplayGroup): string {
+  const merchant = group.merchant.trim() ? group.merchant : 'Bez obchodníka'
+  const parts = group.place ? [merchant, group.place] : [merchant]
+  return `${parts.join(', ')}, ${group.count} platieb, nepriradené`
+}
+
+function UnassignedGroupsBar({ rows, onSelectGroup }: { rows: TxRow[]; onSelectGroup: (ids: number[]) => void }) {
+  const groups = useMemo(() => groupUnassignedTransactions(rows), [rows])
+  if (groups.length === 0) return null
+  return (
+    <div className="k-row k-well" role="region" aria-label="Skupiny nezaradených platieb">
+      {groups.map((group) => (
+        <Button key={group.ids[0]} variant="ghost" onClick={() => onSelectGroup(group.ids)}>
+          {groupLabel(group)}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
+// Point 12: the table region owns arrow/Enter navigation, but only once the
+// key reaches it from something that is not a form field: the search box,
+// a note, and the CategoryPicker's own search all keep typing normal keys.
+function isFormField(target: EventTarget | null): boolean {
+  const tag = (target as HTMLElement | null)?.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+}
+
+function nextFocusedRowId(rows: TxRow[], currentId: number | null, direction: 1 | -1): number | null {
+  if (rows.length === 0) return null
+  const currentIndex = currentId === null ? -1 : rows.findIndex((r) => r.id === currentId)
+  if (currentIndex === -1) return direction === 1 ? rows[0].id : rows[rows.length - 1].id
+  const nextIndex = Math.min(Math.max(currentIndex + direction, 0), rows.length - 1)
+  return rows[nextIndex].id
 }
 
 function useDebouncedText(delay: number, initial = ''): [string, string, (v: string) => void] {
@@ -241,6 +282,7 @@ export function TransactionRow({
   categories,
   selected,
   matchingCount = 0,
+  focused = false,
   onSelect,
   onAssign,
   onConfirm,
@@ -253,6 +295,8 @@ export function TransactionRow({
   // Point 1: how many other unconfirmed rows share this row's merchant/place
   // (or account, for transfer-like kinds). 0 hides the apply-to-matching option.
   matchingCount?: number
+  // Point 12: true for the row currently holding the keyboard roving highlight.
+  focused?: boolean
   onSelect: (id: number, checked: boolean) => void
   onAssign: (id: number, categoryId: number | null) => void
   onConfirm: (id: number, applyToMatching: boolean) => void
@@ -264,7 +308,7 @@ export function TransactionRow({
   const isTransfer = row.status === 'transfer'
   return (
     <>
-      <tr>
+      <tr className={focused ? 'is-active' : undefined}>
         <td>
           <input aria-label={`Vybrať transakciu ${row.id}: ${row.merchant_raw}`} type="checkbox" checked={selected} disabled={isTransfer} onChange={(e) => onSelect(row.id, e.target.checked)} />
         </td>
@@ -350,6 +394,8 @@ export function Transactions({
   const [kind, setKind] = useState<TxKind | null>(null)
   const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS, initialText)
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  // Point 12: which row currently holds the keyboard roving highlight.
+  const [focusedRowId, setFocusedRowId] = useState<number | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   // A17: distinguishes "no rows loaded yet" from "the filter really matches
   // nothing", so the empty sentence only shows once a real load finished.
@@ -444,6 +490,26 @@ export function Transactions({
     if (!effectivePeriodValid || text !== debouncedText) { fetchRequest.current++; return }
     void fetchRows().catch(() => {})
   }, [filter, revision, effectivePeriodValid, text, debouncedText])
+
+  // Point 12: a row that scrolls out of the current filter must drop the
+  // keyboard highlight with it, or the highlight would point at nothing.
+  useEffect(() => {
+    if (focusedRowId !== null && !rows.some((r) => r.id === focusedRowId)) setFocusedRowId(null)
+  }, [rows, focusedRowId])
+
+  function onTableKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (isFormField(event.target)) return
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      setFocusedRowId(nextFocusedRowId(rows, focusedRowId, event.key === 'ArrowDown' ? 1 : -1))
+      return
+    }
+    if (event.key !== 'Enter') return
+    const focusedRow = rows.find((r) => r.id === focusedRowId)
+    if (!focusedRow || focusedRow.status !== 'suggested') return
+    event.preventDefault()
+    void action.run(() => confirmOne(focusedRow.id, false))
+  }
 
   function clearFilters() {
     setPeriod({ kind: 'all' }); setAccountId(null); setCategoryId(null)
@@ -576,6 +642,7 @@ export function Transactions({
         Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby. Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby rovnakého obchodníka.
       </p>
       <fieldset disabled={action.busy} className="k-section">
+        <UnassignedGroupsBar rows={rows} onSelectGroup={(ids) => setSelected(new Set(ids))} />
         <BulkBar
           count={selected.size}
           categories={categories}
@@ -585,7 +652,7 @@ export function Transactions({
           onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
           onConfirm={(applyToMatching) => void action.run(() => bulkConfirm(applyToMatching))}
         />
-        <div className="k-table-scroll" role="region" aria-label="Transakcie" tabIndex={0}>
+        <div className="k-table-scroll" role="region" aria-label="Transakcie" tabIndex={0} onKeyDown={onTableKeyDown}>
         <table className="k-table">
           <thead>
             <tr>
@@ -612,6 +679,7 @@ export function Transactions({
                 categories={categories}
                 selected={selected.has(row.id)}
                 matchingCount={row.status === 'suggested' ? countMatchingUnconfirmed(rows, row) : 0}
+                focused={focusedRowId === row.id}
                 onSelect={toggleSelect}
                 onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
                 onConfirm={(id, applyToMatching) => void action.run(() => confirmOne(id, applyToMatching))}

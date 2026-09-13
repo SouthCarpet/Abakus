@@ -15,6 +15,8 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 - Archivácia kategórie v **Kategóriách** má nové kompaktné ikonové tlačidlo namiesto textového. Nové červené tlačidlo kategóriu zmaže. Pred zmazaním appka ukáže, koľko transakcií sa presunie do nezaradených, a po zmazaní výsledok potvrdí.
 - Tabuľka **Pravidlá** v Kategóriách má priamo v riadku výber cieľovej kategórie na zmenu bez opustenia obrazovky. Tlačidlo **Zmazať** pri pravidle najprv ukáže, koľko otvorených riadkov sa naň odkazuje a koľko z nich po zmazaní zmení zaradenie.
 - Filter **Druh** v Transakciách ponúka aj bankový poplatok (**Poplatok**). Prehľad má novú dlaždicu **Poplatky** a graf **Príjmy a výdavky** má vlastný stĺpec Poplatky.
+- Nad tabuľkou Transakcií sa objavia skupiny nezaradených platieb podľa obchodníka, napríklad „Twitch, 15 platieb, nepriradené“. Kliknutie na skupinu vyberie jej riadky pre hromadné priradenie alebo potvrdenie.
+- Tabuľka Transakcií sa dá ovládať klávesnicou: šípky hore a dole presúvajú zvýraznený riadok, Enter potvrdí jeho odhad. Fokus vo vyhľadávaní, poznámke alebo vo výbere kategórie tieto klávesy nepoužije.
 
 ## 0.1.6 (2026-09-09)
 
