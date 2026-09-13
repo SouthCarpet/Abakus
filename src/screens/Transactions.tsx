@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Account, AccountKind, Category, RuleView, Status, TxFilter, TxRow } from '../api'
+import type { Account, AccountKind, Category, RuleView, Status, TxFilter, TxKind, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { CategoryDialog } from '../components/CategoryDialog'
@@ -19,6 +19,22 @@ import { periodRange, validPeriod } from '../lib/period'
 const TEXT_DEBOUNCE_MS = 300
 const STATUSES: Status[] = ['transfer', 'confirmed', 'suggested', 'unassigned']
 const ACCOUNT_MATCH_KINDS = new Set(['transfer_in', 'transfer_out', 'standing_order'])
+
+// Point 13: fees get their own TxKind so they can be filtered separately
+// from every other kind, without inventing a new concept beyond what the
+// backend already recognizes.
+const TX_KIND_LABELS: Record<TxKind, string> = {
+  card: 'Karta',
+  card_foreign: 'Karta v cudzej mene',
+  refund: 'Vrátenie',
+  atm: 'Bankomat',
+  transfer_in: 'Prichádzajúci prevod',
+  transfer_out: 'Odchádzajúci prevod',
+  standing_order: 'Trvalý príkaz',
+  fee: 'Poplatok',
+  other: 'Iné',
+}
+const TX_KINDS = Object.keys(TX_KIND_LABELS) as TxKind[]
 
 // Point 1: mirrors the backend's ExactIdentity match used by confirm's
 // applyToMatching (same counterparty account for transfer-like kinds,
@@ -56,10 +72,12 @@ function FilterBar({
   accountId,
   categoryId,
   status,
+  kind,
   text,
   onAccount,
   onCategory,
   onStatus,
+  onKind,
   onText,
 }: {
   accounts: Account[]
@@ -67,10 +85,12 @@ function FilterBar({
   accountId: number | null
   categoryId: number | null
   status: Status | null
+  kind: TxKind | null
   text: string
   onAccount: (v: number | null) => void
   onCategory: (v: number | null) => void
   onStatus: (v: Status | null) => void
+  onKind: (v: TxKind | null) => void
   onText: (v: string) => void
 }) {
   return (
@@ -102,6 +122,19 @@ function FilterBar({
         ))}
       </select>
       <CategoryPicker mode="filter" label="Filter kategórie" emptyLabel="Všetky kategórie" value={categoryId} onChange={onCategory} categories={categories} />
+      <select
+        className="k-select k-well"
+        aria-label="Druh"
+        value={kind ?? ''}
+        onChange={(e) => onKind((e.target.value || null) as TxKind | null)}
+      >
+        <option value="">Všetky druhy</option>
+        {TX_KINDS.map((k) => (
+          <option key={k} value={k}>
+            {TX_KIND_LABELS[k]}
+          </option>
+        ))}
+      </select>
       <input
         className="k-input k-well"
         aria-label="Hľadať obchodníka alebo poznámku"
@@ -314,6 +347,7 @@ export function Transactions({
   const [accountId, setAccountId] = useState<number | null>(null)
   const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId)
   const [status, setStatus] = useState<Status | null>(initialStatus)
+  const [kind, setKind] = useState<TxKind | null>(null)
   const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS, initialText)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState<string | null>(null)
@@ -349,10 +383,11 @@ export function Transactions({
       account_kind: drilldown.accountKind ?? null,
       category_id: categoryId,
       status,
+      kind,
       text: debouncedText || null,
       statement_id: drilldown.statementId ?? null,
     }),
-    [from, to, accountId, drilldown, categoryId, status, debouncedText],
+    [from, to, accountId, drilldown, categoryId, status, kind, debouncedText],
   )
 
   const reload = useCallback(() => setRevision((value) => value + 1), [])
@@ -412,7 +447,7 @@ export function Transactions({
 
   function clearFilters() {
     setPeriod({ kind: 'all' }); setAccountId(null); setCategoryId(null)
-    setStatus(null); setText(''); setDrilldown({ statementId: undefined, accountKind: undefined })
+    setStatus(null); setKind(null); setText(''); setDrilldown({ statementId: undefined, accountKind: undefined })
     setSelected(new Set())
   }
 
@@ -512,10 +547,12 @@ export function Transactions({
         accountId={accountId}
         categoryId={categoryId}
         status={status}
+        kind={kind}
         text={text}
         onAccount={setAccountId}
         onCategory={setCategoryId}
         onStatus={setStatus}
+        onKind={setKind}
         onText={setText}
       />
       <div className="k-row">

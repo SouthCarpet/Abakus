@@ -147,7 +147,7 @@ describe('transaction filters, export and sums', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Účet' }), { target: { value: '7' } })
     fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'čerstvý text' } })
     fireEvent.click(screen.getByRole('button', { name: 'Exportovať filtrované CSV' }))
-    await waitFor(() => expect(api.exportCsv).toHaveBeenCalledWith({ from: null, to: null, account_id: 7, account_kind: 'personal', category_id: 8, status: 'unassigned', text: 'čerstvý text', statement_id: 42 }, 'C:/synthetic/export.csv'))
+    await waitFor(() => expect(api.exportCsv).toHaveBeenCalledWith({ from: null, to: null, account_id: 7, account_kind: 'personal', category_id: 8, status: 'unassigned', kind: null, text: 'čerstvý text', statement_id: 42 }, 'C:/synthetic/export.csv'))
     expect(await screen.findByText('Exportovaných transakcií: 1.')).toBeVisible()
   })
   it('clear removes all filters and selection including statement and account kind', async () => {
@@ -155,7 +155,7 @@ describe('transaction filters, export and sums', () => {
     fireEvent.click(await screen.findByRole('checkbox', { name: /Vybrať transakciu/ }))
     expect(screen.getByText('1 vybraných')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Vymazať všetky filtre' }))
-    await waitFor(() => expect(api.listTransactions).toHaveBeenLastCalledWith({ from: null, to: null, account_id: null, account_kind: null, category_id: null, status: null, text: null, statement_id: null }))
+    await waitFor(() => expect(api.listTransactions).toHaveBeenLastCalledWith({ from: null, to: null, account_id: null, account_kind: null, category_id: null, status: null, kind: null, text: null, statement_id: null }))
     expect(screen.queryByText('1 vybraných')).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
   })

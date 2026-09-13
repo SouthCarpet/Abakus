@@ -44,6 +44,7 @@ vi.mock('../api', async (importOriginal) => {
       undoLastAssignment: vi.fn().mockResolvedValue(null),
       confirm: vi.fn().mockResolvedValue({ updated: 0, rules_created: 0, skipped_transfers: 0 }),
       saveTransactionNote: vi.fn().mockResolvedValue(undefined),
+      saveCategory: vi.fn(),
     },
   }
 })
@@ -282,6 +283,42 @@ it('applies initialText as the search filter immediately, without waiting for th
   render(<Transactions initialText="Kaufland" />)
   expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('Kaufland')
   await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'Kaufland' })))
+})
+
+// Point 3: creating a subcategory from an open statement's transactions must
+// work without leaving the screen: pick "Nová kategória..." from the row's
+// picker, name it, choose the parent, and the created category is assigned
+// to that row immediately (already implemented; this pins the behavior).
+it('creates a subcategory from the row picker, asks for the parent, and assigns it to that row', async () => {
+  vi.mocked(api.saveCategory).mockResolvedValueOnce({ id: 9, parent_id: 1, name: 'Potraviny', kind: 'expense', sort: 1, system: false, archived: false })
+  render(<Transactions />)
+  await screen.findByText('Obchod')
+
+  fireEvent.click(screen.getByRole('combobox', { name: 'Kategória transakcie 5' }))
+  fireEvent.click(screen.getByRole('option', { name: 'Nová kategória...' }))
+  const dialog = screen.getByRole('dialog', { name: 'Nová kategória' })
+  await within(dialog).findByRole('option', { name: 'Jedlo' })
+  fireEvent.change(within(dialog).getByLabelText('Nadradená kategória'), { target: { value: '1' } })
+  fireEvent.change(within(dialog).getByLabelText('Názov kategórie'), { target: { value: 'Potraviny' } })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Uložiť' }))
+
+  await waitFor(() => expect(api.saveCategory).toHaveBeenCalledWith(null, 1, 'Potraviny', 'expense'))
+  await waitFor(() => expect(api.assign).toHaveBeenCalledWith([5], 9, false))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+// Point 13: fees need to be a separately filterable kind, so the kind filter
+// must offer every TxKind including 'fee', not just the account/status/
+// category/text filters that existed before.
+it('offers Poplatok in the kind filter and sends kind: fee to listTransactions', async () => {
+  render(<Transactions />)
+  await screen.findByText('Obchod')
+  const kindFilter = screen.getByRole('combobox', { name: 'Druh' })
+  expect(within(kindFilter).getByRole('option', { name: 'Poplatok' })).toBeInTheDocument()
+
+  fireEvent.change(kindFilter, { target: { value: 'fee' } })
+
+  await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ kind: 'fee' })))
 })
 
 const DEFAULT_ROWS = [

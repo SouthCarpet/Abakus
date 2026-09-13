@@ -11,6 +11,10 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 - Prehľad hore ukáže pripomienku, keď appke chýba výpis za predchádzajúci mesiac (sedem dní po konci mesiaca). Text hovorí o medzere v pokrytí, nie o chýbajúcich transakciách. Tlačidlo **Prejsť na import** pri pripomienke otvorí Import.
 - Kliknutie na obchodníka v tabuľke **Najčastejší obchodníci** otvorí Transakcie s vyplneným hľadaním podľa jeho mena.
 - Nová karta **Porovnanie s rovnakým obdobím vlani** vo vlastnom výbere mesiaca a dĺžky (jeden mesiac alebo tri mesiace) ukáže aktuálne aj vlaňajšie obdobie pri číslach príjmov, výdavkov a čistého súčtu.
+- Novú kategóriu aj podkategóriu možno vytvoriť priamo pri priraďovaní transakcie výberom **Nová kategória...**, bez prechodu do Kategórií. Appka rovno priradí novú kategóriu danej transakcii.
+- Archivácia kategórie v **Kategóriách** má nové kompaktné ikonové tlačidlo namiesto textového. Nové červené tlačidlo kategóriu zmaže. Pred zmazaním appka ukáže, koľko transakcií sa presunie do nezaradených, a po zmazaní výsledok potvrdí.
+- Tabuľka **Pravidlá** v Kategóriách má priamo v riadku výber cieľovej kategórie na zmenu bez opustenia obrazovky. Tlačidlo **Zmazať** pri pravidle najprv ukáže, koľko otvorených riadkov sa naň odkazuje a koľko z nich po zmazaní zmení zaradenie.
+- Filter **Druh** v Transakciách ponúka aj bankový poplatok (**Poplatok**). Prehľad má novú dlaždicu **Poplatky** a graf **Príjmy a výdavky** má vlastný stĺpec Poplatky.
 
 ## 0.1.6 (2026-09-09)
 

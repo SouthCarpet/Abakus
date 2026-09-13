@@ -110,12 +110,14 @@ function SummaryBody({
   summary,
   incomeSpan,
   expenseSpan,
+  feeSpan,
   onNavigateToTransactions,
   onMonthClick,
 }: {
   summary: Summary
   incomeSpan?: { min: number; max: number }
   expenseSpan?: { min: number; max: number }
+  feeSpan?: { min: number; max: number }
   onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number; merchantText?: string }) => void
   onMonthClick: (month: string) => void
 }) {
@@ -126,6 +128,9 @@ function SummaryBody({
       <div className="k-kpi-row">
         <Kpi label="Príjem" cents={summary.income_cents} min={incomeSpan?.min} max={incomeSpan?.max} tone="success" />
         <Kpi label="Výdavky" cents={summary.expense_cents} min={expenseSpan?.min} max={expenseSpan?.max} tone="danger" />
+        {/* Point 13: fee_cents is already a subset of expense_cents above, so
+            this tile surfaces it, it does not add a second expense total. */}
+        <Kpi label="Poplatky" cents={summary.fee_cents} min={feeSpan?.min} max={feeSpan?.max} tone="danger" />
         <Kpi label="Čisté" cents={summary.net_cents} tone={summary.net_cents >= 0 ? 'success' : 'danger'} baselineOnly />
         <Kpi label="Prevody vylúčené" cents={summary.transfer_cents} />
       </div>
@@ -216,6 +221,7 @@ export function Overview({
 
   const incomeSpan = summary ? monthlySpan(summary.by_month, (m) => m.income_cents) : undefined
   const expenseSpan = summary ? monthlySpan(summary.by_month, (m) => m.expense_cents) : undefined
+  const feeSpan = summary ? monthlySpan(summary.by_month, (m) => m.fee_cents) : undefined
 
   return (
     <div className="k-section">
@@ -251,6 +257,7 @@ export function Overview({
             summary={summary}
             incomeSpan={incomeSpan}
             expenseSpan={expenseSpan}
+            feeSpan={feeSpan}
             onNavigateToTransactions={navigateFiltered}
             onMonthClick={onMonthClick}
           />

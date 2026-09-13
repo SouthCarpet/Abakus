@@ -25,7 +25,7 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 **0.1.6.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
-Vo vývojovej vetve 0.2.0 je pripravený backend na zmenu cieľa naučených pravidiel, náhľad dopadu zmazania pravidla, explicitné zmazanie kategórie po potvrdení náhľadu a atómové hromadné potvrdenie návrhov. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Ovládanie týchto funkcií ešte nie je hotové. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
+Vo vývojovej vetve 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a červené tlačidlo na zmazanie. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Atómové hromadné potvrdenie návrhov má zatiaľ len backend, ovládanie v rozhraní ešte nie je hotové. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
 ## Prečo
 
@@ -72,7 +72,7 @@ Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Záloh
 
 Vytvorenie kategórie ani podkategórie samo nevytvorí pravidlo. Po priradení kategórie transakcii alebo potvrdení návrhu si appka zapamätá rozpoznaného obchodníka a miesto. Presná zhoda sa priradí automaticky. Rovnakého obchodníka na inom mieste označí ako **odhad**. Ten potvrdíte jedným kliknutím. Platby bez rozpoznaného obchodníka sa takto neučia ako jedna spoločná skupina.
 
-Voľba **Použiť aj na podobné** zaradí podobné už importované transakcie, ktoré ešte nie sú potvrdené. Potvrdené priradenia ponechá. V detaile transakcie možno zmeniť cieľ pôvodného vstavaného pravidla, ak ju zaradilo také pravidlo. Samostatný formulár na ručné vytváranie pravidiel zatiaľ nie je dostupný.
+Voľba **Použiť aj na podobné** zaradí podobné už importované transakcie, ktoré ešte nie sú potvrdené. Potvrdené priradenia ponechá. V detaile transakcie možno zmeniť cieľ pôvodného vstavaného pravidla, ak ju zaradilo také pravidlo. V **Kategóriách** má každé pravidlo priamo v tabuľke výber cieľovej kategórie na zmenu bez opustenia obrazovky. Tlačidlo **Zmazať** pri pravidle najprv ukáže, koľko otvorených riadkov sa naň odkazuje a koľko z nich po zmazaní zmení zaradenie. Samostatný formulár na ručné vytváranie pravidiel zatiaľ nie je dostupný.
 
 ## Hromadné akcie a Späť
 
@@ -90,7 +90,7 @@ Platbu možno potvrdiť, ignorovať alebo obnoviť jej automatický odhad. V det
 
 Panel ukazuje mesačný alebo ročný prepočet a očakávané platby do konca mesiaca. Podiel na výdavkoch je dostupný iba pri dostatočnom overenom pokrytí všetkých vybraných účtov. Tieto hodnoty sú odhady z importovaných údajov. Nie sú bankové príkazy ani aktuálny zostatok.
 
-Kategóriu možno vytvoriť priamo pri priraďovaní transakcie. V **Kategóriách** ju možno presunúť pod inú nadradenú kategóriu alebo osamostatniť. Kategórie majú najviac dve úrovne. Podkategória preberá druh príjem alebo výdavok od rodiča. Zmena druhu s dopadom na staršie transakcie vyžaduje potvrdenie zobrazených počtov. Spotify má vlastnú podkategóriu. Úprava starých údajov zachováva používateľské zmeny pravidiel.
+Kategóriu aj podkategóriu možno vytvoriť priamo pri priraďovaní transakcie v **Transakciách**, bez prechodu do Kategórií: výber **Nová kategória...** v zozname kategórií opýta na názov a nadradenú kategóriu, po uložení appka rovno priradí novú kategóriu danej transakcii. V **Kategóriách** ju možno presunúť pod inú nadradenú kategóriu alebo osamostatniť. Kategórie majú najviac dve úrovne. Podkategória preberá druh príjem alebo výdavok od rodiča. Zmena druhu s dopadom na staršie transakcie vyžaduje potvrdenie zobrazených počtov. Spotify má vlastnú podkategóriu. Úprava starých údajov zachováva používateľské zmeny pravidiel.
 
 ## PDF s grafmi a výpisom
 
@@ -134,6 +134,7 @@ Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, *
 - **Vyhľadávanie** spája obchodníka s miestom, takže `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku, zjednotí nadbytočné medzery a ponechá pôvodné hľadanie v poznámke a názve protistrany. Znaky `%` a `_` sú doslovné. Podrobnosti sú v [technickom kontrakte vyhľadávania](docs/plan-091-transaction-search.md).
 - **Exportovať filtrované CSV** v Transakciách exportuje aktuálne obdobie, účet, druh účtu, kategóriu, stav, hľadaný text aj obmedzenie na konkrétny výpis. Použije text viditeľný pri kliknutí, aj keď tabuľka ešte čaká na dokončenie hľadania. Filter sa zachytí pri kliknutí. CSV číta údaje z databázy pri exporte. Zrušenie výberu súboru nič neexportuje. Zlyhanie zápisu sa zobrazí. Pôvodný export v Nastaveniach naďalej používa iba uložené obdobie.
 - **Filter kategórie** umožňuje vybrať aj nadradenú kategóriu s podkategóriami a zobrazuje kategóriu prevzatú z grafu. Archivovaný alebo nedostupný výber zostáva označený. Neznamená Všetky kategórie.
+- **Filter Druh** vyberá presne jeden druh transakcie vrátane bankového poplatku (**Poplatok**). Kombinuje sa s ostatnými filtrami a s exportom CSV.
 - Výber kategórie (filter aj priradenie transakcii) má pole na vyhľadávanie podľa názvu. Hľadanie ignoruje diakritiku a veľkosť písmen. Ak nič nesedí, zobrazí sa text **Žiadna kategória sa nenašla.**. Zoznam sa dá ovládať aj klávesnicou: šípky hore a dole prechádzajú kategóriami, Enter vyberie a Escape zoznam zavrie.
 - **Vymazať všetky filtre** zobrazí všetky obdobia, účty, druhy, kategórie a stavy bez vyhľadávania a bez obmedzenia na výpis. Vymaže aj hromadný výber. Obdobie Všetko sa uloží pre ďalšie obrazovky.
 - Panel **Súčty zobrazených transakcií** počíta presne načítané riadky tabuľky. Príjem, výdavky a čistá suma sa sčítajú v celých centoch podľa rovnakých pravidiel ako Prehľad, vrátane druhu priradenej kategórie a refundácií znižujúcich výdavky. Interné prevody majú samostatný počet a do týchto súm nevstupujú. Pri načítavaní alebo chybe sa staré súčty nezobrazujú. Nejde o zostatok bankového účtu.
@@ -228,11 +229,13 @@ Kontrakt: [porovnanie s vlaňajškom](docs/plan-091-year-comparison.md).
 
 Abakus pripravuje konzervatívne zoskupenie viditeľných nezaradených transakcií podľa obchodníka a miesta. Helper zachováva poradie, vracia iba explicitné ID a nepredpokladá backendové rozšírenie zhody; presný kontrakt a hranice zobrazenia opisuje [dokumentácia skupín transakcií](docs/plan-091-transaction-groups.md).
 
-Bankové poplatky majú druh `fee`. Voliteľný filter `TxFilter.kind` sa kombinuje
-s ostatnými filtrami a exportom CSV. Súhrn a mesačné riadky vracajú
-`fee_cents`, podpísanú časť už započítaných výdavkov. Migrácia schémy na verziu
-5 mení iba druh rozpoznaných starších poplatkov. Ovládanie filtra a graf v UI
-ešte čakajú na zapojenie. Kontrakt: [bankové poplatky](docs/plan-091-fees.md).
+Bankové poplatky majú druh `fee`. Filter **Druh** v Transakciách ho ponúka ako
+**Poplatok**. Súhrn a mesačné riadky vracajú `fee_cents`, podpísanú časť už
+započítaných výdavkov. V **Prehľade** má dlaždica **Poplatky** a graf **Príjmy
+a výdavky** vlastný stĺpec Poplatky vedľa Príjmu a Výdavkov; nejde o druhý
+súčet, len o zvýraznenie časti, ktorá je už vo Výdavkoch. Migrácia schémy na
+verziu 5 mení iba druh rozpoznaných starších poplatkov. Kontrakt: [bankové
+poplatky](docs/plan-091-fees.md).
 
 Backend kontroly výpisu vracia uloženú kontrolu zostatku, upozornenia parsera
 a aktuálne počty nezaradených a navrhnutých riadkov. Pri starších importoch sú
@@ -272,13 +275,14 @@ a Inno Setup sú build nástroje, používateľ ich nepotrebuje.
 - [CHANGELOG.md](CHANGELOG.md): poznámky k vydaniu, ktoré appka ukáže ako **Poznámky k vydaniu**.
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md): známe obmedzenia.
 - [docs/](docs/): interné poznámky k dráham a vydaniam, vrátane [docs/release-0.1.2.md](docs/release-0.1.2.md) a [docs/release-0.1.3.md](docs/release-0.1.3.md).
-- [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): backendový kontrakt úpravy a náhľadu zmazania pravidiel pre pripravovanú verziu 0.2.0.
-- [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md): explicitný preview/apply kontrakt zmazania kategórie, jej potomkov, priradení a pravidiel.
+- [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): kontrakt úpravy a náhľadu zmazania pravidiel pre pripravovanú verziu 0.2.0; rozhranie v Kategóriách je zapojené.
+- [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md): explicitný preview/apply kontrakt zmazania kategórie, jej potomkov, priradení a pravidiel; ikonové ovládanie v Kategóriách je zapojené.
 - [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre pripravovanú verziu 0.2.0.
 - [docs/plan-091-statement-history.md](docs/plan-091-statement-history.md): backendový kontrakt počtu a podpísaného súčtu uložených transakcií vo výsledku histórie výpisov.
 - [docs/plan-091-transaction-search.md](docs/plan-091-transaction-search.md): kontrakt doslovného vyhľadávania cez obchodníka a miesto bez zmeny API alebo databázy.
 - [docs/plan-091-fees.md](docs/plan-091-fees.md): rozpoznanie poplatkov, filter,
-  súhrny a migrácia schémy na verziu 5 pre pripravovanú verziu 0.2.0.
+  súhrny a migrácia schémy na verziu 5 pre pripravovanú verziu 0.2.0; filter
+  Druh a zobrazenie v Prehľade sú zapojené.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.

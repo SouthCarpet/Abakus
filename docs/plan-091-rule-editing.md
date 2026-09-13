@@ -1,8 +1,12 @@
 # Plan 091 rule editing backend
 
 This slice implements the backend contract for accepted point 14 of Abakus
-0.2.0. The store, Tauri command and TypeScript API are ready. The rules-table
-editing and delete-confirmation screens are still pending.
+0.2.0. The store, Tauri command and TypeScript API are ready. The rules table
+in `src/screens/Categories.tsx` now edits and deletes through this contract:
+each row's category cell is a `CategoryPicker` in assignment mode that calls
+`update_rule_category` directly, and the delete button opens a dialog that
+previews `open_rule_references`/`open_classification_changes` before calling
+`delete_rule`.
 
 ## Behavior
 
@@ -69,5 +73,7 @@ and invalid targets, rollback, fallback rules, confirmed rows, transfer rows
 and unknown rules. `src-tauri/tests/category_json.rs` checks the exact command
 argument and response field names.
 
-Frontend status: backend ready, frontend pending. No rule-table UI or visual
-claim belongs to this slice.
+Frontend status: shipped in `src/screens/Categories.tsx` and covered by
+`src/screens/Categories.test.tsx` ("Categories rule editing (point 14)").
+Native/visual acceptance is controller/independently-routed-verifier
+territory, not this note's.

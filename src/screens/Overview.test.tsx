@@ -308,3 +308,15 @@ describe('Overview year-over-year comparison (point 20)', () => {
     expect(screen.getByText('1. 1. 2025–31. 3. 2025')).toBeInTheDocument()
   })
 })
+
+// Point 13: fees already exist as their own Summary field; they must be
+// visible in Overview, not just filterable in Transactions.
+describe('Overview shows fee totals (point 13)', () => {
+  it('shows a Poplatky KPI for summary.fee_cents', async () => {
+    vi.mocked(api.summary).mockResolvedValue({ ...nonEmptySummary, fee_cents: -1234 })
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+
+    expect(await screen.findByText('Poplatky')).toBeInTheDocument()
+    expect(screen.getByText('-12,34 €')).toBeInTheDocument()
+  })
+})

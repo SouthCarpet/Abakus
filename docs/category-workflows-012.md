@@ -121,8 +121,9 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
 - Any SQL failure rolls back transaction changes, rules, provenance and
   categories. The same Store connection remains usable for a corrected retry.
 - The complete additive field and command inventory is in
-  `docs/plan-091-category-delete.md`. This batch is backend-only; the delete
-  icon and confirmation dialog are a separate UI lane.
+  `docs/plan-091-category-delete.md`. This batch was backend-only; the delete
+  icon and confirmation dialog shipped in a later UI lane
+  (`src/screens/Categories.tsx`, plan 091 UI batch K).
 
 ### Atomic bulk confirmation (`crates/store/src/assign.rs`)
 

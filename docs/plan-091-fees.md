@@ -1,8 +1,12 @@
 # Plan 091: backend bank fees
 
-This backend-only step gives recognized bank fees their own transaction kind,
-filter, and summary fields. The Transactions and Overview screens do not use
-the new fields yet.
+This step gives recognized bank fees their own transaction kind, filter, and
+summary fields. The Transactions kind filter now offers `fee` (label
+"Poplatok") alongside every other `TxKind`, and Overview shows a "Poplatky"
+KPI tile plus a "Poplatky" series in the Príjmy a výdavky chart, both reading
+`Summary.fee_cents`/`by_month[].fee_cents` directly. No new chart type was
+added; the fee data is surfaced through the existing KPI and bar-chart
+components.
 
 ## Recognition and compatibility
 
@@ -58,3 +62,9 @@ composition and CSV parity, date and account scopes, positive corrections,
 income and transfer isolation, stable reimport deduplication, exact legacy
 column preservation, transfer protection, rollback, retry, and idempotent
 reopen. No private statement fixture or user database is read.
+
+The frontend kind filter is covered by `src/screens/Transactions.test.tsx`
+("offers Poplatok in the kind filter and sends kind: fee to
+listTransactions"); the Overview KPI and chart series are covered by
+`src/screens/Overview.test.tsx` ("Overview shows fee totals (point 13)") and
+`src/components/charts/IncomeExpense.test.tsx`.
