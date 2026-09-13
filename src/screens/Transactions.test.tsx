@@ -145,7 +145,8 @@ describe('Transactions bulk assign toast', () => {
 
     fireEvent.click(screen.getAllByRole('checkbox')[0])
     const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
-    fireEvent.change(within(bulkBar).getByRole('combobox'), { target: { value: '1' } })
+    fireEvent.click(within(bulkBar).getByRole('combobox'))
+    fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
 
     await waitFor(() => expect(vi.mocked(api.assign)).toHaveBeenCalled())
@@ -163,18 +164,17 @@ it('retains parent drilldown 10 through asynchronous metadata and queries parent
   vi.mocked(api.listCategories).mockReturnValueOnce(new Promise((resolve) => { resolveCategories = resolve }))
   render(<Transactions initialCategoryId={10} initialAccountKind="personal" />)
   const filter = screen.getByRole('combobox', { name: 'Filter kategórie' })
-  expect(filter).toHaveValue('10')
-  expect(filter).toHaveDisplayValue('Kategória ID 10 (názov nie je dostupný)')
+  expect(filter).toHaveTextContent('Kategória ID 10 (názov nie je dostupný)')
   await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ category_id: 10, account_kind: 'personal' })))
 
   resolveCategories(categories)
-  await waitFor(() => expect(filter).toHaveDisplayValue('Jedlo'))
-  expect(filter).toHaveValue('10')
+  await waitFor(() => expect(filter).toHaveTextContent('Jedlo'))
   expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ category_id: 10, account_kind: 'personal' }))
 
-  fireEvent.change(filter, { target: { value: '11' } })
+  fireEvent.click(filter)
+  fireEvent.click(screen.getByRole('option', { name: 'Potraviny' }))
   await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ category_id: 11, account_kind: 'personal' })))
-  expect(filter).toHaveDisplayValue('Potraviny')
+  expect(filter).toHaveTextContent('Potraviny')
 })
 
 const DEFAULT_ROWS = [

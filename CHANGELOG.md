@@ -2,6 +2,10 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
+## 0.2.0 (nevydané)
+
+- Výber kategórie (priradenie aj filter v Transakciách) má nové ovládanie s vyhľadávaním podľa názvu. Písanie ignoruje diakritiku aj veľkosť písmen. Prázdny výsledok ukáže text „Žiadna kategória sa nenašla.“. Šípky hore a dole a Enter vyberú kategóriu z klávesnice, Escape zavrie zoznam a vráti fokus na pôvodné tlačidlo.
+
 ## 0.1.6 (2026-09-09)
 
 Opravuje import výpisov z nového generátora PDF Tatra banky a zjednodušuje nastavenie účtu.

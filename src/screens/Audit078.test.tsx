@@ -330,6 +330,7 @@ it('reloads account and category sources through Obnoviť after initial metadata
   fireEvent.click(screen.getByRole('button', { name: 'Obnoviť' }))
   expect(await screen.findByRole('region', { name: 'Súčty zobrazených transakcií' })).toBeVisible()
   expect(within(screen.getByRole('combobox', { name: 'Účet' })).getByRole('option', { name: 'Osobný - Test účet' })).toBeInTheDocument()
-  expect(within(screen.getByRole('combobox', { name: 'Filter kategórie' })).getByRole('option', { name: 'Jedlo' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('combobox', { name: 'Filter kategórie' }))
+  expect(screen.getByRole('option', { name: 'Jedlo' })).toBeInTheDocument()
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
