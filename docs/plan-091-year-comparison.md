@@ -9,7 +9,7 @@ point: 20
 
 `yearComparisonRanges` prepares the two date ranges needed for a comparison with the same period one year earlier. This is an additive helper. The existing `previousEqualRange` contract and its callers keep the immediately preceding range with the same number of days.
 
-The UI integration is still pending. This helper does not fetch summaries, select an account kind, or render the period choice and date labels.
+The UI integration is shipped in the YearComparisonCard component (see UI wiring below). The helper itself does not fetch summaries, select an account kind, or render the period choice and date labels; the card owns those responsibilities.
 
 # Input
 
