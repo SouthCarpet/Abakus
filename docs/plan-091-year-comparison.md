@@ -1,6 +1,6 @@
 ---
 title: Plan 091, calendar-year comparison helper
-status: helper-ready-ui-pending
+status: shipped
 plan: 091_abakus-020-ux
 point: 20
 ---
@@ -29,6 +29,14 @@ The helper returns a `YearComparisonRanges` value with two explicit inclusive ra
 
 Calendar boundaries are calculated without local time. February uses 28 or 29 days for its own year. A three-month window can cross a year boundary. For example, January 2026 produces November 2025 through January 2026, compared with November 2024 through January 2025.
 
-# Pending UI work
+# UI wiring
 
-The caller still needs to provide the month and period controls, fetch the existing summary once for each returned range with the same account kind, and show both ranges. No new aggregation API is required.
+`YearComparisonCard` (`src/components/insights/YearComparisonCard.tsx`) provides
+the month input and the one-month/three-month choice, fetches `api.summary`
+once for each returned range with the current account-kind filter, and shows
+both ranges next to income, expense and net totals. It lives directly in
+Overview, next to `InsightsPanel`, because its own month/period controls are
+independent of Overview's `PeriodPicker` (unlike `CategoryComparisonCard`,
+whose comparison follows that picker). No new aggregation API was needed:
+the existing arbitrary-range `api.summary(from, to, accountId, accountKind)`
+covers both ranges.

@@ -275,6 +275,15 @@ it('retains parent drilldown 10 through asynchronous metadata and queries parent
   expect(filter).toHaveTextContent('Potraviny')
 })
 
+// Point 17: a merchant click in Overview lands here with the merchant name
+// already in the search box and already applied as the text filter, with no
+// debounce wait needed for the initial value.
+it('applies initialText as the search filter immediately, without waiting for the debounce', async () => {
+  render(<Transactions initialText="Kaufland" />)
+  expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('Kaufland')
+  await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'Kaufland' })))
+})
+
 const DEFAULT_ROWS = [
   {
     id: 5, account_id: 1, account_kind: 'personal', statement_number: 1, posted_date: '2026-05-01', tx_date: '2026-05-01',

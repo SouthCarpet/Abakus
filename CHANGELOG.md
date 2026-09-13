@@ -8,6 +8,9 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 - Potvrdenie odhadu ponúka aj potvrdenie ostatných nepotvrdených transakcií rovnakého obchodníka. Počet takých transakcií je vidieť pri tlačidle **Potvrdiť**.
 - Nové tlačidlo **Potvrdiť vybrané** potvrdí odhady vo vybraných riadkoch naraz, rovnako ako doterajšie hromadné priradenie kategórie.
 - Po hromadnom priradení kategórie appka na chvíľu ponúkne tlačidlo **Späť**, ktoré priradenie vráti a obnoví tabuľku. Späť zatiaľ nefunguje pre hromadné potvrdenie.
+- Prehľad hore ukáže pripomienku, keď appke chýba výpis za predchádzajúci mesiac (sedem dní po konci mesiaca). Text hovorí o medzere v pokrytí, nie o chýbajúcich transakciách. Tlačidlo **Prejsť na import** pri pripomienke otvorí Import.
+- Kliknutie na obchodníka v tabuľke **Najčastejší obchodníci** otvorí Transakcie s vyplneným hľadaním podľa jeho mena.
+- Nová karta **Porovnanie s rovnakým obdobím vlani** vo vlastnom výbere mesiaca a dĺžky (jeden mesiac alebo tri mesiace) ukáže aktuálne aj vlaňajšie obdobie pri číslach príjmov, výdavkov a čistého súčtu.
 
 ## 0.1.6 (2026-09-09)
 

@@ -33,8 +33,17 @@ account's reminder until review. Other accounts remain independent, and review
 data remains available during the grace period.
 
 This helper does not change `buildCoverage`, `buildAccountCoverage`, or the
-all-time Všetko view. All-time coverage continues to show internal gaps only. No
-UI or native application integration is included in this source-only change.
+all-time Všetko view. All-time coverage continues to show internal gaps only.
+
+## UI wiring (plan 091, point 16/18)
+
+`StatementReminderBanner` (`src/components/insights/StatementReminderBanner.tsx`)
+renders near the top of Overview, above the checksum banners. It fetches its
+own accounts and statement history (independent of the InsightsPanel section
+below), calls this helper with the current account-kind filter and
+`localTodayIso()`, and shows one line per missing range naming it a coverage
+gap, never proof of missing transactions. Its footer button (point 18) opens
+Import, reusing Overview's existing `onNavigateToImport`.
 
 ## Additive surface inventory
 

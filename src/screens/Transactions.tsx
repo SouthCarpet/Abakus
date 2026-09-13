@@ -40,9 +40,9 @@ function countMatchingUnconfirmed(rows: TxRow[], row: TxRow): number {
   ).length
 }
 
-function useDebouncedText(delay: number): [string, string, (v: string) => void] {
-  const [text, setText] = useState('')
-  const [debounced, setDebounced] = useState('')
+function useDebouncedText(delay: number, initial = ''): [string, string, (v: string) => void] {
+  const [text, setText] = useState(initial)
+  const [debounced, setDebounced] = useState(initial)
   useEffect(() => {
     const t = setTimeout(() => setDebounced(text), delay)
     return () => clearTimeout(t)
@@ -295,6 +295,7 @@ export function Transactions({
   initialStatus = null,
   initialCategoryId = null,
   initialAccountKind,
+  initialText,
 }: {
   statementId?: number | null
   initialStatus?: Status | null
@@ -302,6 +303,9 @@ export function Transactions({
   // A17: a drill-down from a kind-filtered Prehľad carries that filter here,
   // so it never shows rows from an account the user already filtered out.
   initialAccountKind?: AccountKind | null
+  // Point 17: a merchant click in Overview lands here with the merchant name
+  // already applied as the search filter (point 9's substring search).
+  initialText?: string
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -310,7 +314,7 @@ export function Transactions({
   const [accountId, setAccountId] = useState<number | null>(null)
   const [categoryId, setCategoryId] = useState<number | null>(initialCategoryId)
   const [status, setStatus] = useState<Status | null>(initialStatus)
-  const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS)
+  const [text, debouncedText, setText] = useDebouncedText(TEXT_DEBOUNCE_MS, initialText)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [toast, setToast] = useState<string | null>(null)
   // A17: distinguishes "no rows loaded yet" from "the filter really matches

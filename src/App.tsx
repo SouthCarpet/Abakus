@@ -15,6 +15,9 @@ interface TransactionsEntry {
   statementId?: number
   status?: Status
   categoryId?: number
+  // Point 17: a merchant click in Overview carries the merchant name here as
+  // the Transactions search text (point 9's substring search).
+  merchantText?: string
   accountKind?: AccountKind
 }
 
@@ -58,6 +61,7 @@ export function App() {
             initialStatus={transactionsEntry.status ?? null}
             initialCategoryId={transactionsEntry.categoryId ?? null}
             initialAccountKind={transactionsEntry.accountKind ?? null}
+            initialText={transactionsEntry.merchantText ?? ''}
           />
         ) : null}
         {screen === 'import' ? <Import onNavigateToTransactions={(statementId) => goToTransactions({ statementId })} /> : null}

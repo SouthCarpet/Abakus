@@ -62,7 +62,7 @@ Ak Abakus už máte nainštalovaný, druhé spustenie inštalátora ho aktualizu
 3. V **Transakciách** skontrolujte navrhnuté kategórie. Odhad potvrdíte jedným kliknutím.
 4. V **Prehľade** uvidíte príjmy, výdavky, kategórie, pravidelné platby a vývoj v čase.
 
-Graf **Podľa kategórií** zachováva znamienko súčtu. Záporné hodnoty vľavo znižujú výdavky. Kladné vpravo ich zvyšujú. Kliknutie na kategóriu otvorí príslušné transakcie. Tabuľky v menšom okne umožňujú vodorovné posúvanie. Suma a mena ostávajú spolu.
+Graf **Podľa kategórií** zachováva znamienko súčtu. Záporné hodnoty vľavo znižujú výdavky. Kladné vpravo ich zvyšujú. Kliknutie na kategóriu otvorí príslušné transakcie. Kliknutie na obchodníka v tabuľke **Najčastejší obchodníci** otvorí Transakcie s vyplneným hľadaním podľa jeho mena. Tabuľky v menšom okne umožňujú vodorovné posúvanie. Suma a mena ostávajú spolu.
 
 Každý importovaný výpis má odznak kontrolného súčtu. Appka overí, či počiatočný zostatok a všetky transakcie dávajú konečný zostatok. Text **Kontrolný súčet nesedí** znamená, že sa tieto hodnoty líšia o uvedenú sumu. Výpis sa importuje. Ostane označený na kontrolu. Ak chýba potrebný zostatok, appka uvedie, že súčet nevie overiť.
 
@@ -112,6 +112,10 @@ V **Prehľade** panel pokrytia uvedie medzery vo výpisoch pre jednotlivé účt
 Porovnanie kategórií ukáže výdavky vo vybranom období a v bezprostredne predchádzajúcom období s rovnakým počtom dní. Oba rozsahy sú uvedené v paneli. Refundácie znižujú výdavky. Interné prevody sa nezapočítavajú. Pri nulovom základe percentuálna zmena nie je dostupná. Chýbajúce výpisy a budúce dni sú označené. Pri voľbe **Všetko** sa porovnanie nezobrazuje.
 
 Historické konečné zostatky sú hodnoty z výpisov ku konkrétnemu dňu. Nie sú aktuálnym zostatkom bankového účtu. Chýbajúci zostatok zostáva neznámy. Kontrolný súčet ukazuje stav overenia výpisu.
+
+Ak appke chýba výpis za predchádzajúci mesiac, sedem dní po konci toho mesiaca sa v Prehľade zobrazí pripomienka. Text hovorí o medzere v pokrytí výpismi, nie o dôkaze chýbajúcich transakcií. Tlačidlo **Prejsť na import** pri pripomienke otvorí obrazovku Import.
+
+**Porovnanie s rovnakým obdobím vlani** má vlastný výber mesiaca a voľbu dĺžky: jeden mesiac alebo tri mesiace končiace vybraným mesiacom. Aktuálne aj vlaňajšie obdobie sú vypísané pri číslach príjmov, výdavkov a čistého súčtu. Toto porovnanie je nezávislé od hlavného výberu obdobia hore na obrazovke.
 
 ## Poznámky k transakciám
 
