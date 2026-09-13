@@ -18,6 +18,27 @@ import { periodRange, validPeriod } from '../lib/period'
 
 const TEXT_DEBOUNCE_MS = 300
 const STATUSES: Status[] = ['transfer', 'confirmed', 'suggested', 'unassigned']
+const ACCOUNT_MATCH_KINDS = new Set(['transfer_in', 'transfer_out', 'standing_order'])
+
+// Point 1: mirrors the backend's ExactIdentity match used by confirm's
+// applyToMatching (same counterparty account for transfer-like kinds,
+// otherwise same merchant and place). This is a display estimate over the
+// rows already on screen; the backend still decides the real set on confirm.
+function matchesForConfirm(a: TxRow, b: TxRow): boolean {
+  if (ACCOUNT_MATCH_KINDS.has(a.kind) && ACCOUNT_MATCH_KINDS.has(b.kind)) {
+    return !!a.counterparty_iban && a.counterparty_iban === b.counterparty_iban
+  }
+  return a.merchant_raw === b.merchant_raw && a.place === b.place
+}
+
+function countMatchingUnconfirmed(rows: TxRow[], row: TxRow): number {
+  return rows.filter(
+    (candidate) =>
+      candidate.id !== row.id &&
+      (candidate.status === 'suggested' || candidate.status === 'unassigned') &&
+      matchesForConfirm(candidate, row),
+  ).length
+}
 
 function useDebouncedText(delay: number): [string, string, (v: string) => void] {
   const [text, setText] = useState('')
@@ -99,6 +120,7 @@ function BulkBar({
   onCategoryChange,
   onCreate,
   onAssign,
+  onConfirm,
 }: {
   count: number
   categories: Category[]
@@ -106,6 +128,7 @@ function BulkBar({
   onCategoryChange: (id: number | null) => void
   onCreate: () => void
   onAssign: (categoryId: number | null, applyToMatching: boolean) => void
+  onConfirm: (applyToMatching: boolean) => void
 }) {
   const [applyToMatching, setApplyToMatching] = useState(false)
   if (count === 0) return null
@@ -119,6 +142,10 @@ function BulkBar({
       </label>
       <Button variant="primary" disabled={categoryId === null} onClick={() => onAssign(categoryId, applyToMatching)}>
         Priradiť
+      </Button>
+      {/* Point 11: bulk confirm needs no category, so it stays enabled on any selection. */}
+      <Button variant="secondary" onClick={() => onConfirm(applyToMatching)}>
+        Potvrdiť vybrané
       </Button>
     </div>
   )
@@ -180,6 +207,7 @@ export function TransactionRow({
   row,
   categories,
   selected,
+  matchingCount = 0,
   onSelect,
   onAssign,
   onConfirm,
@@ -189,13 +217,17 @@ export function TransactionRow({
   row: TxRow
   categories: Category[]
   selected: boolean
+  // Point 1: how many other unconfirmed rows share this row's merchant/place
+  // (or account, for transfer-like kinds). 0 hides the apply-to-matching option.
+  matchingCount?: number
   onSelect: (id: number, checked: boolean) => void
   onAssign: (id: number, categoryId: number | null) => void
-  onConfirm: (id: number) => void
+  onConfirm: (id: number, applyToMatching: boolean) => void
   onNoteSaved: () => Promise<void>
   onCreateCategory: (rowId: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [applyToMatching, setApplyToMatching] = useState(false)
   const isTransfer = row.status === 'transfer'
   return (
     <>
@@ -225,9 +257,17 @@ export function TransactionRow({
         <td>
           <span className="k-card-badge">{statusLabel(row.status)}</span>
           {row.status === 'suggested' ? (
-            <Button variant="secondary" onClick={() => onConfirm(row.id)}>
-              Potvrdiť
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => onConfirm(row.id, applyToMatching)}>
+                Potvrdiť
+              </Button>
+              {matchingCount > 0 ? (
+                <label className="k-checkbox">
+                  <input type="checkbox" checked={applyToMatching} onChange={(e) => setApplyToMatching(e.target.checked)} />
+                  {`Potvrdiť aj podobné (${matchingCount})`}
+                </label>
+              ) : null}
+            </>
           ) : null}
         </td>
         <td>
@@ -286,6 +326,10 @@ export function Transactions({
   // shared CategoryDialog knows where the created category's own explicit
   // assignment goes: the bulk selection, or straight onto that one row.
   const [createFor, setCreateFor] = useState<'bulk' | { rowId: number } | null>(null)
+  // Point 15: undo covers a bulk assignment only (the backend gives no undo
+  // id for confirm). Valid only for the most recent bulk assignment: any
+  // other mutation clears it, and a new bulk assignment replaces it.
+  const [lastUndo, setLastUndo] = useState<{ id: string } | null>(null)
   const action = useAction()
   const exportAction = useAction()
   const periodValid = validPeriod(period)
@@ -389,22 +433,47 @@ export function Transactions({
 
   async function assignOne(id: number, catId: number | null) {
     if (catId === null) return
+    setLastUndo(null)
     await api.assign([id], catId, false)
     reload()
   }
 
-  async function confirmOne(id: number) {
-    await api.confirm([id])
+  async function confirmOne(id: number, applyToMatching: boolean) {
+    setLastUndo(null)
+    await api.confirm([id], applyToMatching)
     reload()
   }
 
+  // Point 15: only the bulk-assign command (`api.bulkAssign`) is undoable;
+  // the backend keeps a single most-recent slot, so a fresh undo id always
+  // replaces whichever one is showing.
   async function bulkAssign(catId: number | null, applyToMatching: boolean) {
     if (catId === null) return
-    const outcome = await api.assign([...selected], catId, applyToMatching)
+    const outcome = await api.bulkAssign([...selected], catId, applyToMatching)
     setSelected(new Set())
     setBulkCategoryId(null)
     setToast(outcome.skipped_transfers > 0 ? `Prevody sa nepriraďujú, preskočené: ${outcome.skipped_transfers}` : null)
+    setLastUndo(outcome.undo_id ? { id: outcome.undo_id } : null)
     reload()
+  }
+
+  // Point 11: bulk confirm has no undo id from the backend, so it never
+  // touches lastUndo other than invalidating a stale one from an earlier
+  // bulk assignment (the write itself makes that old undo id go stale).
+  async function bulkConfirm(applyToMatching: boolean) {
+    setLastUndo(null)
+    const outcome = await api.confirm([...selected], applyToMatching)
+    setSelected(new Set())
+    setToast(`Potvrdených: ${outcome.updated}.`)
+    reload()
+  }
+
+  async function undoLast() {
+    if (!lastUndo) return
+    const outcome = await api.undoLastAssignment(lastUndo.id)
+    setLastUndo(null)
+    setToast(outcome ? `Vrátených transakcií: ${outcome.restored_rows}.` : 'Vrátenie sa nepodarilo, akcia už nie je aktuálna.')
+    if (outcome) reload()
   }
 
   // Section 9 U05: creation and assignment stay two distinct, explicit
@@ -456,6 +525,12 @@ export function Transactions({
       <OperationStatus error={exportAction.error} busy={exportAction.busy} />
       <FilteredTotals rows={rows} categories={categories} loaded={loaded} categoriesLoaded={metadataLoaded} />
       {toast ? <Toast message={toast} /> : null}
+      {lastUndo ? (
+        <div className="k-row k-well" role="status">
+          <span>Priradenie dokončené.</span>
+          <Button variant="ghost" onClick={() => void action.run(undoLast)}>Späť</Button>
+        </div>
+      ) : null}
       <p className="k-field-label">
         Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby. Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby rovnakého obchodníka.
       </p>
@@ -467,6 +542,7 @@ export function Transactions({
           onCategoryChange={setBulkCategoryId}
           onCreate={() => setCreateFor('bulk')}
           onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
+          onConfirm={(applyToMatching) => void action.run(() => bulkConfirm(applyToMatching))}
         />
         <div className="k-table-scroll" role="region" aria-label="Transakcie" tabIndex={0}>
         <table className="k-table">
@@ -494,9 +570,10 @@ export function Transactions({
                 row={row}
                 categories={categories}
                 selected={selected.has(row.id)}
+                matchingCount={row.status === 'suggested' ? countMatchingUnconfirmed(rows, row) : 0}
                 onSelect={toggleSelect}
                 onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
-                onConfirm={(id) => void action.run(() => confirmOne(id))}
+                onConfirm={(id, applyToMatching) => void action.run(() => confirmOne(id, applyToMatching))}
                 onNoteSaved={refreshRows}
                 onCreateCategory={(rowId) => setCreateFor({ rowId })}
               />

@@ -5,6 +5,9 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 ## 0.2.0 (nevydané)
 
 - Výber kategórie (priradenie aj filter v Transakciách) má nové ovládanie s vyhľadávaním podľa názvu. Písanie ignoruje diakritiku aj veľkosť písmen. Prázdny výsledok ukáže text „Žiadna kategória sa nenašla.“. Šípky hore a dole a Enter vyberú kategóriu z klávesnice, Escape zavrie zoznam a vráti fokus na pôvodné tlačidlo.
+- Potvrdenie odhadu ponúka aj potvrdenie ostatných nepotvrdených transakcií rovnakého obchodníka. Počet takých transakcií je vidieť pri tlačidle **Potvrdiť**.
+- Nové tlačidlo **Potvrdiť vybrané** potvrdí odhady vo vybraných riadkoch naraz, rovnako ako doterajšie hromadné priradenie kategórie.
+- Po hromadnom priradení kategórie appka na chvíľu ponúkne tlačidlo **Späť**, ktoré priradenie vráti a obnoví tabuľku. Späť zatiaľ nefunguje pre hromadné potvrdenie.
 
 ## 0.1.6 (2026-09-09)
 

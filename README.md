@@ -74,6 +74,14 @@ Vytvorenie kategórie ani podkategórie samo nevytvorí pravidlo. Po priradení 
 
 Voľba **Použiť aj na podobné** zaradí podobné už importované transakcie, ktoré ešte nie sú potvrdené. Potvrdené priradenia ponechá. V detaile transakcie možno zmeniť cieľ pôvodného vstavaného pravidla, ak ju zaradilo také pravidlo. Samostatný formulár na ručné vytváranie pravidiel zatiaľ nie je dostupný.
 
+## Hromadné akcie a Späť
+
+Pri potvrdení odhadu appka ukáže, koľko ďalších nepotvrdených transakcií má rovnakého obchodníka (alebo rovnaký účet protistrany pri prevodoch). Zaškrtávacie políčko pri tlačidle **Potvrdiť** potvrdí aj tieto transakcie naraz. Bez zaškrtnutia sa potvrdí iba vybraný riadok.
+
+Vo výbere transakcií pribudlo tlačidlo **Potvrdiť vybrané**. Potvrdí odhady z aktuálneho výberu naraz, rovnako ako doterajšie hromadné priradenie kategórie. Voľba **Použiť aj na podobné** platí aj preň. Riadky, ktoré ešte nemajú odhad, sa preskočia.
+
+Po hromadnom priradení kategórie sa na chvíľu zobrazí tlačidlo **Späť**. Vráti práve vykonané priradenie a obnoví tabuľku. Späť platí len pre poslednú takú akciu v tomto behu appky: zmizne po použití alebo keď ho nahradí ďalšie hromadné priradenie. Hromadné potvrdenie zatiaľ vrátiť nemožno.
+
 ## Pravidelné platby a kategórie
 
 V **Prehľade** nájdete pravidelné výdavky aj príjmy s mesačným, štvrťročným alebo ročným opakovaním. Odhady sú oddelené od platieb, ktoré potvrdíte. Detail ukáže konkrétne platby, ďalší očakávaný termín a prípadnú ustálenú zmenu ceny. Výpočty rozlišujú pôvodnú menu a prepočet do eur.

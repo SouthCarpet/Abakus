@@ -39,7 +39,10 @@ vi.mock('../api', async (importOriginal) => {
           note: '',
         },
       ]),
-      assign: vi.fn().mockResolvedValue({ updated: 1, rules_created: 0, skipped_transfers: 2 }),
+      assign: vi.fn().mockResolvedValue({ updated: 1, rules_created: 0, skipped_transfers: 0 }),
+      bulkAssign: vi.fn().mockResolvedValue({ updated: 1, rules_created: 0, skipped_transfers: 2, undo_id: null }),
+      undoLastAssignment: vi.fn().mockResolvedValue(null),
+      confirm: vi.fn().mockResolvedValue({ updated: 0, rules_created: 0, skipped_transfers: 0 }),
       saveTransactionNote: vi.fn().mockResolvedValue(undefined),
     },
   }
@@ -80,7 +83,35 @@ describe('TransactionRow', () => {
     )
     expect(screen.getByText('Odhad')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Potvrdiť' }))
-    expect(onConfirm).toHaveBeenCalledWith(7)
+    expect(onConfirm).toHaveBeenCalledWith(7, false)
+  })
+
+  // Point 1: confirming also matching payments. The confirm button never
+  // touches other rows unless the user explicitly opts in via this checkbox.
+  it('offers confirming matching unconfirmed rows too, and passes that choice on confirm', () => {
+    const onConfirm = vi.fn()
+    render(
+      <table>
+        <tbody>
+          <TransactionRow row={row} categories={[]} selected={false} matchingCount={2} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={onConfirm} onNoteSaved={vi.fn()} onCreateCategory={vi.fn()} />
+        </tbody>
+      </table>,
+    )
+    const checkbox = screen.getByRole('checkbox', { name: 'Potvrdiť aj podobné (2)' })
+    fireEvent.click(checkbox)
+    fireEvent.click(screen.getByRole('button', { name: 'Potvrdiť' }))
+    expect(onConfirm).toHaveBeenCalledWith(7, true)
+  })
+
+  it('shows no matching-rows option when nothing else matches the merchant', () => {
+    render(
+      <table>
+        <tbody>
+          <TransactionRow row={row} categories={[]} selected={false} matchingCount={0} onSelect={vi.fn()} onAssign={vi.fn()} onConfirm={vi.fn()} onNoteSaved={vi.fn()} onCreateCategory={vi.fn()} />
+        </tbody>
+      </table>,
+    )
+    expect(screen.queryByText(/Potvrdiť aj podobné/)).not.toBeInTheDocument()
   })
   it('renders the amount with tabular numerals class and negative sign', () => {
     render(
@@ -149,8 +180,75 @@ describe('Transactions bulk assign toast', () => {
     fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
 
-    await waitFor(() => expect(vi.mocked(api.assign)).toHaveBeenCalled())
+    await waitFor(() => expect(vi.mocked(api.bulkAssign)).toHaveBeenCalled())
     expect(await screen.findByText('Prevody sa nepriraďujú, preskočené: 2')).toBeInTheDocument()
+  })
+})
+
+// Point 11: bulk confirm. One click confirms the current selection through
+// the same bulk bar used for bulk assignment; confirmed rows are never
+// touched again by the same action.
+describe('Transactions bulk confirm', () => {
+  afterEach(() => {
+    vi.mocked(api.confirm).mockReset().mockResolvedValue({ updated: 0, rules_created: 0, skipped_transfers: 0 })
+  })
+
+  it('confirms the whole selection in one click and reports how many were confirmed', async () => {
+    vi.mocked(api.confirm).mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0 })
+    render(<Transactions />)
+    await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    fireEvent.click(within(bulkBar).getByRole('button', { name: 'Potvrdiť vybrané' }))
+
+    await waitFor(() => expect(vi.mocked(api.confirm)).toHaveBeenCalledWith([5], false))
+    expect(await screen.findByText('Potvrdených: 1.')).toBeInTheDocument()
+  })
+})
+
+// Point 15: undo after bulk assignment. Späť is transient: valid only for
+// the most recent bulk assignment, and it disappears once used.
+describe('Transactions undo after bulk assignment', () => {
+  afterEach(() => {
+    vi.mocked(api.bulkAssign).mockReset().mockResolvedValue({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: null })
+    vi.mocked(api.undoLastAssignment).mockReset().mockResolvedValue(null)
+  })
+
+  it('offers Späť after a bulk assignment and restores rows through it', async () => {
+    vi.mocked(api.bulkAssign).mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: 'assignment-undo-1' })
+    vi.mocked(api.undoLastAssignment).mockResolvedValueOnce({ restored_rows: 1 })
+    render(<Transactions />)
+    await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    fireEvent.click(within(bulkBar).getByRole('combobox'))
+    fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
+    fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
+
+    await waitFor(() => expect(vi.mocked(api.bulkAssign)).toHaveBeenCalled())
+    const undoButton = await screen.findByRole('button', { name: 'Späť' })
+
+    fireEvent.click(undoButton)
+    await waitFor(() => expect(vi.mocked(api.undoLastAssignment)).toHaveBeenCalledWith('assignment-undo-1'))
+    expect(await screen.findByText('Vrátených transakcií: 1.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Späť' })).not.toBeInTheDocument()
+  })
+
+  it('does not offer Späť when the backend reports no undo id for that assignment', async () => {
+    vi.mocked(api.bulkAssign).mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: null })
+    render(<Transactions />)
+    await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    fireEvent.click(within(bulkBar).getByRole('combobox'))
+    fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
+    fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
+
+    await waitFor(() => expect(vi.mocked(api.bulkAssign)).toHaveBeenCalled())
+    expect(screen.queryByRole('button', { name: 'Späť' })).not.toBeInTheDocument()
   })
 })
 
