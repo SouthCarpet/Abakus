@@ -2,10 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Account, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
+import { getLatestRelease, setLatestRelease } from '../lib/updateStatus'
 import { Settings } from './Settings'
 
 afterEach(() => cleanup())
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => { vi.clearAllMocks(); setLatestRelease(null) })
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ save: vi.fn() }))
 
@@ -67,13 +68,14 @@ vi.mock('../api', async (importOriginal) => {
 })
 
 describe('Settings: opt-in update check', () => {
-  it('stays off and never calls checkUpdateNow when the flag is off', async () => {
+  it('stays off and never calls checkUpdateNow when the flag is off, and never feeds the global indicator', async () => {
     mockApi()
     render(<Settings />)
     await waitFor(() => expect(api.getCheckUpdates).toHaveBeenCalled())
     expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).not.toBeChecked()
     expect(api.checkUpdateNow).not.toHaveBeenCalled()
     expect(screen.queryByText(/Dostupná aktualizácia/)).not.toBeInTheDocument()
+    expect(getLatestRelease()).toBeNull()
   })
 
   it('checks on mount and shows the quiet release line when the flag is already on', async () => {
@@ -83,13 +85,14 @@ describe('Settings: opt-in update check', () => {
     expect(screen.getByText(release.url)).toBeInTheDocument()
   })
 
-  it('turning the checkbox on persists the setting and runs the check immediately', async () => {
+  it('turning the checkbox on persists the setting, runs the check immediately and feeds the global indicator', async () => {
     mockApi({ checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
     render(<Settings />)
     const box = await screen.findByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
     box.click()
     await waitFor(() => expect(api.setCheckUpdates).toHaveBeenCalledWith(true))
     await waitFor(() => expect(screen.getByText('Dostupná aktualizácia 0.2.0')).toBeInTheDocument())
+    expect(getLatestRelease()).toEqual(release)
   })
 })
 
@@ -327,6 +330,44 @@ describe('Settings: network audit', () => {
     render(<Settings />)
     await waitFor(() => expect(screen.getByText('Žiadna sieťová aktivita')).toBeInTheDocument())
     expect(screen.queryByText('Neúspešné zápisy auditu')).not.toBeInTheDocument()
+  })
+})
+
+// Point 7: "Sieťová aktivita" used to render every fetched row without limit.
+function manyNetLogRows(count: number): NetLogRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    started_at: `2026-08-${String(i + 1).padStart(2, '0')}T10:00:00Z`,
+    url: `https://api.github.com/repos/SouthCarpet/Abakus/releases/latest?n=${i + 1}`,
+    status: '200',
+    duration_ms: 10,
+    bytes_in: 1,
+  }))
+}
+
+describe('Settings: network activity collapse (point 7)', () => {
+  it('shows only the first 10 rows and offers to show the rest', async () => {
+    mockApi({ netLog: vi.fn().mockResolvedValue(manyNetLogRows(12)) } as Partial<typeof api>)
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByText(/n=1$/)).toBeInTheDocument())
+
+    expect(screen.getByText(/n=10$/)).toBeInTheDocument()
+    expect(screen.queryByText(/n=11$/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/n=12$/)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zobraziť všetky (12)' }))
+    expect(screen.getByText(/n=11$/)).toBeInTheDocument()
+    expect(screen.getByText(/n=12$/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zbaliť' }))
+    expect(screen.queryByText(/n=11$/)).not.toBeInTheDocument()
+  })
+
+  it('shows no toggle at all when 10 or fewer rows exist', async () => {
+    mockApi({ netLog: vi.fn().mockResolvedValue(manyNetLogRows(10)) } as Partial<typeof api>)
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByText(/n=10$/)).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Zobraziť všetky/ })).not.toBeInTheDocument()
   })
 })
 

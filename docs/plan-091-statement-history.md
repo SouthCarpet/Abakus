@@ -1,8 +1,8 @@
 # Plan 091: statement-history transaction aggregates
 
 Point 19 extends the existing `statement_history` result. It does not add a
-database migration, endpoint, history limit, or visual change. The UI work is
-still pending.
+database migration, endpoint, or history limit. The Import screen's
+statement list now reads it directly (see below).
 
 Point 21 adds a separate [statement review API](plan-091-statement-review.md).
 It reports stored parser warnings and live retained-row open counts. Legacy
@@ -49,5 +49,14 @@ Store integration tests use the public `Store` API and synthetic statements.
 They cover empty values, mixed positive and negative cents, every current
 transaction kind, statement and account isolation, intersected filters,
 deduplicated re-exports, one-row aggregation, and integer overflow. The Tauri
-JSON test proves that both snake_case fields are present. TypeScript fixture
-builders were updated mechanically; the UI does not consume the fields yet.
+JSON test proves that both snake_case fields are present.
+
+## UI (point 19)
+
+`src/screens/Import.tsx` reads the full, unbounded `statement_history` result
+instead of the previous 8-most-recent `recent_statements` list. Every
+statement shows its `total_cents` sum next to the transaction count. The
+10 newest (by period end, then statement ID) stay visible; the rest sit
+under a collapsed "Staršie výpisy (N)" toggle, never an endless list. View
+and delete reuse the existing `statement_delete_preview`/`delete_statement`
+flow, keyed by `statement_id`.

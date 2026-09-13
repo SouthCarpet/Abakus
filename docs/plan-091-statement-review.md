@@ -2,8 +2,8 @@
 
 `Store::statement_review(statement_id)`, Tauri príkaz `statement_review` a
 `api.statementReview(statementId)` vracajú samostatný `StatementReview`.
-Používateľské rozhranie ešte nie je zapojené. História výpisov má rovnaký DTO,
-filtre aj poradie ako pred týmto krokom.
+Používateľské rozhranie je zapojené v zozname výpisov v Importe (pozri nižšie).
+História výpisov má rovnaký DTO, filtre aj poradie ako pred týmto krokom.
 
 ## Uložené dôkazy a migrácia
 
@@ -83,7 +83,18 @@ a účtov, opakovaný import a deduplikáciu, chyby, atómový import a mazanie.
 Zmrazená SQL schéma v5 overuje zachovanie dát, `NULL`, opakované otvorenie,
 neskorý rollback po `ALTER`, úspešný opakovaný pokus a odmietnutie verzie 99.
 Tauri JSON testy overujú presné polia a rozdiel medzi `null` a `[]`.
-Natívny beh aplikácie a UI zostávajú mimo tohto overenia.
+Natívny beh aplikácie zostáva mimo tohto overenia.
+
+## UI (bod 21)
+
+Každý riadok zoznamu výpisov v Importe (`src/screens/Import.tsx`) má vlastný
+odznak kontroly, ktorý si sám načíta `api.statementReview(statementId)` len
+pri vykreslení (zbalené staršie výpisy teda nič nevolajú, kým sa nerozbalia).
+Kliknutím sa rozbalí zoznam otvorených položiek: nesediaci alebo neoveriteľný
+kontrolný súčet, upozornenia parsera (alebo veta, že nie sú známe) a počty
+nezaradených a odhadovaných riadkov. Text pri stave `no_open_checks` výslovne
+hovorí "Nepotvrdzuje úplnosť bankových dát." a nikde v odznaku sa neobjaví
+tvrdenie, že bankové dáta sú úplné.
 
 Súvisiace: [história výpisov](plan-091-statement-history.md),
 [backend histórie, poznámok a zálohy](backend-012.md).

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AccountKind, Status } from './api'
 import { Rail } from './components/Rail'
 import { ThemePicker } from './components/ThemePicker'
+import { UpdateIndicator } from './components/UpdateIndicator'
 import { ExportPdfAction } from './components/report/ExportPdfAction'
 import { Categories } from './screens/Categories'
 import { Import } from './screens/Import'
@@ -50,7 +51,12 @@ export function App() {
     <div className="k-shell">
       <Rail items={RAIL_ITEMS} active={screen} onSelect={selectScreen} />
       <section className="k-page">
-        <div className="k-app-toolbar"><ThemePicker /><ExportPdfAction /></div>
+        <div className="k-app-toolbar">
+          {/* Point 5: global, persistent chrome so a found update is visible
+              from every screen, not only inside Settings. */}
+          <UpdateIndicator onOpenSettings={() => setScreen('settings')} />
+          <ThemePicker /><ExportPdfAction />
+        </div>
         {screen === 'overview' ? (
           <Overview onNavigateToImport={() => setScreen('import')} onNavigateToTransactions={goToTransactions} />
         ) : null}

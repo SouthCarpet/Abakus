@@ -16,6 +16,7 @@ import { periodRange, validPeriod } from '../lib/period'
 import { parseReleaseNotes } from '../lib/releaseNotes'
 import { type UpdatePhase, updateButtonLabel } from '../lib/updatePhase'
 import { readUpdatePreference, saveUpdatePreference } from '../lib/updatePreference'
+import { setLatestRelease } from '../lib/updateStatus'
 
 // 0.1.4 (Michal, 2026-09-08): the release notes are third-party text from a
 // GitHub release body, so this renders them as plain React text nodes only
@@ -84,6 +85,8 @@ function UpdateAvailable({ release }: { release: Release }) {
 }
 
 const NET_LOG_LIMIT = 20
+// Point 7: fetch stays at NET_LOG_LIMIT; only the on-screen list collapses.
+const NET_LOG_COLLAPSE_AT = 10
 
 function formatLogTime(startedAt: string): string {
   return startedAt.replace('T', ' ').replace('Z', '').slice(0, 19)
@@ -121,30 +124,40 @@ function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
 }
 
 function NetLogSection({ rows, failures, onScanNow }: { rows: NetLogRow[]; failures: AuditFailure[]; onScanNow: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? rows : rows.slice(0, NET_LOG_COLLAPSE_AT)
+  const hasMore = rows.length > NET_LOG_COLLAPSE_AT
   return (
     <div className="k-section">
       <p className="k-card-title">Sieťová aktivita</p>
       {rows.length === 0 ? (
         <p>Žiadna sieťová aktivita</p>
       ) : (
-        <table className="k-table">
-          <thead>
-            <tr>
-              <th>Čas</th>
-              <th>Adresa</th>
-              <th>Stav</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>{formatLogTime(row.started_at)}</td>
-                <td>{row.url}</td>
-                <td>{row.status}</td>
+        <>
+          <table className="k-table">
+            <thead>
+              <tr>
+                <th>Čas</th>
+                <th>Adresa</th>
+                <th>Stav</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visible.map((row) => (
+                <tr key={row.id}>
+                  <td>{formatLogTime(row.started_at)}</td>
+                  <td>{row.url}</td>
+                  <td>{row.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {hasMore ? (
+            <Button variant="ghost" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? 'Zbaliť' : `Zobraziť všetky (${rows.length})`}
+            </Button>
+          ) : null}
+        </>
       )}
       <p>Vzorkovanie nemusí zachytiť krátke pripojenia. Skutočnú záruku dávajú CSP politika a test závislostí.</p>
       <AuditFailuresSection failures={failures} />
@@ -263,6 +276,15 @@ export function Settings() {
     return () => { accountRequest.current++; netRequest.current++; updateRequest.current++ }
   }, [])
 
+  // Point 5: Settings is the only screen that ever runs `check_update_now`.
+  // Every result it finds (including "no release") also goes to the shared
+  // store, so the App-level indicator reflects an already-known result and
+  // never triggers a network call of its own.
+  function publishRelease(next: Release | null) {
+    setRelease(next)
+    setLatestRelease(next)
+  }
+
   async function loadUpdatePreference(request: number) {
     const on = await readUpdatePreference()
     if (request !== updateRequest.current) return
@@ -271,7 +293,7 @@ export function Settings() {
     if (!on) return
     const nextRelease = await api.checkUpdateNow()
     if (request !== updateRequest.current) return
-    setRelease(nextRelease)
+    publishRelease(nextRelease)
     await refreshNetLog()
   }
 
@@ -280,10 +302,10 @@ export function Settings() {
     await saveUpdatePreference(next)
     if (request !== updateRequest.current) return
     setCheckUpdates(next)
-    setRelease(null)
+    publishRelease(null)
     try {
       const nextRelease = next ? await api.checkUpdateNow() : null
-      if (request === updateRequest.current) setRelease(nextRelease)
+      if (request === updateRequest.current) publishRelease(nextRelease)
     } finally {
       if (request === updateRequest.current) await refreshNetLog()
     }

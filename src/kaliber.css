@@ -281,6 +281,16 @@ td.k-num { text-align: right; font-variant-numeric: tabular-nums; }
 .k-round-row:last-child { border-bottom: 0; }
 .k-round-row:hover { background: var(--color-surface-hover); }
 
+/* Point 21: the review chip is a toggle button plus its own detail panel, so
+   it needs to stack rather than stretch the row's space-between layout. */
+.k-review-chip { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.k-review-detail { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-review-detail ul { margin: 0; padding-left: 1.1em; }
+
+/* Point 5: unobtrusive by default (ghost button), named so it reads as a
+   status line rather than a regular nav action. */
+.k-update-indicator { color: var(--color-accent-soft-foreground); font-weight: 600; }
+
 /* Mutation groups use native disabled propagation without browser fieldset framing. */
 fieldset.k-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 

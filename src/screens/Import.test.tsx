@@ -1,22 +1,27 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ImportReport, RecentStatement, StatementDeletePreview } from '../api'
+import type { ImportReport, StatementDeletePreview, StatementHistoryRow } from '../api'
 import { api } from '../api'
 import { Import, ImportResultCard } from './Import'
 
 afterEach(() => cleanup())
 
-vi.mock('../api', () => ({
-  api: {
-    importStatements: vi.fn(),
-    importWithPassword: vi.fn(),
-    saveAccount: vi.fn(),
-    setAccountPassword: vi.fn(),
-    recentStatements: vi.fn().mockResolvedValue([]),
-    statementDeletePreview: vi.fn(),
-    deleteStatement: vi.fn(),
-  },
-}))
+vi.mock('../api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api')>()
+  return {
+    ...actual,
+    api: {
+      importStatements: vi.fn(),
+      importWithPassword: vi.fn(),
+      saveAccount: vi.fn(),
+      setAccountPassword: vi.fn(),
+      statementHistory: vi.fn().mockResolvedValue([]),
+      statementReview: vi.fn().mockResolvedValue({ statement_id: 0, checksum: { status: 'ok' }, parser_warnings: [], unassigned_count: 0, suggested_count: 0, status: 'no_open_checks' }),
+      statementDeletePreview: vi.fn(),
+      deleteStatement: vi.fn(),
+    },
+  }
+})
 
 vi.mock('@tauri-apps/api/webview', () => ({
   getCurrentWebview: () => ({ onDragDropEvent: () => Promise.resolve(() => {}) }),
@@ -25,6 +30,26 @@ vi.mock('@tauri-apps/api/webview', () => ({
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: vi.fn(),
 }))
+
+// Full-field fixture builder for the point-19 unbounded statement list
+// (statement_history), matching lib/insights/balances.test.ts's shape.
+function historyRow(overrides: Partial<StatementHistoryRow> = {}): StatementHistoryRow {
+  return {
+    statement_id: 5,
+    account_id: 1,
+    account_label: 'Osobný',
+    account_kind: 'personal',
+    number: 6,
+    period_start: '2026-05-30',
+    period_end: '2026-06-30',
+    opening_cents: 10000,
+    closing_cents: 12000,
+    transaction_count: 8,
+    total_cents: 2000,
+    checksum: { status: 'ok' },
+    ...overrides,
+  }
+}
 
 const base: ImportReport = { path: 'C:/x/vypis.pdf', status: 'imported', accountLabel: 'Osobný', accountKind: 'personal', ibanMasked: 'SK44...5678', iban: 'SK44', statementNumber: 6, periodStart: '2026-05-30', periodEnd: '2026-06-30', inserted: 8, duplicates: 0, checksum: { status: 'ok' }, warnings: [], message: null, statementId: 9 }
 describe('ImportResultCard', () => {
@@ -186,13 +211,13 @@ describe('Import: password prompt reveal toggle', () => {
 
 // A17/F1: delete asks a real question (the backend's own counts) and then
 // removes the row, refreshing the list so the numbers change immediately.
-describe('Recent imports: delete a statement', () => {
+describe('Statement list: delete a statement', () => {
   beforeEach(() => vi.clearAllMocks())
-  const statement: RecentStatement = { statement_id: 5, number: 6, period_end: '2026-06-30', account_label: 'Osobný', transaction_count: 8, checksum: { status: 'ok' } }
+  const statement = historyRow()
   const preview: StatementDeletePreview = { statement_id: 5, number: 6, account_label: 'Osobný', period_start: '2026-05-30', period_end: '2026-06-30', transaction_count: 8, confirmed_count: 2, rules_deleted: 1 }
 
   it('shows the preview counts before deleting and refreshes the list after', async () => {
-    vi.mocked(api.recentStatements).mockResolvedValueOnce([statement]).mockResolvedValueOnce([])
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([statement]).mockResolvedValueOnce([])
     vi.mocked(api.statementDeletePreview).mockResolvedValueOnce(preview)
     vi.mocked(api.deleteStatement).mockResolvedValueOnce({ statement_id: 5, number: 6, transactions_deleted: 8, rules_deleted: 1, open_rows_reclassified: 0 })
 
@@ -205,12 +230,12 @@ describe('Recent imports: delete a statement', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Natrvalo zmazať' }))
     await waitFor(() => expect(api.deleteStatement).toHaveBeenCalledWith(5))
-    await waitFor(() => expect(vi.mocked(api.recentStatements).mock.calls.length).toBeGreaterThan(1))
+    await waitFor(() => expect(vi.mocked(api.statementHistory).mock.calls.length).toBeGreaterThan(1))
     await waitFor(() => expect(screen.queryByText('č. 6')).not.toBeInTheDocument())
   })
 
   it('cancelling the confirmation never calls deleteStatement', async () => {
-    vi.mocked(api.recentStatements).mockResolvedValueOnce([statement])
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([statement])
     vi.mocked(api.statementDeletePreview).mockResolvedValueOnce(preview)
 
     render(<Import />)
@@ -225,15 +250,14 @@ describe('Recent imports: delete a statement', () => {
 })
 
 // A17: the row cells (date, account, number, count, checksum) had no names.
-describe('Recent imports: column headers', () => {
+// Point 19 adds Suma (sum) and point 21 adds Kontrola (review status).
+describe('Statement list: column headers', () => {
   it('names every cell the rows already render', async () => {
-    vi.mocked(api.recentStatements).mockResolvedValueOnce([
-      { statement_id: 5, number: 6, period_end: '2026-06-30', account_label: 'Osobný', transaction_count: 8, checksum: { status: 'ok' } },
-    ])
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
     render(<Import />)
     await waitFor(() => expect(screen.getByText('č. 6')).toBeInTheDocument())
 
-    for (const label of ['Dátum', 'Účet', 'Číslo', 'Transakcie', 'Kontrolný súčet', 'Akcie']) {
+    for (const label of ['Dátum', 'Účet', 'Číslo', 'Transakcie', 'Suma', 'Kontrolný súčet', 'Kontrola', 'Akcie']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })
@@ -242,11 +266,9 @@ describe('Recent imports: column headers', () => {
 // A17: Zmazať used to outweigh Zobraziť transakcie on every row (filled
 // danger next to a plain text control). It stays findable through the
 // danger text tone, but no longer the loudest thing on the row.
-describe('Recent imports: row-level Zmazať weight', () => {
+describe('Statement list: row-level Zmazať weight', () => {
   it('is a ghost button with the danger text tone, not the filled danger button', async () => {
-    vi.mocked(api.recentStatements).mockResolvedValueOnce([
-      { statement_id: 5, number: 6, period_end: '2026-06-30', account_label: 'Osobný', transaction_count: 8, checksum: { status: 'ok' } },
-    ])
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
     render(<Import />)
     const button = await screen.findByRole('button', { name: 'Zmazať' })
     expect(button).toHaveClass('k-btn-ghost')
@@ -259,7 +281,7 @@ describe('Recent imports: row-level Zmazať weight', () => {
 describe('Import audit failure boundaries', () => {
   it('shows a rejected file import instead of leaving an unhandled promise', async () => {
     const { open } = await import('@tauri-apps/plugin-dialog')
-    vi.mocked(api.recentStatements).mockResolvedValue([])
+    vi.mocked(api.statementHistory).mockResolvedValue([])
     vi.mocked(open).mockResolvedValue('C:/synthetic/failure.pdf')
     vi.mocked(api.importStatements).mockRejectedValueOnce(new Error('PDF sa nedá načítať'))
     render(<Import />)
@@ -269,7 +291,7 @@ describe('Import audit failure boundaries', () => {
   })
 
   it('shows statement preview failure without enabling destructive confirmation', async () => {
-    vi.mocked(api.recentStatements).mockResolvedValue([{ statement_id: 91, number: 3, account_label: 'Test', period_end: '2026-09-01', transaction_count: 2, checksum: { status: 'ok' } }])
+    vi.mocked(api.statementHistory).mockResolvedValue([historyRow({ statement_id: 91, number: 3, account_label: 'Test', period_end: '2026-09-01' })])
     vi.mocked(api.statementDeletePreview).mockRejectedValueOnce(new Error('Náhľad výpisu zlyhal'))
     render(<Import />)
     fireEvent.click(await screen.findByRole('button', { name: 'Zmazať' }))
@@ -280,7 +302,7 @@ describe('Import audit failure boundaries', () => {
   })
 
   it('keeps statement delete failure in its dialog with a retryable confirmation', async () => {
-    vi.mocked(api.recentStatements).mockResolvedValue([{ statement_id: 91, number: 3, account_label: 'Test', period_end: '2026-09-01', transaction_count: 2, checksum: { status: 'ok' } }])
+    vi.mocked(api.statementHistory).mockResolvedValue([historyRow({ statement_id: 91, number: 3, account_label: 'Test', period_end: '2026-09-01' })])
     vi.mocked(api.statementDeletePreview).mockResolvedValue({ statement_id: 91, number: 3, account_label: 'Test', period_start: '2026-08-01', period_end: '2026-09-01', transaction_count: 2, confirmed_count: 1, rules_deleted: 0 })
     vi.mocked(api.deleteStatement).mockRejectedValueOnce(new Error('Odstránenie výpisu zlyhalo'))
     render(<Import />)
@@ -291,5 +313,101 @@ describe('Import audit failure boundaries', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Odstránenie výpisu zlyhalo')
     expect(screen.getByRole('dialog')).toBeVisible()
     expect(remove).toBeEnabled()
+  })
+})
+
+// Point 19: the list used to stop at the 8 most recent imports.
+describe('Statement list: shows every statement, older ones collapsed', () => {
+  it('shows the sum for each statement', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow({ total_cents: 123456 })])
+    render(<Import />)
+    expect(await screen.findByText('1 234,56 €')).toBeInTheDocument()
+  })
+
+  it('keeps the 10 newest visible and collapses the rest under Staršie výpisy', async () => {
+    const rows = Array.from({ length: 12 }, (_, i) =>
+      historyRow({ statement_id: i + 1, number: i + 1, period_end: `2026-${String(i + 1).padStart(2, '0')}-28` }),
+    )
+    vi.mocked(api.statementHistory).mockResolvedValueOnce(rows)
+    render(<Import />)
+
+    // Newest period_end (month 12) sorts first and is visible immediately.
+    await waitFor(() => expect(screen.getByText('č. 12')).toBeInTheDocument())
+    expect(screen.queryByText('č. 2')).not.toBeInTheDocument()
+    expect(screen.queryByText('č. 1')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Staršie výpisy (2)' }))
+    expect(screen.getByText('č. 2')).toBeInTheDocument()
+    expect(screen.getByText('č. 1')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zbaliť' }))
+    expect(screen.queryByText('č. 2')).not.toBeInTheDocument()
+  })
+
+  it('shows no Staršie výpisy toggle with 10 or fewer statements', async () => {
+    const rows = Array.from({ length: 10 }, (_, i) => historyRow({ statement_id: i + 1, number: i + 1 }))
+    vi.mocked(api.statementHistory).mockResolvedValueOnce(rows)
+    render(<Import />)
+    await waitFor(() => expect(screen.getAllByText(/č\. /).length).toBe(10))
+    expect(screen.queryByRole('button', { name: /Staršie výpisy/ })).not.toBeInTheDocument()
+  })
+})
+
+// Point 21: a per-statement review chip, with wording that never claims the
+// bank data are complete.
+describe('Statement list: review status (point 21)', () => {
+  it('shows a loading chip, then the fetched status, keyed to the right statement', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
+    vi.mocked(api.statementReview).mockResolvedValueOnce({ statement_id: 5, checksum: { status: 'ok' }, parser_warnings: [], unassigned_count: 0, suggested_count: 0, status: 'no_open_checks' })
+    render(<Import />)
+    await waitFor(() => expect(screen.getByText('č. 6')).toBeInTheDocument())
+    expect(await screen.findByText('Bez otvorených kontrol')).toBeInTheDocument()
+    expect(api.statementReview).toHaveBeenCalledWith(5)
+  })
+
+  it('needs_attention expands to the exact open items and never claims completeness', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
+    vi.mocked(api.statementReview).mockResolvedValueOnce({
+      statement_id: 5,
+      checksum: { status: 'off_by', off_by: 150 },
+      parser_warnings: ['Riadok 4 sa nedal spracovať'],
+      unassigned_count: 3,
+      suggested_count: 1,
+      status: 'needs_attention',
+    })
+    render(<Import />)
+    const chip = await screen.findByRole('button', { name: 'Vyžaduje pozornosť' })
+    fireEvent.click(chip)
+
+    expect(screen.getByText('Kontrolný súčet nesedí o 1,50 €')).toBeInTheDocument()
+    expect(screen.getByText('Riadok 4 sa nedal spracovať')).toBeInTheDocument()
+    expect(screen.getByText('Nezaradených riadkov: 3')).toBeInTheDocument()
+    expect(screen.getByText('Odhadovaných riadkov: 1')).toBeInTheDocument()
+    expect(screen.queryByText(/Nepotvrdzuje úplnosť/)).not.toBeInTheDocument()
+  })
+
+  it('no_open_checks explicitly says it does not confirm bank-data completeness', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
+    vi.mocked(api.statementReview).mockResolvedValueOnce({ statement_id: 5, checksum: { status: 'ok' }, parser_warnings: [], unassigned_count: 0, suggested_count: 0, status: 'no_open_checks' })
+    render(<Import />)
+    const chip = await screen.findByRole('button', { name: 'Bez otvorených kontrol' })
+    fireEvent.click(chip)
+    expect(screen.getByText('Nepotvrdzuje úplnosť bankových dát.')).toBeInTheDocument()
+  })
+
+  it('evidence_incomplete names unknown warnings as an open item', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
+    vi.mocked(api.statementReview).mockResolvedValueOnce({ statement_id: 5, checksum: { status: 'ok' }, parser_warnings: null, unassigned_count: 0, suggested_count: 0, status: 'evidence_incomplete' })
+    render(<Import />)
+    const chip = await screen.findByRole('button', { name: 'Chýbajú dôkazy' })
+    fireEvent.click(chip)
+    expect(screen.getByText('Upozornenia parsera nie sú známe')).toBeInTheDocument()
+  })
+
+  it('shows a failure badge instead of a stuck loading state when the review call fails', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
+    vi.mocked(api.statementReview).mockRejectedValueOnce(new Error('Kontrola výpisu zlyhala'))
+    render(<Import />)
+    expect(await screen.findByText('Kontrola sa nenačítala')).toBeInTheDocument()
   })
 })

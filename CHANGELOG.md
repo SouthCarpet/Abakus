@@ -17,6 +17,9 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 - Filter **Druh** v Transakciách ponúka aj bankový poplatok (**Poplatok**). Prehľad má novú dlaždicu **Poplatky** a graf **Príjmy a výdavky** má vlastný stĺpec Poplatky.
 - Nad tabuľkou Transakcií sa objavia skupiny nezaradených platieb podľa obchodníka, napríklad „Twitch, 15 platieb, nepriradené“. Kliknutie na skupinu vyberie jej riadky pre hromadné priradenie alebo potvrdenie.
 - Tabuľka Transakcií sa dá ovládať klávesnicou: šípky hore a dole presúvajú zvýraznený riadok, Enter potvrdí jeho odhad. Fokus vo vyhľadávaní, poznámke alebo vo výbere kategórie tieto klávesy nepoužije.
+- Malý odznak novej verzie je teraz v hornej lište appky na každej obrazovke, nielen v Nastaveniach. Ukáže sa, len keď kontrola aktualizácií (vypnutá, kým ju sami nezapnete) už predtým našla novšie vydanie. Kliknutím prejdete do Nastavení. Odznak sám nič nekontroluje.
+- Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky (N)**, s tlačidlom **Zbaliť** na návrat. Počet skutočne nahraných riadkov sa nemení.
+- V **Importe** nahrádza úplný zoznam všetkých výpisov doterajších posledných osem. Každý riadok má sumu, kontrolný súčet, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek (nesediaci alebo neoveriteľný súčet, upozornenia parsera, počty nezaradených a odhadovaných riadkov), tlačidlo **Zobraziť transakcie** a **Zmazať**. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy (N)**. Stav bez otvorených kontrol nepotvrdzuje úplnosť bankových dát.
 
 ## 0.1.6 (2026-09-09)
 

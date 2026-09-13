@@ -39,6 +39,8 @@ kliknutia a oneskorené dokončenie. Test databázy prešiel aj pred opravou.
 Strata hodnoty pri skutočnom reštarte alebo inštalácii novej verzie sa
 nepotvrdila. Natívna aplikácia ani inštalátor sa pri tomto overení nespustili.
 
-Globálny indikátor aktualizácie nie je súčasťou tejto zmeny. Vizuálny návrh
-a kontrola zostávajú otvorené. Podrobné dôkazy sú v artefaktoch plánu 091
-s predponou `update5-`.
+Globálny indikátor aktualizácie je zapojený v hornej lište appky
+(`src/components/UpdateIndicator.tsx`, `src/lib/updateStatus.ts`). Ukáže sa,
+len keď Nastavenia už predtým samé zistili novšie vydanie; indikátor sám nič
+nekontroluje a nevolá sieť. Kliknutie otvorí Nastavenia. Podrobné dôkazy sú
+v artefaktoch plánu 091 s predponou `update5-`.

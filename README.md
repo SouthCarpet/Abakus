@@ -27,6 +27,8 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 Vo vývojovej vetve 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a červené tlačidlo na zmazanie. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
+Pribudol aj malý odznak novej verzie v hornej lište appky, viditeľný na každej obrazovke, nielen v Nastaveniach; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) už predtým nájde novšie vydanie. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
+
 ## Prečo
 
 - Bankové PDF spracujete offline.
@@ -58,7 +60,7 @@ Ak Abakus už máte nainštalovaný, druhé spustenie inštalátora ho aktualizu
 ## Ako to funguje
 
 1. V **Nastaveniach** pridajte účty. Zadajte IBAN alebo zápis `kód banky/prefix-číslo účtu`.
-2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu. Ak výpis patrí účtu, ktorý appka ešte nepozná, otvorí sa hneď dialóg na jeho nastavenie s druhom účtu a prípadným heslom. Nastavenia zostávajú druhou cestou, ako účet pridať aj bez importu.
+2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu. Ak výpis patrí účtu, ktorý appka ešte nepozná, otvorí sa hneď dialóg na jeho nastavenie s druhom účtu a prípadným heslom. Nastavenia zostávajú druhou cestou, ako účet pridať aj bez importu. Pod dropzónou appka ukáže úplný zoznam všetkých doteraz importovaných výpisov so sumou, kontrolným súčtom a stavom kontroly; staršie výpisy sú zbalené pod samostatným tlačidlom.
 3. V **Transakciách** skontrolujte navrhnuté kategórie. Odhad potvrdíte jedným kliknutím.
 4. V **Prehľade** uvidíte príjmy, výdavky, kategórie, pravidelné platby a vývoj v čase.
 
@@ -151,6 +153,8 @@ Kontrola aktualizácií je predvolene vypnutá. Zapnete ju v Nastaveniach voľbo
 
 Voľba sa ukladá v databáze. Nastavenia ju pri každom otvorení znova načítajú. Prepínač je neaktívny, kým sa hodnota nenačíta. Ak načítanie zlyhá, zobrazí sa chyba. Ak sa vrátite do Nastavení počas ukladania, načítanie počká na dokončenie zápisu. Neúspešný zápis ponechá poslednú uloženú hodnotu. Podrobnosti a limity overenia sú v [docs/plan-091-update-preference.md](docs/plan-091-update-preference.md).
 
+Keď Nastavenia nájdu novšie vydanie, malý odznak sa objaví aj v hornej lište appky na každej obrazovke. Kliknutím naň prejdete do Nastavení. Odznak sám nič nekontroluje ani nesťahuje. Pri vypnutej voľbe alebo bez doterajšej kontroly sa nezobrazí nič.
+
 Keď je na GitHub novšie vydanie, appka ukáže jeho poznámky k vydaniu. Ukáže aj tlačidlo `Aktualizovať na v<verzia>`. Až po kliknutí stiahne inštalátor. Sťahovanie overí voči `SHA256SUMS.txt` publikovanému s tým vydaním. Bez kliknutia sa nič nestiahne a nič sa nespustí.
 
 Inštalátor, ktorý appka takto spustí, je ten istý sprievodca ako pri ručnom stiahnutí: aktualizuje existujúcu inštaláciu na mieste a povie to.
@@ -223,8 +227,8 @@ cargo clippy --workspace --all-targets
 
 Backend pripravovanej verzie 0.2.0 rozširuje existujúci výsledok
 `statement_history` o povinné polia `transaction_count` a `total_cents`.
-Polia opisujú uložené transakcie, ktoré patria danému výpisu. Zapojenie do
-používateľského rozhrania je ešte otvorená úloha plánu 091.
+Polia opisujú uložené transakcie, ktoré patria danému výpisu. Zoznam výpisov
+v Importe tieto polia zobrazuje priamo.
 
 Pomocná funkcia `yearComparisonRanges` pripravuje celý mesiac alebo tri celé
 mesiace a rovnaké kalendárne obdobie vlani. Oba rozsahy obsahujú začiatok aj
@@ -244,7 +248,8 @@ poplatky](docs/plan-091-fees.md).
 Backend kontroly výpisu vracia uloženú kontrolu zostatku, upozornenia parsera
 a aktuálne počty nezaradených a navrhnutých riadkov. Pri starších importoch sú
 upozornenia neznáme. Stav bez otvorených kontrol nepotvrdzuje úplnosť bankových
-dát. Používateľské rozhranie ešte nie je zapojené.
+dát. Zoznam výpisov v Importe ukazuje tento stav ako odznak s rozbaliteľným
+zoznamom otvorených položiek.
 [Kontrakt kontroly výpisu](docs/plan-091-statement-review.md).
 
 Backend hromadného priradenia teraz vráti identifikátor poslednej vratnej
