@@ -68,8 +68,9 @@ databázu z odloženého súboru presne ako v ostatných prípadoch.
 
 Ani bezpečnostná kópia, ani odložený súbor, ani prípadný súbor
 `abakus-obnova-zlyhala-*` sa týmto tokom nikdy nemažú, ani pri úspešnej
-obnove. Ide o zámerne duplicitnú poistku: úspešná obnova necháva na disku
-pôvodný súbor aj pod pôvodným, aj pod bezpečnostným menom. Iba prechodný
+obnove. Ide o zámerne duplicitnú poistku: úspešná obnova necháva pôvodné
+bajty na disku pod odloženým (`.abakus-restore-aside-*`) aj pod bezpečnostným
+menom; na ceste `abakus.db` je už obnovená záloha. Iba prechodný
 skopírovaný súbor zálohy (krok 3) sa po zámene odstráni. `backup_to`
 (bezpečnostná kópia aj bežné zálohovanie) navyše po úspešnom uverejnení
 zavolá `File::sync_all` na výsledný súbor (na POSIX aj na priečinok, kde to
