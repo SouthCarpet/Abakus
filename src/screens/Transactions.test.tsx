@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api, type TxRow } from '../api'
+import { files } from '../lib/files'
 import { Transactions, TransactionRow } from './Transactions'
 
 function makeTxRow(overrides: Partial<TxRow> & { id: number }): TxRow {
@@ -71,9 +72,11 @@ vi.mock('../api', async (importOriginal) => {
       confirm: vi.fn().mockResolvedValue({ updated: 0, rules_created: 0, skipped_transfers: 0 }),
       saveTransactionNote: vi.fn().mockResolvedValue(undefined),
       saveCategory: vi.fn(),
+      exportCsv: vi.fn(),
     },
   }
 })
+vi.mock('../lib/files', () => ({ files: { saveCsv: vi.fn() } }))
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -549,5 +552,99 @@ describe('Transactions keyboard row navigation (point 12)', () => {
     fireEvent.keyDown(search, { key: 'Enter' })
 
     expect(vi.mocked(api.confirm)).not.toHaveBeenCalled()
+  })
+})
+
+// Point 9: precise merchant+place substring search must work together with
+// every other Transactions control, not just on its own.
+describe('Transactions common search (point 9)', () => {
+  afterEach(() => {
+    vi.mocked(api.listAccounts).mockReset().mockResolvedValue([])
+    vi.mocked(api.listTransactions).mockReset().mockResolvedValue(DEFAULT_ROWS)
+    vi.mocked(files.saveCsv).mockReset()
+    vi.mocked(api.exportCsv).mockReset()
+  })
+
+  it('combines search text with period, account, kind, category and status filters into one listTransactions call', async () => {
+    vi.mocked(api.listAccounts).mockResolvedValueOnce([
+      { id: 1, iban: 'SK4411000000000012345678', kind: 'personal', label: 'Osobný', has_password: false },
+    ])
+    render(<Transactions />)
+    await screen.findByText('Obchod')
+    vi.mocked(api.listTransactions).mockClear()
+
+    // Period: click "Všetko" to get a deterministic from/to (null, null)
+    // instead of depending on today's date.
+    fireEvent.click(screen.getByRole('button', { name: 'Všetko' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Účet' }), { target: { value: '1' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Druh' }), { target: { value: 'fee' } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'Filter kategórie' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Jedlo' }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Stav' }), { target: { value: 'unassigned' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
+
+    const expectedFilter = {
+      from: null, to: null,
+      account_id: 1, account_kind: null,
+      category_id: 1, status: 'unassigned', kind: 'fee',
+      text: 'Penny Neuss', statement_id: null,
+    }
+    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expectedFilter))
+    // The full combination reaches listTransactions exactly once: earlier
+    // calls (fired before the debounce settled) still carried text: null.
+    const fullCombinationCalls = vi.mocked(api.listTransactions).mock.calls.filter(
+      (call) => JSON.stringify(call[0]) === JSON.stringify(expectedFilter),
+    )
+    expect(fullCombinationCalls).toHaveLength(1)
+  })
+
+  it('keeps the group strip clickable and the search text in the input while a search is active', async () => {
+    const twitchRows = Array.from({ length: 15 }, (_, i) => makeTxRow({ id: 300 + i, merchant_raw: 'Twitch' }))
+    vi.mocked(api.listTransactions).mockResolvedValue(twitchRows)
+    render(<Transactions />)
+    await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'twi' } })
+    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'twi' })))
+
+    const groupButton = await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
+    fireEvent.click(groupButton)
+
+    expect(await screen.findByText('15 vybraných')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('twi')
+  })
+
+  it('sends the currently visible search text in the CSV export before the debounce settles', async () => {
+    vi.mocked(files.saveCsv).mockResolvedValueOnce('C:/synthetic/export.csv')
+    vi.mocked(api.exportCsv).mockResolvedValueOnce(3)
+    render(<Transactions />)
+    await screen.findByText('Obchod')
+    vi.mocked(api.listTransactions).mockClear()
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Exportovať filtrované CSV' }))
+
+    // The 300 ms debounce has not elapsed: no listTransactions refetch has
+    // carried the new text yet, so this proves the export used the live
+    // input value, not the (still-old) debounced filter.
+    expect(vi.mocked(api.listTransactions).mock.calls.some(
+      (call) => (call[0] as { text: string | null }).text === 'Penny Neuss',
+    )).toBe(false)
+
+    await waitFor(() => expect(vi.mocked(api.exportCsv)).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.exportCsv).mock.calls[0][0]).toEqual(expect.objectContaining({ text: 'Penny Neuss' }))
+  })
+
+  it('clears the search text together with every other filter, so the next list call carries text: null', async () => {
+    render(<Transactions />)
+    await screen.findByText('Obchod')
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
+    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'Penny Neuss' })))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vymazať všetky filtre' }))
+
+    expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
+    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: null })))
   })
 })
