@@ -1,6 +1,6 @@
 # Plán 091: backend mazania kategórií
 
-Tento dokument opisuje backendový kontrakt bodu 4 pre pripravovanú verziu
+Tento dokument opisuje backendový kontrakt bodu 4 pre verziu
 0.2.0. Používateľské ovládanie je zapojené v `src/screens/Categories.tsx`:
 kompaktné ikonové tlačidlo na archiváciu, červené tlačidlo na zmazanie a
 dialóg, ktorý pred zmazaním ukáže presný počet transakcií, ktoré appka

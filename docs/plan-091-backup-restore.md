@@ -1,6 +1,6 @@
 # Plán 091: obnova zo zálohy
 
-Tento dokument opisuje backendový kontrakt bodu 10 pre pripravovanú verziu
+Tento dokument opisuje backendový kontrakt bodu 10 pre verziu
 0.2.0. Používateľské ovládanie je zapojené v `src/screens/Settings.tsx`,
 hneď pod `BackupSection`: `src/components/RestoreSection.tsx` ponúka
 tlačidlo **Vybrať zálohu**, náhľad v dialógu a potvrdzujúce tlačidlo

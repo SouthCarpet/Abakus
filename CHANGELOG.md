@@ -2,7 +2,7 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
-## 0.2.0 (nevydané)
+## 0.2.0 (2026-09-14)
 
 - Vyhľadávanie v Transakciách spája obchodníka s miestom: `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku a znaky `%` a `_` berie doslovne.
 - Výber kategórie (priradenie aj filter v Transakciách) má nové ovládanie s vyhľadávaním podľa názvu. Písanie ignoruje diakritiku aj veľkosť písmen. Prázdny výsledok ukáže text „Žiadna kategória sa nenašla.“. Šípky hore a dole a Enter vyberú kategóriu z klávesnice, Escape zavrie zoznam a vráti fokus na pôvodné tlačidlo.

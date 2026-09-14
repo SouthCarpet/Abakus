@@ -206,7 +206,7 @@ spustite rovnakú kontrolu a použite jej výstup:
 $payload = node packaging/check-payload.mjs target/release/abakus.exe src-tauri/resources/pdfium/pdfium.dll
 if ($LASTEXITCODE -ne 0) { throw 'Payload validation failed' }
 $checked = ($payload -join "`n") | ConvertFrom-Json
-ISCC /DAppVersion=0.1.6 "/DExeSha256=$($checked.exe.sha256)" "/DPdfiumSha256=$($checked.pdfium.sha256)" packaging/abakus.iss
+ISCC /DAppVersion=0.2.0 "/DExeSha256=$($checked.exe.sha256)" "/DPdfiumSha256=$($checked.pdfium.sha256)" packaging/abakus.iss
 ```
 
 `/DExeSha256` a `/DPdfiumSha256` sú povinné údaje z validátora.

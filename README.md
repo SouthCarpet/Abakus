@@ -15,7 +15,7 @@ Lokálna desktopová appka na PDF výpisy z Tatra banky.
 
 Abakus is a local Windows desktop app for Tatra banka PDF statements. It imports statements, checks checksums, assigns categories with learned rules, tracks recurring payments, stores notes, and builds PDF reports with charts. Bank data stays on your computer. The only network use is an opt-in update check and a user-triggered installer download from GitHub Releases. Both are written to the in-app network log. There is no telemetry.
 
-Version 0.1.6 is the current release. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
+Version 0.2.0 is the current release. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
 
 ## Čo to je
 
@@ -23,9 +23,9 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 ## Stav
 
-**0.1.6.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+**0.2.0.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
-Vo vývojovej vetve 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a červené tlačidlo na zmazanie. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
+Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a červené tlačidlo na zmazanie. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
 Pribudol aj malý odznak novej verzie v hornej lište appky, viditeľný na každej obrazovke, nielen v Nastaveniach; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) už predtým nájde novšie vydanie. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
 
@@ -187,10 +187,10 @@ Od vydania 0.1.4 obsahuje každé vydanie na GitHub súbor `SHA256SUMS.txt`. Vyd
 Kontrola stiahnutého súboru v PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\abakus-setup-0.1.6.exe
+Get-FileHash -Algorithm SHA256 .\abakus-setup-0.2.0.exe
 ```
 
-Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.1.6 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
+Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.2.0 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
 
 Známe kontrolné súčty SHA-256 pre **0.1.3**:
 
@@ -231,7 +231,7 @@ npm test
 cargo clippy --workspace --all-targets
 ```
 
-Backend pripravovanej verzie 0.2.0 rozširuje existujúci výsledok
+Backend verzie 0.2.0 rozširuje existujúci výsledok
 `statement_history` o povinné polia `transaction_count` a `total_cents`.
 Polia opisujú uložené transakcie, ktoré patria danému výpisu. Zoznam výpisov
 v Importe tieto polia zobrazuje priamo.
@@ -290,17 +290,17 @@ a Inno Setup sú build nástroje, používateľ ich nepotrebuje.
 - [CHANGELOG.md](CHANGELOG.md): poznámky k vydaniu, ktoré appka ukáže ako **Poznámky k vydaniu**.
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md): známe obmedzenia.
 - [docs/](docs/): interné poznámky k dráham a vydaniam, vrátane [docs/release-0.1.2.md](docs/release-0.1.2.md) a [docs/release-0.1.3.md](docs/release-0.1.3.md).
-- [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): kontrakt úpravy a náhľadu zmazania pravidiel pre pripravovanú verziu 0.2.0; rozhranie v Kategóriách je zapojené.
+- [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): kontrakt úpravy a náhľadu zmazania pravidiel pre verziu 0.2.0; rozhranie v Kategóriách je zapojené.
 - [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md): explicitný preview/apply kontrakt zmazania kategórie, jej potomkov, priradení a pravidiel; ikonové ovládanie v Kategóriách je zapojené.
-- [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre pripravovanú verziu 0.2.0.
+- [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre verziu 0.2.0.
 - [docs/plan-091-statement-history.md](docs/plan-091-statement-history.md): backendový kontrakt počtu a podpísaného súčtu uložených transakcií vo výsledku histórie výpisov.
 - [docs/plan-091-transaction-search.md](docs/plan-091-transaction-search.md): kontrakt doslovného vyhľadávania cez obchodníka a miesto bez zmeny API alebo databázy.
 - [docs/plan-091-fees.md](docs/plan-091-fees.md): rozpoznanie poplatkov, filter,
-  súhrny a migrácia schémy na verziu 5 pre pripravovanú verziu 0.2.0; filter
+  súhrny a migrácia schémy na verziu 5 pre verziu 0.2.0; filter
   Druh a zobrazenie v Prehľade sú zapojené.
 - [docs/plan-091-backup-restore.md](docs/plan-091-backup-restore.md): kontrakt
   náhľadu, bezpečnostnej kópie, zámeny súborov a rollbacku pri obnove databázy
-  pre pripravovanú verziu 0.2.0; ovládanie v Nastaveniach je zapojené.
+  pre verziu 0.2.0; ovládanie v Nastaveniach je zapojené.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.
