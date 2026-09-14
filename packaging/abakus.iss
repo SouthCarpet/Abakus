@@ -1,15 +1,24 @@
 ﻿; Abakus Windows installer (Inno Setup 6).
-; Build with packaging\build-installer.ps1, or manually:
-;   iscc /DAppVersion=0.1.2 packaging\abakus.iss
+; Build with packaging\build-installer.ps1 (includes payload validation).
+
+#ifndef ExeSha256
+  #error Build with packaging\build-installer.ps1: missing validated EXE identity
+#endif
+#ifndef PdfiumSha256
+  #error Build with packaging\build-installer.ps1: missing validated PDFium pin
+#endif
+#if GetSHA256OfFile('..\target\release\abakus.exe') != ExeSha256
+  #error EXE changed after payload validation
+#endif
+#if GetSHA256OfFile('..\src-tauri\resources\pdfium\pdfium.dll') != PdfiumSha256
+  #error PDFium changed after payload validation
+#endif
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
 
-; 0.1.4: /DWebView2Check=skip lets a CI-free or network-free build compile
-; and run without the WebView2 registry check/prompt blocking it (documented
-; in packaging\INSTALL.md). Any other value, including unset, runs the real
-; check.
+; Developer-only test build: skip registry/download work, keep launch disabled.
 #ifndef WebView2Check
   #define WebView2Check "run"
 #endif
@@ -41,6 +50,7 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+MinVersion=10.0
 
 [Languages]
 Name: "slovak"; MessagesFile: "compiler:Languages\Slovak.isl"
@@ -51,7 +61,7 @@ Name: "desktopicon"; Description: "Pridať odkaz na plochu"; GroupDescription: "
 
 [Files]
 Source: "..\target\release\abakus.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\src-tauri\resources\pdfium\pdfium.dll"; DestDir: "{app}\resources\pdfium"; Flags: ignoreversion
+Source: "..\src-tauri\resources\pdfium\pdfium.dll"; DestDir: "{app}\resources\pdfium"; Flags: ignoreversion; Check: PdfiumNeedsCopy
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
@@ -60,60 +70,58 @@ Name: "{group}\Odinštalovať Abakus"; Filename: "{uninstallexe}"; Tasks: startm
 Name: "{autodesktop}\Abakus"; Filename: "{app}\abakus.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\abakus.exe"; Description: "Spustiť Abakus"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\abakus.exe"; Description: "Spustiť Abakus"; Flags: postinstall nowait skipifsilent; Check: CanLaunch
 
 [Code]
-// 0.1.4 (Michal 2026-09-08): a machine without the WebView2 Evergreen
-// runtime must still get a WORKING install of a Tauri app, not a silently
-// broken one. `InitializeSetup` below checks for it before the wizard shows
-// any page and, on the user's Yes, downloads and installs it.
 const
-  WebView2SubKeyWow = 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   WebView2SubKeyNative = 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
   WebView2BootstrapperUrl = 'https://go.microsoft.com/fwlink/p/?LinkId=2124703';
 
-// Reads the Evergreen runtime's "pv" (product version) value from one
-// registry hive/key. '' means the key or value is absent, the same signal
-// an explicit "0.0.0.0" carries (a WebView2 client key can exist with that
-// placeholder version before the runtime is actually installed).
-function WebView2Version(const RootKey: Integer; const SubKeyName: String): String;
 var
-  Value: String;
+  DependenciesReady: Boolean;
+  PayloadFailed: Boolean;
+
+function NumericVersionShape(const Value: String): Boolean;
+var
+  I, Dots: Integer;
 begin
-  if RegQueryStringValue(RootKey, SubKeyName, 'pv', Value) then
-    Result := Value
-  else
-    Result := '';
+  Result := False;
+  if (Value = '') or (Pos('..', Value) > 0) then Exit;
+  if (Value[1] = '.') or (Value[Length(Value)] = '.') then Exit;
+  Dots := 0;
+  for I := 1 to Length(Value) do
+    if Value[I] = '.' then
+      Dots := Dots + 1
+    else if (Value[I] < '0') or (Value[I] > '9') then Exit;
+  Result := Dots = 3;
 end;
 
-// Checked in the order most installs are actually found in: the
-// 32-bit-on-64-bit key first (the vast majority of per-machine Evergreen
-// installs), then the native key (ARM64 and some per-machine installs),
-// then the per-user key (an unelevated Evergreen bootstrapper run, which is
-// exactly what a decline-then-retry from this installer would produce,
-// since PrivilegesRequired=lowest never elevates).
-function WebView2Installed(): Boolean;
+function RegisteredWebView2(const RootKey: Integer): Boolean;
 var
   Version: String;
+  Packed: Int64;
 begin
-  Version := WebView2Version(HKLM, WebView2SubKeyWow);
-  if (Version = '') or (Version = '0.0.0.0') then
-    Version := WebView2Version(HKLM, WebView2SubKeyNative);
-  if (Version = '') or (Version = '0.0.0.0') then
-    Version := WebView2Version(HKCU, WebView2SubKeyNative);
-  Result := (Version <> '') and (Version <> '0.0.0.0');
+  Result := False;
+  if not RegQueryStringValue(RootKey, WebView2SubKeyNative, 'pv', Version) then Exit;
+  if not NumericVersionShape(Version) then Exit;
+  if not StrToVersion(Version, Packed) then Exit;
+  Result := ComparePackedVersion(Packed, 0) > 0;
   if Result then
-    Log('WebView2 check: found version ' + Version)
-  else
-    Log('WebView2 check: no usable "pv" value in any of the three registry keys');
+    Log('WebView2: registered version ' + Version + '; runtime health not tested');
+end;
+
+function WebView2Installed(): Boolean;
+begin
+  // Explicit views avoid combining WOW6432Node with an implicit view.
+  Result := RegisteredWebView2(HKLM32) or RegisteredWebView2(HKLM64) or
+    RegisteredWebView2(HKCU32) or RegisteredWebView2(HKCU64);
 end;
 
 // {#WebView2Check} is an ISPP compile-time substitution (same pattern as
 // {#AppVersion} above): '/DWebView2Check=skip' on the ISCC command line
 // turns this into the literal text "skip"; unset, it is "run" (see the
 // #ifndef block near the top of this file). Documented in
-// packaging\INSTALL.md as a developer/CI-only escape hatch: a build using it
-// never asks about or checks for WebView2 at all.
+// packaging\INSTALL.md as a developer-only test build with launch disabled.
 function WantsWebView2CheckSkipped(): Boolean;
 begin
   Result := '{#WebView2Check}' = 'skip';
@@ -145,106 +153,81 @@ begin
     Log('Existing install check: no existing install found under HKCU\' + UninstallKeyName);
 end;
 
-// Unchanged from 0.1.4 (Michal's WebView2 spec below), moved out of
-// InitializeSetup into its own procedure in 0.1.5 so its own early `Exit`
-// calls only stop this WebView2 sub-check, not the whole of
-// InitializeSetup, now that InitializeSetup also runs the existing-install
-// check further down.
-//
-// Never requires admin: the Evergreen bootstrapper installs per-user when
-// run unelevated, matching PrivilegesRequired=lowest above. A decline or a
-// failure both continue the setup with a warning rather than stopping it:
-// Michal's spec is "a working install", and refusing to install Abakus at
-// all over a missing runtime the user can still add later would be worse
-// than installing it and saying so. `SuppressibleMsgBox` (not `MsgBox`)
-// throughout, so a /VERYSILENT run never blocks waiting for a click nobody
-// will make; its `Default` result is what a silent run gets instead of
-// asking.
-procedure CheckWebView2();
+procedure DependencyWarning(const Detail: String);
+begin
+  Log('Dependencies: deferred; ' + Detail);
+  if not WizardSilent then
+    SuppressibleMsgBox(Detail + #13#10 +
+      'Ponuka spustenia Abakusu bude vypnutá. ' +
+      'Odstráňte uvedený problém a zopakujte inštaláciu Abakusu.',
+      mbError, MB_OK, IDOK);
+end;
+
+function CheckWebView2(): Boolean;
 var
   ResultCode: Integer;
   DownloadedBytes: Int64;
   BootstrapperPath: String;
-  Choice: Integer;
 begin
+  Result := False;
   if WantsWebView2CheckSkipped() then
   begin
-    Log('WebView2 check: skipped (/DWebView2Check=skip)');
+    Log('WebView2: check skipped in test build; launch disabled');
     Exit;
   end;
-
-  Log('WebView2 check: starting');
-  if WebView2Installed() then
+  Result := WebView2Installed();
+  if Result then Exit;
+  if WizardSilent then
   begin
-    Log('WebView2 check: runtime already present, nothing to do');
+    Log('Dependencies: missing WebView2; silent setup aborted before file copy; no download');
     Exit;
   end;
-
-  Choice := SuppressibleMsgBox(
-    'Abakus potrebuje Microsoft Edge WebView2 Runtime. Stiahnuť a nainštalovať teraz ' +
-    '(asi 2 MB, vyžaduje internet)?',
-    mbConfirmation, MB_YESNO, IDYES);
-  if Choice = IDNO then
+  if SuppressibleMsgBox(
+    'Abakus potrebuje Microsoft Edge WebView2 Runtime. Stiahnuť a nainštalovať teraz? ' +
+    'Vyžaduje internet. Malý inštalátor stiahne aj samotný modul.',
+    mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) <> IDYES then
   begin
-    Log('WebView2 check: user declined the download');
-    SuppressibleMsgBox(
-      'Pokračujem bez inštalácie WebView2 Runtime. Abakus sa nespustí, kým modul ' +
-      'nebude nainštalovaný, aj samostatne neskôr.',
-      mbInformation, MB_OK, IDOK);
+    DependencyWarning('Inštalácia WebView2 Runtime bola odložená.');
     Exit;
   end;
-
   BootstrapperPath := ExpandConstant('{tmp}\MicrosoftEdgeWebview2Setup.exe');
   try
     DownloadedBytes := DownloadTemporaryFile(WebView2BootstrapperUrl, 'MicrosoftEdgeWebview2Setup.exe', '', nil);
-    Log(Format('WebView2 check: bootstrapper downloaded, %d bytes', [DownloadedBytes]));
+    Log(Format('WebView2: bootstrapper downloaded, %d bytes', [DownloadedBytes]));
   except
-    Log('WebView2 check: download failed: ' + GetExceptionMessage);
-    SuppressibleMsgBox(
-      'Stiahnutie modulu WebView2 Runtime zlyhalo: ' + GetExceptionMessage + '. Abakus ' +
-      'sa nespustí, kým modul nebude nainštalovaný, aj samostatne neskôr.',
-      mbError, MB_OK, IDOK);
+    DependencyWarning('Stiahnutie WebView2 Runtime zlyhalo: ' + GetExceptionMessage);
     Exit;
   end;
-
   if not Exec(BootstrapperPath, '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
-    Log('WebView2 check: bootstrapper failed to start');
-    SuppressibleMsgBox(
-      'Inštalátor modulu WebView2 Runtime sa nepodarilo spustiť. Abakus sa nespustí, ' +
-      'kým modul nebude nainštalovaný, aj samostatne neskôr.',
-      mbError, MB_OK, IDOK);
+    DependencyWarning('Inštalátor WebView2 Runtime sa nepodarilo spustiť.');
     Exit;
   end;
-
-  Log(Format('WebView2 check: bootstrapper finished, exit code %d', [ResultCode]));
-  if WebView2Installed() then
-    Log('WebView2 check: runtime detected after install')
-  else
+  Log(Format('WebView2: bootstrapper exit code %d', [ResultCode]));
+  if ResultCode <> 0 then
   begin
-    Log('WebView2 check: runtime still not detected after the bootstrapper ran');
-    SuppressibleMsgBox(
-      'Modul WebView2 Runtime sa aj po inštalácii nepodarilo overiť. Abakus sa nemusí spustiť.',
-      mbError, MB_OK, IDOK);
+    DependencyWarning('Inštalátor WebView2 Runtime ohlásil chybu. Kód: ' + IntToStr(ResultCode));
+    Exit;
   end;
+  Result := WebView2Installed();
+  if not Result then
+    DependencyWarning('WebView2 Runtime nemá platný záznam ani po inštalácii.');
 end;
 
-// Runs before the wizard shows any page: first the WebView2 check above,
-// unchanged, then the existing-install check added in 0.1.5. Fresh install
-// (no previous install found): Result stays True, nothing else changes.
-// Existing install found: names the old version and folder and asks
-// (update: OK/Cancel, default OK; same version: Yes/No, default Yes;
-// installed copy newer than this installer: Yes/No, default No, so a
-// downgrade is refused by default). `SuppressibleMsgBox` throughout, so a
-// /VERYSILENT run gets the stated Default instead of asking.
-function InitializeSetup(): Boolean;
+// Silent update/reinstall proceed; silent downgrade is refused.
+// The interactive defaults are unchanged.
+function InstallChoice(const Text: String; Kind: TMsgBoxType; Buttons, Default: Integer): Integer;
+begin
+  if WizardSilent then Result := Default
+  else Result := SuppressibleMsgBox(Text, Kind, Buttons, Default);
+end;
+function ConfirmExistingInstall(): Boolean;
 var
   Choice: Integer;
   OldVer, NewVer: Int64;
   Cmp: Integer;
 begin
   Result := True;
-  CheckWebView2();
 
   ExistingInstallFound := ExistingInstallVersion(ExistingInstallVersionStr, ExistingInstallDir);
   if not ExistingInstallFound then
@@ -268,7 +251,7 @@ begin
   begin
     Log('Existing install check: older install ' + ExistingInstallVersionStr + ' at ' +
       ExistingInstallDir + ' -> update to {#AppVersion}');
-    Choice := SuppressibleMsgBox(
+    Choice := InstallChoice(
       'Abakus ' + ExistingInstallVersionStr + ' je už nainštalovaný v ' + ExistingInstallDir + '. ' +
       'Inštalátor ho aktualizuje na {#AppVersion}. Údaje v %LOCALAPPDATA%\Abakus a heslá v ' +
       'Správcovi poverení zostanú.',
@@ -283,7 +266,7 @@ begin
   begin
     Log('Existing install check: same version ' + ExistingInstallVersionStr + ' at ' +
       ExistingInstallDir + ' -> asking to reinstall');
-    Choice := SuppressibleMsgBox(
+    Choice := InstallChoice(
       'Abakus ' + ExistingInstallVersionStr + ' je už nainštalovaný v ' + ExistingInstallDir + '. ' +
       'Chcete ho preinštalovať?',
       mbConfirmation, MB_YESNO, IDYES);
@@ -297,7 +280,7 @@ begin
   begin
     Log('Existing install check: installed version ' + ExistingInstallVersionStr + ' at ' +
       ExistingInstallDir + ' is newer than installer {#AppVersion}');
-    Choice := SuppressibleMsgBox(
+    Choice := InstallChoice(
       'Nainštalovaná verzia ' + ExistingInstallVersionStr + ' je novšia ako {#AppVersion}. ' +
       'Chcete ju nahradiť staršou verziou?',
       mbConfirmation, MB_YESNO, IDNO);
@@ -307,6 +290,57 @@ begin
       Result := False;
     end;
   end;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  Result := ConfirmExistingInstall();
+  if not Result then Exit;
+  Log('Dependencies: Windows 10+; x64-compatible platform accepted by Setup');
+  DependenciesReady := CheckWebView2();
+  Result := DependenciesReady or (not WizardSilent) or WantsWebView2CheckSkipped();
+end;
+
+function FileMatches(const Path, Expected: String): Boolean;
+begin
+  Result := False;
+  if not FileExists(Path) then Exit;
+  try
+    Result := CompareText(GetSHA256OfFile(Path), Expected) = 0;
+  except
+    Log('Dependencies: cannot read ' + Path + ': ' + GetExceptionMessage);
+  end;
+end;
+
+function PdfiumNeedsCopy(): Boolean;
+begin
+  Result := not FileMatches(ExpandConstant('{app}\resources\pdfium\pdfium.dll'), '{#PdfiumSha256}');
+end;
+
+function CanLaunch(): Boolean;
+begin
+  Result := DependenciesReady;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep <> ssPostInstall then Exit;
+  PayloadFailed := not (FileMatches(ExpandConstant('{app}\resources\pdfium\pdfium.dll'), '{#PdfiumSha256}') and
+    FileMatches(ExpandConstant('{app}\abakus.exe'), '{#ExeSha256}'));
+  DependenciesReady := DependenciesReady and (not PayloadFailed);
+  if PayloadFailed then
+    DependencyWarning('Kontrola nainštalovaných súborov zlyhala (abakus.exe alebo pdfium.dll). ' +
+      'Zopakujte inštaláciu z dôveryhodného inštalátora.');
+  if DependenciesReady then
+    Log('Dependencies: payload hashes match and WebView2 is registered; runtime health not tested')
+  else
+    Log('Dependencies: incomplete; app launch disabled');
+end;
+
+function GetCustomSetupExitCode(): Integer;
+begin
+  Result := 0;
+  if PayloadFailed then Result := 4;
 end;
 
 // The tasks page (startmenuicon/desktopicon) is the redundant page from
@@ -331,6 +365,10 @@ end;
 // unchanged.
 procedure CurPageChanged(CurPageID: Integer);
 begin
+  if (CurPageID = wpFinished) and (not DependenciesReady) then
+    WizardForm.FinishedLabel.Caption :=
+      'Inštalácia vyžaduje opravu alebo doplnenie závislostí. Abakus sa teraz nespustí. ' +
+      'Pozrite si uvedené upozornenie a inštalačný denník.';
   if (CurPageID = wpReady) and ExistingInstallFound then
   begin
     WizardForm.ReadyLabel.Caption :=
@@ -338,6 +376,17 @@ begin
       ExistingInstallDir;
     Log('CurPageChanged: rewrote ReadyLabel caption for update/reinstall (' +
       ExistingInstallVersionStr + ' -> {#AppVersion})');
+  end;
+  if CurPageID = wpReady then
+  begin
+    WizardForm.ReadyLabel.Caption := WizardForm.ReadyLabel.Caption + #13#10 +
+      'Platforma: Windows 10 alebo novší, x64 kompatibilný. PDFium: overený súbor v balíku.';
+    if DependenciesReady then
+      WizardForm.ReadyLabel.Caption := WizardForm.ReadyLabel.Caption + #13#10 +
+        'WebView2: platný záznam verzie. Funkčnosť modulu sa tým netestuje.'
+    else
+      WizardForm.ReadyLabel.Caption := WizardForm.ReadyLabel.Caption + #13#10 +
+        'WebView2: chýba alebo kontrola bola preskočená. Spustenie bude vypnuté.';
   end;
 end;
 

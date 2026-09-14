@@ -34,11 +34,11 @@ const account = (overrides: Partial<Account> = {}): Account => ({
 const statement = (overrides: Partial<StatementHistoryRow> = {}): StatementHistoryRow => ({
   statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 3,
   period_start: '2026-06-01', period_end: '2026-06-30', opening_cents: 10000, closing_cents: 12345,
-  checksum: { status: 'ok' }, ...overrides,
+  transaction_count: 1, total_cents: 2345, checksum: { status: 'ok' }, ...overrides,
 })
 
 const emptySummary: Summary = {
-  income_cents: 0, expense_cents: 0, transfer_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0,
+  income_cents: 0, expense_cents: 0, transfer_cents: 0, fee_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0,
   by_category: [], by_month: [], by_month_category: [], top_merchants: [],
 }
 

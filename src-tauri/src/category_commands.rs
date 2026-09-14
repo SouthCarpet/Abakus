@@ -11,21 +11,72 @@ fn lock<'a>(state: &'a State<AppState>) -> Result<MutexGuard<'a, store::Store>, 
 }
 
 #[tauri::command]
-pub fn category_update_preview(state: State<AppState>, request: store::CategoryUpdateRequest) -> Result<store::CategoryUpdatePreview, String> {
-    lock(&state)?.category_update_preview(&request).map_err(|e| e.to_string())
+pub fn category_update_preview(
+    state: State<AppState>,
+    request: store::CategoryUpdateRequest,
+) -> Result<store::CategoryUpdatePreview, String> {
+    lock(&state)?
+        .category_update_preview(&request)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn update_category(state: State<AppState>, request: store::CategoryUpdateRequest) -> Result<store::Category, String> {
-    lock(&state)?.update_category(&request).map_err(|e| e.to_string())
+pub fn category_delete_preview(
+    state: State<AppState>,
+    category_id: i64,
+) -> Result<store::CategoryDeletePreview, String> {
+    lock(&state)?
+        .category_delete_preview(category_id)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn seed_rule_for_transaction(state: State<AppState>, transaction_id: i64) -> Result<Option<store::RuleView>, String> {
-    lock(&state)?.seed_rule_for_transaction(transaction_id).map_err(|e| e.to_string())
+pub fn delete_category(
+    state: State<AppState>,
+    request: store::CategoryDeleteRequest,
+) -> Result<store::CategoryDeletePreview, String> {
+    lock(&state)?
+        .delete_category(&request)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn update_rule_category(state: State<AppState>, rule_id: i64, category_id: i64) -> Result<store::RuleRedirectOutcome, String> {
-    lock(&state)?.update_rule_category(rule_id, category_id).map_err(|e| e.to_string())
+pub fn update_category(
+    state: State<AppState>,
+    request: store::CategoryUpdateRequest,
+) -> Result<store::Category, String> {
+    lock(&state)?
+        .update_category(&request)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn seed_rule_for_transaction(
+    state: State<AppState>,
+    transaction_id: i64,
+) -> Result<Option<store::RuleView>, String> {
+    lock(&state)?
+        .seed_rule_for_transaction(transaction_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_rule_category(
+    state: State<AppState>,
+    rule_id: i64,
+    category_id: i64,
+) -> Result<store::RuleRedirectOutcome, String> {
+    lock(&state)?
+        .update_rule_category(rule_id, category_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn rule_delete_preview(
+    state: State<AppState>,
+    rule_id: i64,
+) -> Result<store::RuleDeletePreview, String> {
+    lock(&state)?
+        .rule_delete_preview(rule_id)
+        .map_err(|e| e.to_string())
 }

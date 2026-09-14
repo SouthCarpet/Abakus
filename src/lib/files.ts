@@ -1,4 +1,4 @@
-import { save } from '@tauri-apps/plugin-dialog'
+import { open, save } from '@tauri-apps/plugin-dialog'
 
 function pad(value: number, width = 2): string {
   return value.toString().padStart(width, '0')
@@ -13,4 +13,6 @@ export function defaultBackupFilename(date: Date): string {
 export const files = {
   saveCsv: () => save({ filters: [{ name: 'CSV', extensions: ['csv'] }] }),
   saveBackup: () => save({ filters: [{ name: 'Databáza', extensions: ['db'] }], defaultPath: defaultBackupFilename(new Date()) }),
+  /** 091/B10: a single backup file to restore from. No `defaultPath`: this picks an existing file, it does not name a new one. */
+  openBackup: () => open({ filters: [{ name: 'Databáza', extensions: ['db'] }] }),
 }

@@ -71,8 +71,8 @@ Two more real-statement shapes, after `split_blocks`/`split_records`:
 ## Fee records and E-COMM cards
 
 A description whose folded text starts with `poplat` (`Poplatok za účet`,
-`Poplatky za transakcie`) is a recognized fee record: kind stays `Other`
-(a dedicated `Fee` kind is deferred, see `KNOWN_ISSUES.md`), but it no
-longer warns as an unknown transaction type. `card::is_card` also accepts
+`Poplatky za transakcie`) is a recognized `Fee` record. It does not warn as
+an unknown transaction type. A description that contains `poplat` later in
+the text stays `Other` and keeps the unknown-type warning. `card::is_card` also accepts
 `nakup e-comm`; an E-COMM purchase with `zahr` in the description is
 `CardForeign` through the existing rule, otherwise it is a plain `Card`.

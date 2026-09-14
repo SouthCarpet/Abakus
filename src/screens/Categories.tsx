@@ -3,11 +3,13 @@ import type { Category, CategoryKind, RuleView } from '../api'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
+import { CategoryPicker } from '../components/CategoryPicker'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
+import { Toast } from '../components/Toast'
 import { useAction } from '../lib/useAction'
 import { groupCategories } from '../lib/categories'
-import { categoryApi, type CategoryUpdatePreview } from '../lib/category-api'
+import { categoryApi, type CategoryDeletePreview, type CategoryUpdatePreview, type RuleDeletePreview } from '../lib/category-api'
 
 const RULE_KIND_LABELS: Record<RuleView['kind'], string> = {
   exact: 'presné',
@@ -19,8 +21,22 @@ const RULE_KIND_LABELS: Record<RuleView['kind'], string> = {
 const CATEGORY_KIND_LABELS: Record<CategoryKind, string> = { expense: 'Výdavok', income: 'Príjem' }
 
 const ARCHIVE_CONFIRM_TEXT = 'Kategória sa skryje z výberu. Historické priradenia ostávajú.'
+const ARCHIVE_TITLE = 'Archivuje kategóriu. História ostáva.'
 
-export function RulesTable({ rules, onDelete }: { rules: RuleView[]; onDelete: (id: number) => void }) {
+// Point 14: the category cell is now the redirect control itself. A learned
+// or seeded rule's target is changed here, inline, instead of needing a
+// separate screen; the backend already accepts every persisted rule kind.
+export function RulesTable({
+  rules,
+  categories,
+  onRedirect,
+  onDelete,
+}: {
+  rules: RuleView[]
+  categories: Category[]
+  onRedirect: (ruleId: number, categoryId: number) => void
+  onDelete: (rule: RuleView) => void
+}) {
   return (
     <table className="k-table k-rules-table">
       <thead>
@@ -38,14 +54,21 @@ export function RulesTable({ rules, onDelete }: { rules: RuleView[]; onDelete: (
           <tr key={rule.id}>
             <td>{rule.key}</td>
             <td>{rule.place ?? ''}</td>
-            <td>{rule.parent_name ? `${rule.parent_name} / ${rule.category_name}` : rule.category_name}</td>
+            <td>
+              <CategoryPicker
+                label={`Kategória pravidla ${rule.key}`}
+                value={rule.category_id}
+                onChange={(categoryId) => { if (categoryId !== null) onRedirect(rule.id, categoryId) }}
+                categories={categories}
+              />
+            </td>
             <td>
               <span className="k-card-badge">{RULE_KIND_LABELS[rule.kind]}</span>
             </td>
             <td className="k-num">{rule.hit_count}</td>
             <td>
               {rule.kind !== 'seed' ? (
-                <Button variant="danger" onClick={() => onDelete(rule.id)}>
+                <Button variant="danger" onClick={() => onDelete(rule)}>
                   Zmazať
                 </Button>
               ) : null}
@@ -63,12 +86,14 @@ function CategoryRow({
   onRename,
   onArchive,
   onEdit,
+  onDeleteRequest,
 }: {
   category: Category
   indent: boolean
   onRename: (id: number, name: string) => void
   onArchive: (category: Category) => void
   onEdit: (category: Category) => void
+  onDeleteRequest: (category: Category) => void
 }) {
   const [name, setName] = useState(category.name)
   useEffect(() => setName(category.name), [category.name])
@@ -98,8 +123,22 @@ function CategoryRow({
         </Button>
       ) : null}
       {!category.system ? (
-        <Button variant="ghost" onClick={() => onArchive(category)}>
-          Archivovať
+        // Point 4: icon-only so the row stays compact; the accessible name
+        // stays plain "Archivovať" (unchanged for existing archive tests),
+        // the native title carries the hover explanation.
+        <Button variant="ghost" className="k-icon-btn" aria-label="Archivovať" title={ARCHIVE_TITLE} onClick={() => onArchive(category)}>
+          🗄
+        </Button>
+      ) : null}
+      {!category.system ? (
+        <Button
+          variant="danger"
+          className="k-icon-btn"
+          aria-label={`Zmazať kategóriu ${category.name}`}
+          title="Zmaže kategóriu natrvalo."
+          onClick={() => onDeleteRequest(category)}
+        >
+          🗑
         </Button>
       ) : null}
     </div>
@@ -112,21 +151,23 @@ function CategoryTree({
   onAddSub,
   onArchive,
   onEdit,
+  onDeleteRequest,
 }: {
   categories: Category[]
   onRename: (id: number, name: string) => void
   onAddSub: (parent: Category) => void
   onArchive: (category: Category) => void
   onEdit: (category: Category) => void
+  onDeleteRequest: (category: Category) => void
 }) {
   const groups = groupCategories(categories)
   return (
     <div className="k-section">
       {groups.map(({ parent, subs }) => (
         <div key={parent.id} className="k-section">
-          <CategoryRow category={parent} indent={false} onRename={onRename} onArchive={onArchive} onEdit={onEdit} />
+          <CategoryRow category={parent} indent={false} onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} />
           {subs.map((sub) => (
-            <CategoryRow key={sub.id} category={sub} indent onRename={onRename} onArchive={onArchive} onEdit={onEdit} />
+            <CategoryRow key={sub.id} category={sub} indent onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} />
           ))}
           <div className="k-row" style={{ marginLeft: 'var(--space-6)' }}>
             <Button variant="ghost" onClick={() => onAddSub(parent)}>
@@ -292,6 +333,156 @@ function CategoryEditDialog({
   )
 }
 
+// Point 4: preview -> explicit confirm -> apply, same shape as the account
+// delete dialog. The dialog owns its own preview load so a stale category
+// list on the caller side can never skip straight to the write.
+function CategoryDeleteDialog({
+  category,
+  onClose,
+  onDeleted,
+}: {
+  category: Category | null
+  onClose: () => void
+  onDeleted: (outcome: CategoryDeletePreview) => Promise<void>
+}) {
+  const [preview, setPreview] = useState<CategoryDeletePreview | null>(null)
+  const [previewError, setPreviewError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!category) return
+    setPreview(null)
+    setPreviewError('')
+    setError('')
+    let active = true
+    void categoryApi
+      .previewDelete(category.id)
+      .then((value) => { if (active) setPreview(value) })
+      .catch((e) => { if (active) setPreviewError(String(e)) })
+    return () => { active = false }
+  }, [category])
+
+  if (!category) return null
+
+  async function confirmDelete() {
+    if (!preview) return
+    setBusy(true)
+    setError('')
+    try {
+      const outcome = await categoryApi.deleteCategory(preview)
+      await onDeleted(outcome)
+      onClose()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      title={`Zmazať kategóriu ${category.name}`}
+      onClose={() => { if (!busy) onClose() }}
+      actions={
+        <>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Zrušiť
+          </Button>
+          <Button variant="danger" disabled={busy || !preview} onClick={() => void confirmDelete()}>
+            Zmazať
+          </Button>
+        </>
+      }
+    >
+      {error ? <p role="alert">{error}</p> : null}
+      {previewError ? <p role="alert">{previewError}</p> : null}
+      {!preview && !previewError ? <p role="status">Načítava sa náhľad zmazania...</p> : null}
+      {preview ? (
+        <div className="k-section">
+          <p>{`Zmaže kategóriu ${category.name} a jej podkategórie.`}</p>
+          <p>{`${preview.transaction_count} transakcií sa presunie do nezaradených (z toho ${preview.confirmed_count} potvrdených).`}</p>
+          {preview.rule_count > 0 ? <p>{`Zmaže sa aj ${preview.rule_count} pravidiel.`}</p> : null}
+        </div>
+      ) : null}
+    </Dialog>
+  )
+}
+
+// Point 14: same preview -> confirm shape for a learned rule. The preview
+// simulates the classifier without this rule, so the two counts can differ:
+// a row can keep the same result under a lower-priority rule.
+function RuleDeleteDialog({
+  rule,
+  onClose,
+  onDeleted,
+}: {
+  rule: RuleView | null
+  onClose: () => void
+  onDeleted: () => Promise<void>
+}) {
+  const [preview, setPreview] = useState<RuleDeletePreview | null>(null)
+  const [previewError, setPreviewError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!rule) return
+    setPreview(null)
+    setPreviewError('')
+    setError('')
+    let active = true
+    void categoryApi
+      .previewRuleDelete(rule.id)
+      .then((value) => { if (active) setPreview(value) })
+      .catch((e) => { if (active) setPreviewError(String(e)) })
+    return () => { active = false }
+  }, [rule])
+
+  if (!rule) return null
+
+  async function confirmDelete() {
+    if (!rule) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.deleteRule(rule.id)
+      await onDeleted()
+      onClose()
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open
+      title={`Zmazať pravidlo ${rule.key}`}
+      onClose={() => { if (!busy) onClose() }}
+      actions={
+        <>
+          <Button variant="secondary" disabled={busy} onClick={onClose}>
+            Zrušiť
+          </Button>
+          <Button variant="danger" disabled={busy || !preview} onClick={() => void confirmDelete()}>
+            Zmazať pravidlo
+          </Button>
+        </>
+      }
+    >
+      {error ? <p role="alert">{error}</p> : null}
+      {previewError ? <p role="alert">{previewError}</p> : null}
+      {!preview && !previewError ? <p role="status">Načítava sa náhľad zmazania...</p> : null}
+      {preview ? (
+        <p>{`Otvorených riadkov s týmto pravidlom: ${preview.open_rule_references}. Po zmazaní sa zmení zaradenie pri ${preview.open_classification_changes} riadkoch.`}</p>
+      ) : null}
+    </Dialog>
+  )
+}
+
 export function Categories() {
   const [categories, setCategories] = useState<Category[]>([])
   const [rules, setRules] = useState<RuleView[]>([])
@@ -304,6 +495,9 @@ export function Categories() {
   const [subName, setSubName] = useState('')
   const [archiveTarget, setArchiveTarget] = useState<Category | null>(null)
   const [editTarget, setEditTarget] = useState<Category | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
+  const [ruleDeleteTarget, setRuleDeleteTarget] = useState<RuleView | null>(null)
 
   async function refresh() {
     const request = ++refreshRequest.current
@@ -360,9 +554,18 @@ export function Categories() {
     })
   }
 
-  function deleteRule(id: number) {
+  // Point 4: the outcome is the exact preview the backend just applied, so
+  // the shown count is never a stale client guess.
+  async function categoryDeleted(outcome: CategoryDeletePreview) {
+    setDeleteMessage(`Zmazané: ${outcome.transaction_count} transakcií presunutých do nezaradených.`)
+    await refresh()
+  }
+
+  // Point 14: redirect and delete-preview failures surface through the same
+  // toast/error strip as every other mutation on this screen.
+  function redirectRule(ruleId: number, categoryId: number) {
     void withToast(async () => {
-      await api.deleteRule(id)
+      await categoryApi.redirectRule(ruleId, categoryId)
       await refresh()
     })
   }
@@ -371,6 +574,7 @@ export function Categories() {
     <div className="k-section">
       {action.error ? <p role="alert">{action.error}</p> : null}
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
+      {deleteMessage ? <Toast message={deleteMessage} /> : null}
       <fieldset disabled={action.busy} className="k-section">
         <div className="k-row" style={{ alignItems: 'stretch' }}>
           <div style={{ flex: 1, minWidth: 320 }}>
@@ -388,6 +592,7 @@ export function Categories() {
                 onAddSub={(parent) => setSubParent(parent)}
                 onArchive={setArchiveTarget}
                 onEdit={setEditTarget}
+                onDeleteRequest={setDeleteTarget}
               />
             </Card>
           </div>
@@ -397,7 +602,7 @@ export function Categories() {
                 Pravidlá vzniknú po priradení kategórie alebo potvrdení návrhu pri rozpoznateľnom obchodníkovi. Samotné vytvorenie kategórie pravidlo nevytvorí.
               </p>
               <div className="k-table-scroll" role="region" aria-label="Pravidlá" tabIndex={0}>
-                <RulesTable rules={rules} onDelete={deleteRule} />
+                <RulesTable rules={rules} categories={categories} onRedirect={redirectRule} onDelete={setRuleDeleteTarget} />
               </div>
             </Card>
           </div>
@@ -473,6 +678,8 @@ export function Categories() {
       </Dialog>
 
       <CategoryEditDialog category={editTarget} categories={categories} onClose={() => setEditTarget(null)} onSaved={refresh} />
+      <CategoryDeleteDialog category={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={categoryDeleted} />
+      <RuleDeleteDialog rule={ruleDeleteTarget} onClose={() => setRuleDeleteTarget(null)} onDeleted={refresh} />
     </div>
   )
 }

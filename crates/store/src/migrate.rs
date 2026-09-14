@@ -12,6 +12,11 @@
 //! for a brand-new database too (`Store::init` never creates these tables
 //! via `schema.sql`'s unconditional `CREATE TABLE IF NOT EXISTS`), so a
 //! fresh install and an upgraded one reach v4 by the identical code path.
+//! Version 5 classifies legacy `other` rows as `fee` only when their stored
+//! raw block passes the current parser fee predicate. Transfer rows are never
+//! eligible, and no column except `kind` changes.
+//! Version 6 adds nullable parser warning evidence to statements. Legacy
+//! imports remain NULL; a known empty parser result is saved as JSON [].
 //!
 //! `Store::init` wraps `schema.sql` (base table creation) and this whole
 //! function in ONE `BEGIN IMMEDIATE`/`COMMIT`: a failure anywhere from the
@@ -22,7 +27,13 @@
 use crate::{Result, Store, StoreError};
 
 const VERSION_KEY: &str = "schema_version";
-pub(crate) const SCHEMA_VERSION: i64 = 4;
+pub(crate) const SCHEMA_VERSION: i64 = 6;
+
+/// The schema version this build of Abakus writes and supports, exposed
+/// publicly (091/B10) so a restore preview can compare a backup's version
+/// against the running binary without a private accessor, and so tests can
+/// build an intentionally-too-new database without hardcoding the number.
+pub const CURRENT_SCHEMA_VERSION: i64 = SCHEMA_VERSION;
 
 const V4_DDL: &str = "\
 CREATE TABLE recurring_decisions (
@@ -71,6 +82,16 @@ impl Store {
             self.conn.execute_batch(V4_DDL)?;
             self.repair_spotify_seed_tx()?;
         }
+        self.migrate_statement_evidence_tx(from)
+    }
+
+    fn migrate_statement_evidence_tx(&mut self, from: i64) -> Result<()> {
+        if from < 5 {
+            self.backfill_fee_kinds()?;
+        }
+        if from < 6 {
+            self.add_parser_warnings_column()?;
+        }
         Ok(())
     }
 
@@ -80,7 +101,11 @@ impl Store {
         self.set_setting(VERSION_KEY, &SCHEMA_VERSION.to_string())
     }
 
-    pub(crate) fn schema_version(&self) -> Result<i64> {
+    /// Public (091/B10) so a test, or any future diagnostic, can confirm a
+    /// live store's schema version without a private accessor: in
+    /// particular that a restore of an older-but-supported backup lands on
+    /// `CURRENT_SCHEMA_VERSION` immediately, in the same session.
+    pub fn schema_version(&self) -> Result<i64> {
         Ok(self.setting(VERSION_KEY)?.and_then(|v| v.parse().ok()).unwrap_or(1))
     }
 
@@ -97,6 +122,14 @@ impl Store {
             .exists([])?;
         if !has_note {
             self.conn.execute_batch("ALTER TABLE transactions ADD COLUMN note TEXT NOT NULL DEFAULT ''")?;
+        }
+        Ok(())
+    }
+
+    fn add_parser_warnings_column(&mut self) -> Result<()> {
+        let exists = self.conn.prepare("SELECT 1 FROM pragma_table_info('statements') WHERE name='parser_warnings_json'")?.exists([])?;
+        if !exists {
+            self.conn.execute_batch("ALTER TABLE statements ADD COLUMN parser_warnings_json TEXT")?;
         }
         Ok(())
     }
@@ -118,6 +151,21 @@ impl Store {
              WHERE t.rule_id IS NOT NULL AND r.match_kind <> 'seed'",
             [],
         )?;
+        Ok(())
+    }
+
+    fn backfill_fee_kinds(&mut self) -> Result<()> {
+        let fee_ids = {
+            let mut statement = self.conn.prepare("SELECT id, raw_block FROM transactions WHERE kind = 'other' AND status <> 'transfer'")?;
+            let rows = statement.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+                .into_iter()
+                .filter_map(|(id, raw_block)| parser::raw_block_is_fee(&raw_block).then_some(id))
+                .collect::<Vec<_>>()
+        };
+        for id in fee_ids {
+            self.conn.execute("UPDATE transactions SET kind = 'fee' WHERE id = ?1", [id])?;
+        }
         Ok(())
     }
 }

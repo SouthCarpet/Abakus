@@ -9,9 +9,9 @@ use parser::{AccountKind, Checksum};
 use rules::{RuleKind, Status};
 use serde_json::json;
 use store::{
-    Account, AssignOutcome, BackupOutcome, BadChecksum, Category, CategoryKind, NetLogRow,
-    RecentStatement, RuleView, StatementDeleteOutcome, StatementDeletePreview,
-    StatementHistoryRow, Summary, TxFilter, TxRow,
+    Account, AssignOutcome, BackupOutcome, BackupPreview, BadChecksum, Category, CategoryKind,
+    NetLogRow, RecentStatement, RestoreOutcome, RuleView, StatementDeleteOutcome,
+    StatementDeletePreview, StatementHistoryRow, Summary, TxFilter, TxRow,
 };
 
 /// Tauri deserializes each command argument from its own JSON field (there is
@@ -91,7 +91,10 @@ struct ArchiveCategoryArgs { id: i64 }
 struct DeleteRuleArgs { id: i64 }
 
 #[derive(serde::Deserialize)]
-struct ConfirmArgs { ids: Vec<i64> }
+struct ConfirmArgs {
+    ids: Vec<i64>,
+    #[serde(default, rename = "applyToMatching")] apply_to_matching: bool,
+}
 
 #[derive(serde::Deserialize)]
 struct ExportCsvArgs { filter: TxFilter, path: String }
@@ -108,6 +111,15 @@ struct SaveTransactionNoteArgs { id: i64, note: String }
 
 #[derive(serde::Deserialize)]
 struct BackupDatabaseArgs { path: String }
+
+/// 091/B10: both restore commands take the backup file the user picked
+/// under `backupPath`, never `path` (that name is already `backup_database`'s
+/// destination argument, the opposite direction).
+#[derive(serde::Deserialize)]
+struct RestorePreviewArgs { #[serde(rename = "backupPath")] backup_path: String }
+
+#[derive(serde::Deserialize)]
+struct RestoreDatabaseArgs { #[serde(rename = "backupPath")] backup_path: String }
 
 #[test]
 fn import_statements_args_match_the_ui_call() {
@@ -188,7 +200,7 @@ fn tx_row_and_summary_serialize_snake_case() {
     assert_eq!(v["note"], json!("kúpiť darček"));
     assert!(v.get("accountId").is_none(), "TxRow keeps snake_case field names, no camelCase");
 
-    let summary = Summary { income_cents: 0, expense_cents: 199, transfer_cents: 0, net_cents: -199, unassigned_count: 0, suggested_count: 1, by_category: Vec::new(), by_month: Vec::new(), by_month_category: Vec::new(), top_merchants: Vec::new() };
+    let summary = Summary { income_cents: 0, expense_cents: 199, transfer_cents: 0, fee_cents: 0, net_cents: -199, unassigned_count: 0, suggested_count: 1, by_category: Vec::new(), by_month: Vec::new(), by_month_category: Vec::new(), top_merchants: Vec::new() };
     let sv = serde_json::to_value(&summary).unwrap();
     assert_eq!(sv["expense_cents"], json!(199));
     assert!(sv.get("expenseCents").is_none(), "Summary keeps snake_case field names, no camelCase");
@@ -279,8 +291,16 @@ fn delete_rule_args_match_the_ui_call() {
 
 #[test]
 fn confirm_args_match_the_ui_call() {
+    let args: ConfirmArgs = serde_json::from_value(json!({"ids": [1, 2, 3], "applyToMatching": true})).unwrap();
+    assert_eq!(args.ids, vec![1, 2, 3]);
+    assert!(args.apply_to_matching);
+}
+
+#[test]
+fn confirm_apply_to_matching_defaults_to_false_for_old_requests() {
     let args: ConfirmArgs = serde_json::from_value(json!({"ids": [1, 2, 3]})).unwrap();
     assert_eq!(args.ids, vec![1, 2, 3]);
+    assert!(!args.apply_to_matching);
 }
 
 #[test]
@@ -490,13 +510,15 @@ fn statement_history_row_serializes_snake_case() {
     let r = StatementHistoryRow {
         statement_id: 9, account_id: 1, account_label: "Osobný".into(), account_kind: AccountKind::Personal,
         number: 6, period_start: NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(), period_end: NaiveDate::from_ymd_opt(2026, 6, 30).unwrap(),
-        opening_cents: Some(69_392), closing_cents: None, checksum: Checksum::NotVerifiable,
+        opening_cents: Some(69_392), closing_cents: None, transaction_count: 3, total_cents: -2_696, checksum: Checksum::NotVerifiable,
     };
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["statement_id"], json!(9));
     assert_eq!(v["account_label"], json!("Osobný"));
     assert_eq!(v["opening_cents"], json!(69_392));
     assert_eq!(v["closing_cents"], json!(null));
+    assert_eq!(v["transaction_count"], json!(3));
+    assert_eq!(v["total_cents"], json!(-2_696));
     assert_eq!(v["checksum"], json!({"status": "not_verifiable"}));
     assert!(v.get("statementId").is_none(), "StatementHistoryRow keeps snake_case field names, no camelCase");
 }
@@ -522,6 +544,32 @@ fn backup_outcome_serializes_the_fields_the_ui_reads() {
     let o = BackupOutcome { path: "C:/zálohy/abakus.db".into(), bytes: 45_056 };
     let v = serde_json::to_value(&o).unwrap();
     assert_eq!(v, json!({"path": "C:/zálohy/abakus.db", "bytes": 45_056}));
+}
+
+#[test]
+fn restore_preview_args_match_the_ui_call() {
+    let args: RestorePreviewArgs = serde_json::from_value(json!({"backupPath": "C:/zálohy/abakus-zaloha.db"})).unwrap();
+    assert_eq!(args.backup_path, "C:/zálohy/abakus-zaloha.db");
+}
+
+#[test]
+fn restore_database_args_match_the_ui_call() {
+    let args: RestoreDatabaseArgs = serde_json::from_value(json!({"backupPath": "C:/zálohy/abakus-zaloha.db"})).unwrap();
+    assert_eq!(args.backup_path, "C:/zálohy/abakus-zaloha.db");
+}
+
+#[test]
+fn backup_preview_serializes_the_fields_the_ui_reads() {
+    let p = BackupPreview { accounts: 2, statements: 5, transactions: 120, schema_version: 6 };
+    let v = serde_json::to_value(&p).unwrap();
+    assert_eq!(v, json!({"accounts": 2, "statements": 5, "transactions": 120, "schema_version": 6}));
+}
+
+#[test]
+fn restore_outcome_serializes_the_fields_the_ui_reads() {
+    let o = RestoreOutcome { safety_copy_path: "C:/Users/x/AppData/Local/Abakus/abakus-pred-obnovou-2026-09-13-120000000.db".into() };
+    let v = serde_json::to_value(&o).unwrap();
+    assert_eq!(v, json!({"safety_copy_path": "C:/Users/x/AppData/Local/Abakus/abakus-pred-obnovou-2026-09-13-120000000.db"}));
 }
 
 #[derive(serde::Deserialize)]

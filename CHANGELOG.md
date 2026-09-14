@@ -2,6 +2,27 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
+## 0.2.0 (2026-09-14)
+
+- Vyhľadávanie v Transakciách spája obchodníka s miestom: `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku a znaky `%` a `_` berie doslovne.
+- Výber kategórie (priradenie aj filter v Transakciách) má nové ovládanie s vyhľadávaním podľa názvu. Písanie ignoruje diakritiku aj veľkosť písmen. Prázdny výsledok ukáže text „Žiadna kategória sa nenašla.“. Šípky hore a dole a Enter vyberú kategóriu z klávesnice, Escape zavrie zoznam a vráti fokus na pôvodné tlačidlo.
+- Potvrdenie odhadu ponúka aj potvrdenie ostatných nepotvrdených transakcií rovnakého obchodníka. Počet takých transakcií je vidieť pri tlačidle **Potvrdiť**.
+- Nové tlačidlo **Potvrdiť vybrané** potvrdí odhady vo vybraných riadkoch naraz, rovnako ako doterajšie hromadné priradenie kategórie.
+- Po hromadnom priradení kategórie appka na chvíľu ponúkne tlačidlo **Späť**, ktoré priradenie vráti a obnoví tabuľku. Späť zatiaľ nefunguje pre hromadné potvrdenie.
+- Prehľad hore ukáže pripomienku, keď appke chýba výpis za predchádzajúci mesiac (sedem dní po konci mesiaca). Text hovorí o medzere v pokrytí, nie o chýbajúcich transakciách. Tlačidlo **Prejsť na import** pri pripomienke otvorí Import.
+- Kliknutie na obchodníka v tabuľke **Najčastejší obchodníci** otvorí Transakcie s vyplneným hľadaním podľa jeho mena.
+- Nová karta **Porovnanie s rovnakým obdobím vlani** vo vlastnom výbere mesiaca a dĺžky (jeden mesiac alebo tri mesiace) ukáže aktuálne aj vlaňajšie obdobie pri číslach príjmov, výdavkov a čistého súčtu.
+- Novú kategóriu aj podkategóriu možno vytvoriť priamo pri priraďovaní transakcie výberom **Nová kategória...**, bez prechodu do Kategórií. Appka rovno priradí novú kategóriu danej transakcii.
+- Archivácia kategórie v **Kategóriách** má nové kompaktné ikonové tlačidlo namiesto textového. Nové červené tlačidlo kategóriu zmaže. Pred zmazaním appka ukáže, koľko transakcií sa presunie do nezaradených, a po zmazaní výsledok potvrdí.
+- Tabuľka **Pravidlá** v Kategóriách má priamo v riadku výber cieľovej kategórie na zmenu bez opustenia obrazovky. Tlačidlo **Zmazať** pri pravidle najprv ukáže, koľko otvorených riadkov sa naň odkazuje a koľko z nich po zmazaní zmení zaradenie.
+- Filter **Druh** v Transakciách ponúka aj bankový poplatok (**Poplatok**). Prehľad má novú dlaždicu **Poplatky** a graf **Príjmy a výdavky** má vlastný stĺpec Poplatky.
+- Nad tabuľkou Transakcií sa objavia skupiny nezaradených platieb podľa obchodníka, napríklad „Twitch, 15 platieb, nepriradené“. Kliknutie na skupinu vyberie jej riadky pre hromadné priradenie alebo potvrdenie.
+- Tabuľka Transakcií sa dá ovládať klávesnicou: šípky hore a dole presúvajú zvýraznený riadok, Enter potvrdí jeho odhad. Fokus vo vyhľadávaní, poznámke alebo vo výbere kategórie tieto klávesy nepoužije.
+- Malý odznak novej verzie je teraz v hornej lište appky na každej obrazovke, nielen v Nastaveniach. Ukáže sa, len keď kontrola aktualizácií (vypnutá, kým ju sami nezapnete) už predtým našla novšie vydanie. Kliknutím prejdete do Nastavení. Odznak sám nič nekontroluje.
+- Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky (N)**, s tlačidlom **Zbaliť** na návrat. Počet skutočne nahraných riadkov sa nemení.
+- V **Nastaveniach**, hneď pod zálohou, tlačidlo **Vybrať zálohu** obnoví databázu zo súboru zálohy. Appka najprv ukáže náhľad (počet účtov, výpisov a transakcií) a v tom istom dialógu pripomenie, že najprv vytvorí bezpečnostnú kópiu súčasnej databázy, aj že heslá zo Správcu poverení v zálohe nie sú. Súbor, ktorý nie je zálohou Abakusu, appka odmietne so zrozumiteľnou správou; rovnako odmietne zálohu vytvorenú novšou appkou, než akú appka podporuje. Pred obnovou vždy vytvorí bezpečnostnú kópiu súčasnej databázy a ukáže jej cestu. Pri zlyhaní appka vráti pôvodnú databázu; ak sa nahradená databáza nedá znova otvoriť, odloží ju pod menom `abakus-obnova-zlyhala-*` a pôvodnú vráti späť. Jediný krok, ktorý sa nedá vrátiť, je zlyhanie tohto odloženia: vtedy ostanú pôvodné dáta netknuté v pomenovanom odloženom súbore aj v bezpečnostnej kópii a appka ich sama znova nepripojí. Po obnove sa v Nastaveniach aj v Transakciách znova načítajú aktuálne dáta (účty, výpisy, sieťový log, kategórie); rozpracované Späť a výber riadkov z obdobia pred obnovou sa zrušia.
+- V **Importe** nahrádza úplný zoznam všetkých výpisov doterajších posledných osem. Každý riadok má sumu, kontrolný súčet, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek (nesediaci alebo neoveriteľný súčet, upozornenia parsera, počty nezaradených a odhadovaných riadkov), tlačidlo **Zobraziť transakcie** a **Zmazať**. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy (N)**. Stav bez otvorených kontrol nepotvrdzuje úplnosť bankových dát.
+
 ## 0.1.6 (2026-09-09)
 
 Opravuje import výpisov z nového generátora PDF Tatra banky a zjednodušuje nastavenie účtu.

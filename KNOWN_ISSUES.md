@@ -20,8 +20,21 @@
   možno zmeniť v detaile ním zaradenej transakcie.
 
 - **Záloha je nešifrovaný súbor SQLite.** Obsahuje bankové údaje a poznámky.
-  Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Obnova nemá ovládanie
-  v appke; zálohovanie nemá plánovač.
+  Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Zálohovanie ani
+  obnova nemajú plánovač, obe treba spustiť ručne.
+- **Obnova nahradí celú databázu naraz.** Nedá sa vybrať len časť zálohy ani
+  zlúčiť zálohu so súčasnými dátami. Bezpečnostné kópie (pred obnovou aj
+  odložený pôvodný súbor pri zámene, prípadne súbor
+  `abakus-obnova-zlyhala-*` po zlyhanom opätovnom otvorení) appka nikdy sama
+  nezmaže, takže sa v priečinku s dátami postupne hromadia a treba ich
+  mazať ručne.
+- **Obnova nerieši sidecar súbory WAL/SHM.** Táto appka zatiaľ nenastavuje
+  `journal_mode=WAL`, takže bežne žiadne `-wal`/`-shm` súbory nevznikajú.
+  Ak by sa vedľa `abakus.db` objavili (napríklad skopírované z inej appky
+  alebo po budúcej zmene na WAL), obnova ich pri premenovaní neprenesie ani
+  neodstráni; mohli by sa pripojiť k novej databáze s neplatným obsahom.
+  Vonkajšie zámky súboru (antivírus, indexovanie) môžu zhodiť premenovanie
+  a vtedy sa spustí rovnaký rollback ako pri zlyhaní zámeny.
 - **Pokrytie sa vzťahuje na obdobia výpisov.** Úplné pokrytie nie je dôkazom,
   že existujú všetky transakcie pre daný rozsah dátumov. Transakcia sa môže
   objaviť až vo výpise za neskorší mesiac. Historický zostatok je stav ku dňu
@@ -112,10 +125,9 @@
   `abakus-cli geometry` diagnostic. Other pages from the same generator are
   not covered by an automated fixture; they are verified only by Michal's
   own `abakus-cli check` runs on his real statements.
-- **Fee records (`Poplatok za účet`, `Poplatky za transakcie`, and any
-  description folding to start with `poplat`) use `TxKind::Other`, not a
-  dedicated `Fee` kind.** A dedicated kind is deferred; today they only stop
-  warning as an unknown transaction type (`parser::statement::is_fee`,
-  2026-09-09 continuation fix). The UI cannot filter or chart them apart
-  from other unclassified transactions yet.
+- **Fee detection is prefix-based.** The parser and store use `TxKind::Fee`,
+  the Transactions **Druh** filter offers **Poplatok**, and Overview shows the
+  **Poplatky** tile and chart series. A description that does not fold to
+  start with `poplat` remains `Other` and reports the existing unknown-type
+  warning.
 

@@ -51,7 +51,7 @@ fn main() {
 fn report(path: &Path, password: Option<&str>, st: &parser::Statement) {
     println!("account: {:?} {}  statement {}  period {} .. {}", st.account_kind, mask(&st.iban), st.number, st.period_start, st.period_end);
     println!("opening {:?}  closing {:?}", st.opening_cents, st.closing_cents);
-    for kind in [TxKind::Card, TxKind::CardForeign, TxKind::Refund, TxKind::Atm, TxKind::TransferIn, TxKind::TransferOut, TxKind::StandingOrder, TxKind::Other] {
+    for kind in [TxKind::Card, TxKind::CardForeign, TxKind::Refund, TxKind::Atm, TxKind::TransferIn, TxKind::TransferOut, TxKind::StandingOrder, TxKind::Fee, TxKind::Other] {
         let n = st.transactions.iter().filter(|t| t.kind == kind).count();
         if n > 0 { println!("  {kind:?}: {n}"); }
     }

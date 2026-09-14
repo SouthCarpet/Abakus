@@ -49,8 +49,8 @@ impl Drop for TempDb {
     fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); }
 }
 
-/// M01: a pre-v4 database gains the two recurring tables and reaches
-/// schema_version 4, with every prior row and the notes column untouched.
+/// M01: a pre-v4 database gains the two recurring tables and reaches the
+/// current schema version, with every prior row and the notes column untouched.
 #[test]
 fn m01_a_v3_database_gains_recurring_tables_and_keeps_every_row() {
     let db = TempDb::with_v3("m01");
@@ -58,7 +58,7 @@ fn m01_a_v3_database_gains_recurring_tables_and_keeps_every_row() {
 
     let raw = Connection::open(&db.0).unwrap();
     let version: String = raw.query_row("SELECT value FROM settings WHERE key = 'schema_version'", [], |r| r.get(0)).unwrap();
-    assert_eq!(version, "4");
+    assert_eq!(version, "6");
     let recurring_tables: i64 = raw.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('recurring_decisions','recurring_members')", [], |r| r.get(0)).unwrap();
     assert_eq!(recurring_tables, 2);
 
@@ -73,7 +73,7 @@ fn m01_a_v3_database_gains_recurring_tables_and_keeps_every_row() {
 /// (no `IF NOT EXISTS` on the versioned DDL, unlike the base `schema.sql`).
 /// The whole migration must roll back: schema_version stays 3, no
 /// recurring table survives half-created, and a later open (once the
-/// conflicting table is gone) still reaches v4 cleanly.
+/// conflicting table is gone) still reaches the current version cleanly.
 #[test]
 fn m02_a_forced_ddl_failure_leaves_the_old_version_and_data_unchanged() {
     let db = TempDb::with_v3("m02");
@@ -254,7 +254,7 @@ fn m03_backup_carries_recurring_decisions_and_ignored_items() {
     assert_eq!(member, "fp-2");
     assert_eq!(backed_up_note, snapshot_note);
     assert_eq!(provenance, 1);
-    assert_eq!((version.as_str(), check_updates.as_str()), ("4", "1"));
+    assert_eq!((version.as_str(), check_updates.as_str()), ("6", "1"));
     assert_eq!(backup.list_transactions(&store::TxFilter::default()).unwrap().len(), 2);
     assert!(s.list_transactions(&store::TxFilter::default()).unwrap().iter().any(|row| row.note == "source changed after snapshot"), "the source remains usable after backup");
     let _ = std::fs::remove_file(&dest);

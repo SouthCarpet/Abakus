@@ -1,13 +1,15 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { open } from '@tauri-apps/plugin-dialog'
 import type { Account, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
+import { getLatestRelease, setLatestRelease } from '../lib/updateStatus'
 import { Settings } from './Settings'
 
 afterEach(() => cleanup())
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => { vi.clearAllMocks(); setLatestRelease(null) })
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({ save: vi.fn() }))
+vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn(), save: vi.fn() }))
 
 const release: Release = {
   tag: '0.2.0',
@@ -40,6 +42,8 @@ function mockApi(overrides: Partial<typeof api> = {}) {
   vi.mocked(api.setCheckUpdates).mockResolvedValue(undefined)
   vi.mocked(api.openReleasePage).mockResolvedValue(undefined)
   vi.mocked(api.runNetAudit).mockResolvedValue(0)
+  vi.mocked(api.restorePreview).mockResolvedValue({ accounts: 0, statements: 0, transactions: 0, schema_version: 6 })
+  vi.mocked(api.restoreDatabase).mockResolvedValue({ safety_copy_path: 'C:/safety.db' })
   Object.assign(api, overrides)
 }
 
@@ -62,18 +66,21 @@ vi.mock('../api', async (importOriginal) => {
       runNetAudit: vi.fn(),
       updateAccount: vi.fn(),
       setAccountPassword: vi.fn(),
+      restorePreview: vi.fn(),
+      restoreDatabase: vi.fn(),
     },
   }
 })
 
 describe('Settings: opt-in update check', () => {
-  it('stays off and never calls checkUpdateNow when the flag is off', async () => {
+  it('stays off and never calls checkUpdateNow when the flag is off, and never feeds the global indicator', async () => {
     mockApi()
     render(<Settings />)
     await waitFor(() => expect(api.getCheckUpdates).toHaveBeenCalled())
     expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).not.toBeChecked()
     expect(api.checkUpdateNow).not.toHaveBeenCalled()
     expect(screen.queryByText(/Dostupná aktualizácia/)).not.toBeInTheDocument()
+    expect(getLatestRelease()).toBeNull()
   })
 
   it('checks on mount and shows the quiet release line when the flag is already on', async () => {
@@ -83,13 +90,14 @@ describe('Settings: opt-in update check', () => {
     expect(screen.getByText(release.url)).toBeInTheDocument()
   })
 
-  it('turning the checkbox on persists the setting and runs the check immediately', async () => {
+  it('turning the checkbox on persists the setting, runs the check immediately and feeds the global indicator', async () => {
     mockApi({ checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
     render(<Settings />)
     const box = await screen.findByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
     box.click()
     await waitFor(() => expect(api.setCheckUpdates).toHaveBeenCalledWith(true))
     await waitFor(() => expect(screen.getByText('Dostupná aktualizácia 0.2.0')).toBeInTheDocument())
+    expect(getLatestRelease()).toEqual(release)
   })
 })
 
@@ -102,6 +110,143 @@ function deferred<T>() {
   const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
   return { promise, resolve, reject }
 }
+
+// Plan 091 point 5: the database owns the preference. Deferred owned API
+// stubs exercise read/write completion order without a network or native app.
+describe('Settings: saved update preference lifecycle', () => {
+  it('prevents a write before the saved true preference has loaded', async () => {
+    const read = deferred<boolean>()
+    mockApi({ getCheckUpdates: vi.fn().mockReturnValue(read.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    expect(box).toBeDisabled()
+    await act(async () => read.resolve(true))
+    expect(box).toBeChecked()
+    expect(box).toBeEnabled()
+  })
+
+  it('keeps an unreadable preference disabled and reports the read error', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockRejectedValue('Preference unreadable') })
+    render(<Settings />)
+    await screen.findByText('Preference unreadable')
+    expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeDisabled()
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
+  })
+
+  it('reads the saved opt-in again after Settings unmounts and remounts', async () => {
+    let saved = false
+    mockApi({
+      getCheckUpdates: vi.fn(async () => saved),
+      setCheckUpdates: vi.fn(async (next: boolean) => { saved = next }),
+    })
+    const first = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    await waitFor(() => expect(box).toBeChecked())
+    first.unmount()
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeChecked())
+    expect(saved).toBe(true)
+  })
+
+  it('retains the saved true value when saving false fails', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), setCheckUpdates: vi.fn().mockRejectedValue('Save refused') })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    await screen.findByText('Save refused')
+    expect(box).toBeChecked()
+    expect(box).toBeEnabled()
+  })
+
+  it('waits for a pending save from the previous mount before reading the preference', async () => {
+    const save = deferred<void>()
+    let saved = false
+    mockApi({
+      getCheckUpdates: vi.fn(async () => saved),
+      setCheckUpdates: vi.fn(async (next: boolean) => { await save.promise; saved = next }),
+    })
+    const first = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    first.unmount()
+    render(<Settings />)
+    await act(async () => save.resolve())
+    expect(saved).toBe(true)
+    expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeChecked()
+    expect(api.checkUpdateNow).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads the saved true value after a previous mount fails to save false', async () => {
+    const save = deferred<void>()
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
+    const first = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    first.unmount()
+    render(<Settings />)
+    await act(async () => save.reject('Write failed'))
+    const remountedBox = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    expect(remountedBox).toBeChecked()
+    expect(remountedBox).toBeEnabled()
+    expect(screen.queryByText('Write failed')).not.toBeInTheDocument()
+  })
+
+  it('serializes rapid clicks until the pending save completes', async () => {
+    const save = deferred<void>()
+    mockApi({ setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    fireEvent.click(box)
+    expect(box).toBeDisabled()
+    expect(api.setCheckUpdates).toHaveBeenCalledTimes(1)
+    await act(async () => save.resolve())
+    expect(box).toBeChecked()
+    expect(box).toBeEnabled()
+  })
+
+  it('ignores a stale check error after the user saves opt-out', async () => {
+    const check = deferred<Release | null>()
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockReturnValue(check.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    await waitFor(() => expect(box).not.toBeChecked())
+    await act(async () => check.reject('Old check failed'))
+    expect(screen.queryByText('Old check failed')).not.toBeInTheDocument()
+  })
+
+  it('ignores a stale release after the user saves opt-out', async () => {
+    const check = deferred<Release | null>()
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockReturnValue(check.promise) })
+    render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeChecked())
+    fireEvent.click(box)
+    await waitFor(() => expect(box).not.toBeChecked())
+    await act(async () => check.resolve(release))
+    expect(screen.queryByText('Dostupná aktualizácia 0.2.0')).not.toBeInTheDocument()
+  })
+
+  it('does not start a check when a save completes after Settings unmounts', async () => {
+    const save = deferred<void>()
+    mockApi({ setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
+    const view = render(<Settings />)
+    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    await waitFor(() => expect(box).toBeEnabled())
+    fireEvent.click(box)
+    view.unmount()
+    await act(async () => save.resolve())
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
+  })
+})
 
 describe('Settings: update button (0.1.4)', () => {
   it('shows only the quiet line and the link, no button, when the release has no installer asset', async () => {
@@ -190,6 +335,44 @@ describe('Settings: network audit', () => {
     render(<Settings />)
     await waitFor(() => expect(screen.getByText('Žiadna sieťová aktivita')).toBeInTheDocument())
     expect(screen.queryByText('Neúspešné zápisy auditu')).not.toBeInTheDocument()
+  })
+})
+
+// Point 7: "Sieťová aktivita" used to render every fetched row without limit.
+function manyNetLogRows(count: number): NetLogRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    started_at: `2026-08-${String(i + 1).padStart(2, '0')}T10:00:00Z`,
+    url: `https://api.github.com/repos/SouthCarpet/Abakus/releases/latest?n=${i + 1}`,
+    status: '200',
+    duration_ms: 10,
+    bytes_in: 1,
+  }))
+}
+
+describe('Settings: network activity collapse (point 7)', () => {
+  it('shows only the first 10 rows and offers to show the rest', async () => {
+    mockApi({ netLog: vi.fn().mockResolvedValue(manyNetLogRows(12)) } as Partial<typeof api>)
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByText(/n=1$/)).toBeInTheDocument())
+
+    expect(screen.getByText(/n=10$/)).toBeInTheDocument()
+    expect(screen.queryByText(/n=11$/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/n=12$/)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zobraziť všetky (12)' }))
+    expect(screen.getByText(/n=11$/)).toBeInTheDocument()
+    expect(screen.getByText(/n=12$/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zbaliť' }))
+    expect(screen.queryByText(/n=11$/)).not.toBeInTheDocument()
+  })
+
+  it('shows no toggle at all when 10 or fewer rows exist', async () => {
+    mockApi({ netLog: vi.fn().mockResolvedValue(manyNetLogRows(10)) } as Partial<typeof api>)
+    render(<Settings />)
+    await waitFor(() => expect(screen.getByText(/n=10$/)).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Zobraziť všetky/ })).not.toBeInTheDocument()
   })
 })
 
@@ -321,5 +504,32 @@ describe('Settings: account password', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
     expect(setAccountPassword).not.toHaveBeenCalled()
+  })
+})
+
+// 091/B10 p3 fix: a restore swaps the whole database file. Settings must
+// refetch its own account list right after, or it keeps showing accounts
+// from the database that restore just replaced.
+describe('Settings: restore refetches the account list', () => {
+  const accountA: Account = { id: 1, iban: 'SK4411000000000012345678', kind: 'personal', label: 'Účet A', has_password: false }
+  const accountB: Account = { id: 2, iban: 'SK3711000000000098765432', kind: 'business', label: 'Účet B', has_password: false }
+
+  it('shows accounts from the restored database, not the ones fetched before the restore', async () => {
+    const listAccounts = vi.fn().mockResolvedValueOnce([accountA]).mockResolvedValueOnce([accountB])
+    mockApi({ listAccounts } as Partial<typeof api>)
+    vi.mocked(open).mockResolvedValue('C:/zálohy/abakus-zaloha.db')
+    vi.mocked(api.restorePreview).mockResolvedValue({ accounts: 1, statements: 2, transactions: 10, schema_version: 6 })
+    vi.mocked(api.restoreDatabase).mockResolvedValue({ safety_copy_path: 'C:/safety.db' })
+
+    render(<Settings />)
+    expect(await screen.findByText('Účet A')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať zálohu' }))
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: 'Obnoviť databázu' }))
+
+    await waitFor(() => expect(listAccounts).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Účet B')).toBeInTheDocument()
+    expect(screen.queryByText('Účet A')).not.toBeInTheDocument()
   })
 })

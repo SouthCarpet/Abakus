@@ -26,6 +26,10 @@ export function IncomeExpense({
           <Legend />
           <Bar dataKey="income_cents" name="Príjem" fill="var(--color-chart-1)" className="k-chart-slice" onClick={handleBarClick} />
           <Bar dataKey="expense_cents" name="Výdavky" fill="var(--color-chart-2)" className="k-chart-slice" onClick={handleBarClick} />
+          {/* Point 13: fee_cents is already a subset of expense_cents on the
+              backend; this series only surfaces it, it does not add a second
+              total. */}
+          <Bar dataKey="fee_cents" name="Poplatky" fill="var(--color-chart-3)" className="k-chart-slice" onClick={handleBarClick} />
         </BarChart>
       </ResponsiveContainer>
     </div>

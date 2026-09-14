@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AccountKind, BadChecksum, Status, Summary } from '../api'
+import type { Account, AccountKind, BadChecksum, StatementHistoryRow, Status, Summary } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
@@ -7,6 +7,8 @@ import { CategoryBars } from '../components/charts/CategoryBars'
 import { IncomeExpense } from '../components/charts/IncomeExpense'
 import { MonthlyStacked } from '../components/charts/MonthlyStacked'
 import { InsightsPanel } from '../components/insights/InsightsPanel'
+import { StatementReminderBanner } from '../components/insights/StatementReminderBanner'
+import { YearComparisonCard } from '../components/insights/YearComparisonCard'
 import { Kpi } from '../components/Kpi'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { monthRange, periodRange, validPeriod } from '../lib/period'
@@ -47,7 +49,9 @@ function UnassignedTile({ count, suggested, onClick }: { count: number; suggeste
   )
 }
 
-function TopMerchantsTable({ rows }: { rows: Summary['top_merchants'] }) {
+// Point 17: the merchant name is the drilldown affordance into Transactions,
+// pre-filtered by that merchant's text (point 9's substring search).
+function TopMerchantsTable({ rows, onMerchantClick }: { rows: Summary['top_merchants']; onMerchantClick: (merchant: string) => void }) {
   return (
     <Card title="Najčastejší obchodníci">
       <table className="k-table">
@@ -61,7 +65,11 @@ function TopMerchantsTable({ rows }: { rows: Summary['top_merchants'] }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.merchant}>
-              <td>{r.merchant}</td>
+              <td>
+                <Button variant="ghost" onClick={() => onMerchantClick(r.merchant)}>
+                  {r.merchant}
+                </Button>
+              </td>
               <td className="k-num">{formatEur(r.cents)}</td>
               <td className="k-num">{r.count}</td>
             </tr>
@@ -102,21 +110,27 @@ function SummaryBody({
   summary,
   incomeSpan,
   expenseSpan,
+  feeSpan,
   onNavigateToTransactions,
   onMonthClick,
 }: {
   summary: Summary
   incomeSpan?: { min: number; max: number }
   expenseSpan?: { min: number; max: number }
-  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number }) => void
+  feeSpan?: { min: number; max: number }
+  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number; merchantText?: string }) => void
   onMonthClick: (month: string) => void
 }) {
   const onCategoryClick = (categoryId: number) => onNavigateToTransactions({ categoryId })
+  const onMerchantClick = (merchant: string) => onNavigateToTransactions({ merchantText: merchant })
   return (
     <>
       <div className="k-kpi-row">
         <Kpi label="Príjem" cents={summary.income_cents} min={incomeSpan?.min} max={incomeSpan?.max} tone="success" />
         <Kpi label="Výdavky" cents={summary.expense_cents} min={expenseSpan?.min} max={expenseSpan?.max} tone="danger" />
+        {/* Point 13: fee_cents is already a subset of expense_cents above, so
+            this tile surfaces it, it does not add a second expense total. */}
+        <Kpi label="Poplatky" cents={summary.fee_cents} min={feeSpan?.min} max={feeSpan?.max} tone="danger" />
         <Kpi label="Čisté" cents={summary.net_cents} tone={summary.net_cents >= 0 ? 'success' : 'danger'} baselineOnly />
         <Kpi label="Prevody vylúčené" cents={summary.transfer_cents} />
       </div>
@@ -140,7 +154,7 @@ function SummaryBody({
       <Card title="Podľa kategórií">
         <CategoryBars rows={summary.by_month_category} onCategoryClick={onCategoryClick} />
       </Card>
-      <TopMerchantsTable rows={summary.top_merchants} />
+      <TopMerchantsTable rows={summary.top_merchants} onMerchantClick={onMerchantClick} />
     </>
   )
 }
@@ -150,23 +164,33 @@ export function Overview({
   onNavigateToTransactions,
 }: {
   onNavigateToImport: () => void
-  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number; accountKind?: AccountKind }) => void
+  onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number; merchantText?: string; accountKind?: AccountKind }) => void
 }) {
   const [period, setPeriod] = usePeriod()
   const [error, setError] = useState('')
   const [summaryError, setSummaryError] = useState('')
   const onMonthClick = (month: string) => setPeriod({ kind: 'custom', custom: monthRange(month) })
   const [accountKind, setAccountKind] = useState<'all' | AccountKind>('all')
+  // A17/F3: filters by the whole KIND, so a second personal or business
+  // account is never dropped out of the totals (it used to send the id of
+  // just one account of that kind).
+  const kind = accountKind === 'all' ? null : accountKind
   const [summary, setSummary] = useState<Summary | null>(null)
   const [badChecksums, setBadChecksums] = useState<BadChecksum[]>([])
   // A17: whether ANY statement was ever imported, independent of the period
   // filter, so the empty state can tell "no imports" from "wrong period".
   const [hasAnyImports, setHasAnyImports] = useState<boolean | null>(null)
+  // Point 16/18: the statement-coverage reminder banner owns its own fetch
+  // (same independence principle as the rest of the insights section), so a
+  // failed or slow reminder never blocks or is blocked by the transaction
+  // summary above it.
+  const [reminderAccounts, setReminderAccounts] = useState<Account[]>([])
+  const [reminderHistory, setReminderHistory] = useState<StatementHistoryRow[]>([])
 
   // A17: a drill-down out of a kind-filtered Prehľad must land on the same
   // filter in Transakcie, or it can show rows from an account the user just
   // filtered out.
-  function navigateFiltered(entry: { statementId?: number; status?: Status; categoryId?: number }) {
+  function navigateFiltered(entry: { statementId?: number; status?: Status; categoryId?: number; merchantText?: string }) {
     onNavigateToTransactions(accountKind === 'all' ? entry : { ...entry, accountKind })
   }
 
@@ -179,20 +203,25 @@ export function Overview({
   }, [])
 
   useEffect(() => {
+    void api.listAccounts().then(setReminderAccounts).catch((e) => setError(String(e)))
+  }, [])
+
+  useEffect(() => {
+    void api.statementHistory(null, kind).then(setReminderHistory).catch((e) => setError(String(e)))
+  }, [kind])
+
+  useEffect(() => {
     let active = true
     setSummary(null); setSummaryError('')
     if (!validPeriod(period)) return
     const { from, to } = periodRange(period.kind, new Date(), period.custom)
-    // A17/F3: filters by the whole KIND, so a second personal or business
-    // account is never dropped out of the totals (it used to send the id of
-    // just one account of that kind).
-    const kind = accountKind === 'all' ? null : accountKind
     void api.summary(from, to, null, kind).then((value) => { if (active) setSummary(value) }).catch((e) => { if (active) setSummaryError(String(e)) })
     return () => { active = false }
-  }, [period, accountKind])
+  }, [period, kind])
 
   const incomeSpan = summary ? monthlySpan(summary.by_month, (m) => m.income_cents) : undefined
   const expenseSpan = summary ? monthlySpan(summary.by_month, (m) => m.expense_cents) : undefined
+  const feeSpan = summary ? monthlySpan(summary.by_month, (m) => m.fee_cents) : undefined
 
   return (
     <div className="k-section">
@@ -209,6 +238,13 @@ export function Overview({
 
       {error ? <p role="alert">{error}</p> : null}
       {summaryError ? <p role="alert">{summaryError}</p> : null}
+      <StatementReminderBanner
+        accounts={reminderAccounts}
+        statements={reminderHistory}
+        accountKind={kind}
+        today={localTodayIso()}
+        onNavigateToImport={onNavigateToImport}
+      />
       {badChecksums.map((row) => (
         <ChecksumBanner key={row.statement_id} row={row} onNavigate={(statementId) => onNavigateToTransactions({ statementId })} />
       ))}
@@ -221,6 +257,7 @@ export function Overview({
             summary={summary}
             incomeSpan={incomeSpan}
             expenseSpan={expenseSpan}
+            feeSpan={feeSpan}
             onNavigateToTransactions={navigateFiltered}
             onMonthClick={onMonthClick}
           />
@@ -236,6 +273,12 @@ export function Overview({
           fetches and stay visible even when the transaction summary above is
           empty or still loading. */}
       <InsightsPanel period={period} accountKind={accountKind} summary={summary} />
+
+      {/* Point 20: this comparison has its own month/period-window controls,
+          independent of the PeriodPicker above, so it lives directly in
+          Overview rather than inside InsightsPanel (whose category
+          comparison is gated on that PeriodPicker's period instead). */}
+      <YearComparisonCard accountKind={kind} today={localTodayIso()} />
     </div>
   )
 }

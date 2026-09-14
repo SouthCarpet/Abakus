@@ -1,15 +1,151 @@
 //! Manual assignment, confirmation and reclassification. Transfer rows are a
 //! protected invariant (spec A1): `assign`/`confirm` never touch them.
-use crate::{Result, Store};
+use crate::{Result, Store, StoreError};
 use rules::RuleKind;
+use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
-/// What one assigned row taught: the rules it created or reused, so
-/// `apply_to_matching` can sweep its merchant afterwards.
-struct Learned {
+mod undo;
+pub use undo::{BulkAssignOutcome, UndoAssignmentOutcome};
+pub(crate) use undo::AssignmentUndo;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum MatchKey {
+    MerchantPlace {
+        merchant: String,
+        place: Option<String>,
+    },
+    CounterpartyAccount(String),
+}
+
+#[derive(Clone, Copy)]
+enum MatchMode {
+    Merchant,
+    ExactIdentity,
+}
+
+#[derive(Clone)]
+struct StoredTransaction {
+    id: i64,
+    kind: String,
     merchant: String,
-    merchant_rule: Option<i64>,
+    place: Option<String>,
+    counterparty_iban: Option<String>,
+    category_id: Option<i64>,
+    status: String,
+}
+
+impl StoredTransaction {
+    fn match_key(&self, mode: MatchMode) -> Option<MatchKey> {
+        if matches!(mode, MatchMode::Merchant) {
+            return (!self.merchant.is_empty()).then(|| MatchKey::MerchantPlace {
+                merchant: self.merchant.clone(),
+                place: None,
+            });
+        }
+        if uses_counterparty_account(&self.kind) {
+            return self
+                .counterparty_iban
+                .as_deref()
+                .map(str::trim)
+                .filter(|iban| !iban.is_empty())
+                .map(|iban| MatchKey::CounterpartyAccount(iban.to_string()));
+        }
+        (!self.merchant.is_empty()).then(|| MatchKey::MerchantPlace {
+            merchant: self.merchant.clone(),
+            place: self.place.clone(),
+        })
+    }
+}
+
+struct AssignmentSource {
+    row: StoredTransaction,
+    category_id: i64,
+}
+
+struct AssignmentPlan {
+    sources: Vec<AssignmentSource>,
+    targets: Vec<MatchingTarget>,
+    policy: BatchPolicy,
+    skipped_transfers: usize,
+}
+
+struct MatchingTarget {
+    id: i64,
+    key: MatchKey,
+    category_id: i64,
+}
+
+#[derive(Clone, Copy)]
+struct MatchingRule {
+    id: i64,
+    source: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct RuleIdentity { match_kind: &'static str, key: String, place: String }
+
+struct Learned {
+    key: Option<MatchKey>,
+    matching_rule: Option<MatchingRule>,
+    source_rules: Vec<i64>,
+    primary_rule: Option<i64>,
+    source: &'static str,
     created: usize,
+}
+
+#[derive(Default)]
+struct BatchPolicy {
+    identities: HashMap<MatchKey, Option<i64>>,
+    merchants: HashMap<String, Option<i64>>,
+}
+
+impl BatchPolicy {
+    fn from_sources(sources: &[AssignmentSource], mode: MatchMode) -> Self {
+        let mut policy = Self::default();
+        for source in sources {
+            if let Some(key) = source.row.match_key(mode) {
+                merge_category(&mut policy.identities, key, source.category_id);
+            }
+            if !uses_counterparty_account(&source.row.kind) && !source.row.merchant.is_empty() {
+                merge_category(
+                    &mut policy.merchants,
+                    source.row.merchant.clone(),
+                    source.category_id,
+                );
+            }
+        }
+        policy
+    }
+
+    fn identity_category(&self, key: &MatchKey) -> Option<i64> {
+        self.identities.get(key).copied().flatten()
+    }
+
+    fn merchant_has_category(&self, merchant: &str, category_id: i64) -> bool {
+        self.merchants.get(merchant).copied().flatten() == Some(category_id)
+    }
+}
+
+fn merge_category<K: std::hash::Hash + Eq>(
+    categories: &mut HashMap<K, Option<i64>>,
+    key: K,
+    category_id: i64,
+) {
+    match categories.entry(key) {
+        Entry::Vacant(entry) => {
+            entry.insert(Some(category_id));
+        }
+        Entry::Occupied(mut entry) if *entry.get() != Some(category_id) => {
+            entry.insert(None);
+        }
+        Entry::Occupied(_) => {}
+    }
+}
+
+fn uses_counterparty_account(kind: &str) -> bool {
+    matches!(kind, "transfer_in" | "transfer_out" | "standing_order")
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -20,131 +156,373 @@ pub struct AssignOutcome {
 }
 
 impl Store {
-    /// One SQLite transaction for the whole batch: any failure (unknown id,
-    /// FK-violating category) rolls every row back instead of leaving a
-    /// half-applied assignment.
-    pub fn assign(&mut self, ids: &[i64], category_id: i64, apply_to_matching: bool) -> Result<AssignOutcome> {
+    /// Assigns every unique selected row in one SQLite transaction. Optional
+    /// matching uses a stable snapshot and includes only an exact merchant +
+    /// place or an exact counterparty account for bank transaction kinds.
+    pub fn assign(
+        &mut self,
+        ids: &[i64],
+        category_id: i64,
+        apply_to_matching: bool,
+    ) -> Result<AssignOutcome> {
         self.conn.execute_batch("BEGIN IMMEDIATE")?;
-        match self.assign_tx(ids, category_id, apply_to_matching) {
-            Ok(outcome) => { self.conn.execute_batch("COMMIT")?; Ok(outcome) }
-            Err(e) => { let _ = self.conn.execute_batch("ROLLBACK"); Err(e) }
+        let result = self.assign_tx(ids, category_id, apply_to_matching);
+        self.finish_assignment_transaction(result)
+    }
+
+    fn assign_tx(
+        &mut self,
+        ids: &[i64],
+        category_id: i64,
+        apply_to_matching: bool,
+    ) -> Result<AssignOutcome> {
+        let plan = self.prepare_assignment(ids, category_id, apply_to_matching)?;
+        self.apply_assignment_plan(&plan, MatchMode::Merchant)
+    }
+
+    /// Confirms selected suggestions atomically. Unknown ids fail the full
+    /// batch. Confirmed and unassigned selected rows are no-ops. Transfer ids
+    /// are protected and reported once after input deduplication.
+    pub fn confirm(&mut self, ids: &[i64], apply_to_matching: bool) -> Result<AssignOutcome> {
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        let result = self.confirm_tx(ids, apply_to_matching);
+        self.finish_assignment_transaction(result)
+    }
+
+    fn confirm_tx(&mut self, ids: &[i64], apply_to_matching: bool) -> Result<AssignOutcome> {
+        let selected = self.load_selected(ids)?;
+        let skipped_transfers = selected
+            .iter()
+            .filter(|row| row.status == "transfer")
+            .count();
+        let sources = selected
+            .into_iter()
+            .filter(|row| row.status == "suggested")
+            .filter_map(|row| {
+                row.category_id
+                    .map(|category_id| AssignmentSource { row, category_id })
+            })
+            .collect::<Vec<_>>();
+        let policy = BatchPolicy::from_sources(&sources, MatchMode::ExactIdentity);
+        let selected_ids = sources.iter().map(|source| source.row.id).collect::<HashSet<_>>();
+        let targets = self.matching_targets(&policy, &selected_ids, apply_to_matching, MatchMode::ExactIdentity)?;
+        self.apply_assignment_sources(
+            &sources,
+            &targets,
+            &policy,
+            skipped_transfers,
+            MatchMode::ExactIdentity,
+        )
+    }
+
+    fn finish_assignment_transaction<T>(&mut self, result: Result<T>) -> Result<T> {
+        match result {
+            Ok(value) => self.commit_assignment(value),
+            Err(error) => {
+                let _ = self.conn.execute_batch("ROLLBACK");
+                Err(error)
+            }
         }
     }
 
-    fn assign_tx(&mut self, ids: &[i64], category_id: i64, apply_to_matching: bool) -> Result<AssignOutcome> {
-        let mut outcome = AssignOutcome { updated: 0, rules_created: 0, skipped_transfers: 0 };
-        let mut learned = Vec::new();
-        for id in ids {
-            match self.assign_one(*id, category_id)? {
-                Some(l) => {
-                    outcome.updated += 1;
-                    outcome.rules_created += l.created;
-                    learned.push(l);
-                }
-                None => outcome.skipped_transfers += 1,
+    fn commit_assignment<T>(&mut self, value: T) -> Result<T> {
+        if let Err(error) = self.conn.execute_batch("COMMIT") {
+            let _ = self.conn.execute_batch("ROLLBACK");
+            return Err(error.into());
+        }
+        Ok(value)
+    }
+
+    fn load_selected(&self, ids: &[i64]) -> Result<Vec<StoredTransaction>> {
+        let mut unique = HashSet::new();
+        ids.iter()
+            .copied()
+            .filter(|id| unique.insert(*id))
+            .map(|id| self.load_transaction(id))
+            .collect()
+    }
+
+    fn load_transaction(&self, id: i64) -> Result<StoredTransaction> {
+        self.conn
+            .query_row(
+                "SELECT id, kind, merchant_norm, place_norm, counterparty_iban, category_id, status FROM transactions WHERE id = ?1",
+                [id],
+                read_stored_transaction,
+            )
+            .optional()?
+            .ok_or(StoreError::UnknownTransaction { id })
+    }
+
+    fn prepare_assignment(&self, ids: &[i64], category_id: i64, apply_to_matching: bool) -> Result<AssignmentPlan> {
+        let selected = self.load_selected(ids)?;
+        let skipped_transfers = selected.iter().filter(|row| row.status == "transfer").count();
+        let sources = selected.into_iter().filter(|row| row.status != "transfer").map(|row| AssignmentSource { row, category_id }).collect::<Vec<_>>();
+        let policy = BatchPolicy::from_sources(&sources, MatchMode::Merchant);
+        let selected_ids = sources.iter().map(|source| source.row.id).collect::<HashSet<_>>();
+        let targets = self.matching_targets(&policy, &selected_ids, apply_to_matching, MatchMode::Merchant)?;
+        Ok(AssignmentPlan { sources, targets, policy, skipped_transfers })
+    }
+
+    fn apply_assignment_plan(&mut self, plan: &AssignmentPlan, mode: MatchMode) -> Result<AssignOutcome> {
+        self.apply_assignment_sources(&plan.sources, &plan.targets, &plan.policy, plan.skipped_transfers, mode)
+    }
+
+    fn apply_assignment_sources(
+        &mut self,
+        sources: &[AssignmentSource],
+        targets: &[MatchingTarget],
+        policy: &BatchPolicy,
+        skipped_transfers: usize,
+        mode: MatchMode,
+    ) -> Result<AssignOutcome> {
+        let mut outcome = AssignOutcome {
+            updated: 0,
+            rules_created: 0,
+            skipped_transfers,
+        };
+        let mut matching_rules = HashMap::new();
+        for source in sources {
+            let learned = self.assign_one(source, policy, mode)?;
+            outcome.updated += 1;
+            outcome.rules_created += learned.created;
+            if let (Some(key), Some(rule)) = (learned.key, learned.matching_rule) {
+                matching_rules.insert((key, source.category_id), rule);
             }
         }
-        if apply_to_matching {
-            for l in &learned {
-                self.apply_merchant_rule(&l.merchant, l.merchant_rule, category_id)?;
-            }
-        }
+        outcome.updated += self.apply_matching_targets(targets, &matching_rules)?;
         Ok(outcome)
     }
 
-    /// One row: learn the rules it teaches, confirm it, and record that THIS
-    /// transaction is where those rules came from (A17/F1). A transfer row
-    /// teaches nothing and is reported as skipped.
-    fn assign_one(&mut self, id: i64, category_id: i64) -> Result<Option<Learned>> {
-        let (merchant, place, status): (String, Option<String>, String) = self.conn.query_row(
-            "SELECT merchant_norm, place_norm, status FROM transactions WHERE id = ?1",
-            [id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    fn matching_targets(
+        &self,
+        policy: &BatchPolicy,
+        selected_ids: &HashSet<i64>,
+        apply_to_matching: bool,
+        mode: MatchMode,
+    ) -> Result<Vec<MatchingTarget>> {
+        if !apply_to_matching {
+            return Ok(Vec::new());
+        }
+        let mut statement = self.conn.prepare(
+            "SELECT id, kind, merchant_norm, place_norm, counterparty_iban, category_id, status \
+             FROM transactions WHERE status IN ('suggested', 'unassigned')",
         )?;
-        if status == "transfer" {
-            return Ok(None);
-        }
-        let (exact, merchant_rule, created) = self.learn_rules_for(&merchant, place.as_deref(), category_id)?;
-        self.confirm_assignment(id, category_id, exact, merchant_rule)?;
-        Ok(Some(Learned { merchant, merchant_rule, created }))
-    }
-
-    fn confirm_assignment(&mut self, id: i64, category_id: i64, exact: Option<i64>, merchant_rule: Option<i64>) -> Result<()> {
-        let source = if exact.is_some() { "exact_rule" } else { "none" };
-        self.conn.execute(
-            "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = ?3, source = ?4 WHERE id = ?1 AND status <> 'transfer'",
-            rusqlite::params![id, category_id, exact, source],
-        )?;
-        if let Some(rule) = exact {
-            self.record_rule_source(rule, id)?;
-        }
-        if let Some(rule) = merchant_rule {
-            self.record_rule_source(rule, id)?;
-        }
-        Ok(())
-    }
-
-    /// The exact rule this row itself teaches, plus the broader merchant
-    /// rule (skipped when the merchant name is empty), and how many of the
-    /// two were genuinely new rather than reused. Split out of `assign_one`
-    /// so each function's cyclomatic complexity (every `?` here counts as a
-    /// branch under the project's Lizard budget) stays within the limit.
-    fn learn_rules_for(&mut self, merchant: &str, place: Option<&str>, category_id: i64) -> Result<(Option<i64>, Option<i64>, usize)> {
-        if merchant.is_empty() {
-            return Ok((None, None, 0));
-        }
-        let before = self.list_rules()?.len();
-        let exact = Some(self.insert_rule(RuleKind::Exact, merchant, place, category_id)?);
-        let merchant_rule = Some(self.insert_rule(RuleKind::Merchant, merchant, None, category_id)?);
-        let created = self.list_rules()?.len() - before;
-        Ok((exact, merchant_rule, created))
-    }
-
-    /// The rows this assignment sweeps along keep pointing at the merchant
-    /// rule that classified them (`COALESCE` leaves `rule_id` alone when the
-    /// merchant is empty and no merchant rule exists). Without that pointer a
-    /// statement delete could remove a rule that a surviving row still uses.
-    /// Confirmed rows are never swept: only `suggested` and `unassigned`.
-    ///
-    /// A17/F1 gap closed: a swept row also gets a `rule_sources` row of its
-    /// own, recorded under ITS statement, not the row that taught the rule.
-    /// Without this, a rule the teaching statement's own delete correctly
-    /// kept (a surviving row still used it) could become undeletable later:
-    /// once the teacher is gone, the swept row's statement has no provenance
-    /// of its own to hand `delete_statement` when its turn comes.
-    fn apply_merchant_rule(&mut self, merchant: &str, rule_id: Option<i64>, category_id: i64) -> Result<()> {
-        if merchant.is_empty() {
-            return Ok(());
-        }
-        let swept: Vec<i64> = {
-            let mut st = self.conn.prepare("SELECT id FROM transactions WHERE merchant_norm = ?1 AND status IN ('suggested', 'unassigned')")?;
-            let rows = st.query_map([merchant], |r| r.get(0))?;
-            rows.collect::<std::result::Result<_, _>>()?
-        };
-        self.conn.execute(
-            "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = COALESCE(?3, rule_id), source = 'merchant_rule' WHERE merchant_norm = ?1 AND status IN ('suggested', 'unassigned')",
-            rusqlite::params![merchant, category_id, rule_id],
-        )?;
-        if let Some(rule) = rule_id {
-            for id in swept {
-                self.record_rule_source(rule, id)?;
+        let rows = statement.query_map([], read_stored_transaction)?;
+        let mut targets = Vec::new();
+        for row in rows {
+            let row = row?;
+            if let Some(target) = matching_target(row, policy, selected_ids, mode) {
+                targets.push(target);
             }
         }
+        Ok(targets)
+    }
+
+    fn assign_one(
+        &mut self,
+        source: &AssignmentSource,
+        policy: &BatchPolicy,
+        mode: MatchMode,
+    ) -> Result<Learned> {
+        let learned = self.learn_rules_for(source, policy, mode)?;
+        self.confirm_selected(source.row.id, source.category_id, &learned)?;
+        Ok(learned)
+    }
+
+    fn learn_rules_for(
+        &mut self,
+        source: &AssignmentSource,
+        policy: &BatchPolicy,
+        mode: MatchMode,
+    ) -> Result<Learned> {
+        if matches!(mode, MatchMode::Merchant) {
+            return self.learn_assignment_rules(source, policy);
+        }
+        let Some(key) = source.row.match_key(mode) else {
+            return Ok(Learned::none());
+        };
+        if policy.identity_category(&key) != Some(source.category_id) {
+            return Ok(Learned::none());
+        }
+        match &key {
+            MatchKey::CounterpartyAccount(iban) => {
+                self.learn_account_rule(key.clone(), iban, source.category_id)
+            }
+            MatchKey::MerchantPlace { merchant, place } => self.learn_merchant_rules(
+                key.clone(),
+                merchant,
+                place.as_deref(),
+                source.category_id,
+                policy,
+            ),
+        }
+    }
+
+    fn learn_assignment_rules(
+        &mut self,
+        source: &AssignmentSource,
+        policy: &BatchPolicy,
+    ) -> Result<Learned> {
+        let key = MatchKey::MerchantPlace {
+            merchant: source.row.merchant.clone(),
+            place: None,
+        };
+        let identities = assignment_rule_identities(std::slice::from_ref(source), policy);
+        if identities.is_empty() {
+            return Ok(Learned::none());
+        }
+        let (exact, exact_created) = self.insert_learned_identity(&identities[0], source.category_id)?;
+        let (merchant, merchant_created) = self.insert_learned_identity(&identities[1], source.category_id)?;
+        Ok(Learned {
+            key: Some(key),
+            matching_rule: Some(MatchingRule {
+                id: merchant,
+                source: "merchant_rule",
+            }),
+            source_rules: vec![exact, merchant],
+            primary_rule: Some(exact),
+            source: "exact_rule",
+            created: exact_created + merchant_created,
+        })
+    }
+
+    fn learn_account_rule(
+        &mut self,
+        key: MatchKey,
+        iban: &str,
+        category_id: i64,
+    ) -> Result<Learned> {
+        let (rule, created) =
+            self.insert_learned_rule(RuleKind::CounterpartyAccount, iban, None, category_id)?;
+        Ok(Learned {
+            key: Some(key),
+            matching_rule: Some(MatchingRule {
+                id: rule,
+                source: "account_rule",
+            }),
+            source_rules: vec![rule],
+            primary_rule: Some(rule),
+            source: "account_rule",
+            created,
+        })
+    }
+
+    fn learn_merchant_rules(
+        &mut self,
+        key: MatchKey,
+        merchant: &str,
+        place: Option<&str>,
+        category_id: i64,
+        policy: &BatchPolicy,
+    ) -> Result<Learned> {
+        let (exact, exact_created) =
+            self.insert_learned_rule(RuleKind::Exact, merchant, place, category_id)?;
+        let merchant_rule = self.learn_broad_merchant_rule(merchant, category_id, policy)?;
+        let mut source_rules = vec![exact];
+        let mut created = exact_created;
+        if let Some((rule, was_created)) = merchant_rule {
+            source_rules.push(rule);
+            created += was_created;
+        }
+        Ok(Learned {
+            key: Some(key),
+            matching_rule: Some(MatchingRule {
+                id: exact,
+                source: "exact_rule",
+            }),
+            source_rules,
+            primary_rule: Some(exact),
+            source: "exact_rule",
+            created,
+        })
+    }
+
+    fn learn_broad_merchant_rule(
+        &mut self,
+        merchant: &str,
+        category_id: i64,
+        policy: &BatchPolicy,
+    ) -> Result<Option<(i64, usize)>> {
+        if !policy.merchant_has_category(merchant, category_id) {
+            return Ok(None);
+        }
+        self.insert_learned_rule(RuleKind::Merchant, merchant, None, category_id)
+            .map(Some)
+    }
+
+    fn insert_learned_rule(
+        &mut self,
+        kind: RuleKind,
+        key: &str,
+        place: Option<&str>,
+        category_id: i64,
+    ) -> Result<(i64, usize)> {
+        let place_value = place.unwrap_or("");
+        let existed = self
+            .conn
+            .prepare("SELECT 1 FROM rules WHERE match_kind = ?1 AND key = ?2 AND place = ?3")?
+            .exists(params![crate::rules_repo::kind_str(kind), key, place_value])?;
+        let rule = self.insert_rule(kind, key, place, category_id)?;
+        Ok((rule, usize::from(!existed)))
+    }
+
+    fn insert_learned_identity(&mut self, identity: &RuleIdentity, category_id: i64) -> Result<(i64, usize)> {
+        let kind = match identity.match_kind {
+            "exact" => RuleKind::Exact,
+            "merchant" => RuleKind::Merchant,
+            _ => return Err(StoreError::Db("unsupported assignment rule identity".into())),
+        };
+        self.insert_learned_rule(kind, &identity.key, (!identity.place.is_empty()).then_some(identity.place.as_str()), category_id)
+    }
+
+    fn confirm_selected(&mut self, id: i64, category_id: i64, learned: &Learned) -> Result<()> {
+        self.conn.execute(
+            "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = ?3, source = ?4 \
+             WHERE id = ?1 AND status <> 'transfer'",
+            params![id, category_id, learned.primary_rule, learned.source],
+        )?;
+        for rule in &learned.source_rules {
+            self.record_rule_source(*rule, id)?;
+        }
         Ok(())
     }
 
-    pub fn confirm(&mut self, ids: &[i64]) -> Result<usize> {
-        let mut n = 0;
-        for id in ids {
-            let cat: Option<i64> = self.conn.query_row("SELECT category_id FROM transactions WHERE id = ?1 AND status = 'suggested'", [id], |r| r.get(0)).ok().flatten();
-            if let Some(c) = cat { self.assign(&[*id], c, false)?; n += 1; }
+    fn apply_matching_targets(
+        &mut self,
+        targets: &[MatchingTarget],
+        matching_rules: &HashMap<(MatchKey, i64), MatchingRule>,
+    ) -> Result<usize> {
+        let mut updated = 0;
+        for target in targets {
+            if let Some(rule) = matching_rules.get(&(target.key.clone(), target.category_id)) {
+                updated += self.confirm_matching_target(target, *rule)?;
+            }
         }
-        Ok(n)
+        Ok(updated)
+    }
+
+    fn confirm_matching_target(
+        &mut self,
+        target: &MatchingTarget,
+        rule: MatchingRule,
+    ) -> Result<usize> {
+        let updated = self.conn.execute(
+            "UPDATE transactions SET status = 'confirmed', category_id = ?2, rule_id = ?3, source = ?4 \
+             WHERE id = ?1 AND status IN ('suggested', 'unassigned') \
+               AND (category_id IS NULL OR category_id = ?2)",
+            params![target.id, target.category_id, rule.id, rule.source],
+        )?;
+        if updated == 1 {
+            self.record_rule_source(rule.id, target.id)?;
+        }
+        Ok(updated)
     }
 
     pub fn reclassify_open(&mut self) -> Result<usize> {
         let ids: Vec<i64> = {
-            let mut st = self.conn.prepare("SELECT id FROM transactions WHERE status IN ('suggested', 'unassigned')")?;
+            let mut st = self.conn.prepare(
+                "SELECT id FROM transactions WHERE status IN ('suggested', 'unassigned')",
+            )?;
             let r = st.query_map([], |r| r.get(0))?;
             r.collect::<std::result::Result<_, _>>()?
         };
@@ -167,4 +545,70 @@ impl Store {
         self.reclassify_open()?;
         Ok(flipped)
     }
+}
+
+impl Learned {
+    fn none() -> Self {
+        Self {
+            key: None,
+            matching_rule: None,
+            source_rules: Vec::new(),
+            primary_rule: None,
+            source: "none",
+            created: 0,
+        }
+    }
+}
+
+fn matching_target(
+    row: StoredTransaction,
+    policy: &BatchPolicy,
+    selected_ids: &HashSet<i64>,
+    mode: MatchMode,
+) -> Option<MatchingTarget> {
+    if selected_ids.contains(&row.id) {
+        return None;
+    }
+    let key = row.match_key(mode)?;
+    let category_id = policy.identity_category(&key)?;
+    if row
+        .category_id
+        .is_some_and(|existing| existing != category_id)
+    {
+        return None;
+    }
+    Some(MatchingTarget {
+        id: row.id,
+        key,
+        category_id,
+    })
+}
+
+fn affected_row_ids(plan: &AssignmentPlan) -> Vec<i64> {
+    plan.sources.iter().map(|source| source.row.id).chain(plan.targets.iter().map(|target| target.id)).collect()
+}
+
+fn assignment_rule_identities(sources: &[AssignmentSource], policy: &BatchPolicy) -> Vec<RuleIdentity> {
+    let mut seen = HashSet::new();
+    sources.iter()
+        .filter(|source| !source.row.merchant.is_empty())
+        .filter(|source| policy.identity_category(&MatchKey::MerchantPlace { merchant: source.row.merchant.clone(), place: None }) == Some(source.category_id))
+        .flat_map(|source| [
+            RuleIdentity { match_kind: "exact", key: source.row.merchant.clone(), place: source.row.place.clone().unwrap_or_default() },
+            RuleIdentity { match_kind: "merchant", key: source.row.merchant.clone(), place: String::new() },
+        ])
+        .filter(|identity| seen.insert(identity.clone()))
+        .collect()
+}
+
+fn read_stored_transaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredTransaction> {
+    Ok(StoredTransaction {
+        id: row.get(0)?,
+        kind: row.get(1)?,
+        merchant: row.get(2)?,
+        place: row.get(3)?,
+        counterparty_iban: row.get(4)?,
+        category_id: row.get(5)?,
+        status: row.get(6)?,
+    })
 }

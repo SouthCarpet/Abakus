@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CatTotal { pub category_id: i64, pub name: String, pub parent_name: Option<String>, pub cents: i64 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MonthRow { pub month: String, pub income_cents: i64, pub expense_cents: i64 }
+pub struct MonthRow { pub month: String, pub income_cents: i64, pub expense_cents: i64, pub fee_cents: i64 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MonthCat { pub month: String, pub category_id: i64, pub name: String, pub cents: i64 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -18,6 +18,9 @@ pub struct Summary {
     pub income_cents: i64,
     pub expense_cents: i64,
     pub transfer_cents: i64,
+    /// Signed expense contribution from fee rows within this summary scope.
+    /// It is already included in `expense_cents`.
+    pub fee_cents: i64,
     pub net_cents: i64,
     pub unassigned_count: i64,
     pub suggested_count: i64,
@@ -39,6 +42,7 @@ pub struct BadChecksum { pub statement_id: i64, pub number: i64, pub account_lab
 /// takes the `c.kind = 'expense'` branch with a positive amount.
 const INCOME: &str = "CASE WHEN t.status <> 'transfer' AND t.amount_cents > 0 AND t.kind <> 'refund' AND (c.kind = 'income' OR c.kind IS NULL) THEN t.amount_cents ELSE 0 END";
 const EXPENSE: &str = "CASE WHEN t.status <> 'transfer' AND (c.kind = 'expense' OR (c.kind IS NULL AND (t.amount_cents < 0 OR t.kind = 'refund'))) THEN -t.amount_cents ELSE 0 END";
+const FEE: &str = "CASE WHEN t.kind = 'fee' AND t.status <> 'transfer' AND (c.kind = 'expense' OR (c.kind IS NULL AND t.amount_cents < 0)) THEN -t.amount_cents ELSE 0 END";
 const FROM: &str = "FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN categories p ON p.id = c.parent_id";
 
 impl Store {
@@ -64,12 +68,12 @@ impl Store {
         let by_month = self.by_month_rows(&w, &refs)?;
         let by_month_category = self.by_month_category_rows(&w, &refs)?;
         let top_merchants = self.top_merchant_rows(&w, &refs)?;
-        Ok(Summary { income_cents: totals.0, expense_cents: totals.1, transfer_cents: totals.2, net_cents: totals.0 - totals.1, unassigned_count: totals.3, suggested_count: totals.4, by_category, by_month, by_month_category, top_merchants })
+        Ok(Summary { income_cents: totals.0, expense_cents: totals.1, transfer_cents: totals.2, fee_cents: totals.3, net_cents: totals.0 - totals.1, unassigned_count: totals.4, suggested_count: totals.5, by_category, by_month, by_month_category, top_merchants })
     }
 
-    fn summary_totals(&self, w: &str, refs: &[&dyn rusqlite::ToSql]) -> Result<(i64, i64, i64, i64, i64)> {
-        let sql = format!("SELECT COALESCE(SUM({INCOME}),0), COALESCE(SUM({EXPENSE}),0), COALESCE(SUM(CASE WHEN t.status = 'transfer' AND t.amount_cents < 0 THEN -t.amount_cents ELSE 0 END),0), COALESCE(SUM(t.status = 'unassigned'),0), COALESCE(SUM(t.status = 'suggested'),0) {FROM}{w}");
-        Ok(self.conn.query_row(&sql, refs, |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?)
+    fn summary_totals(&self, w: &str, refs: &[&dyn rusqlite::ToSql]) -> Result<(i64, i64, i64, i64, i64, i64)> {
+        let sql = format!("SELECT COALESCE(SUM({INCOME}),0), COALESCE(SUM({EXPENSE}),0), COALESCE(SUM(CASE WHEN t.status = 'transfer' AND t.amount_cents < 0 THEN -t.amount_cents ELSE 0 END),0), COALESCE(SUM({FEE}),0), COALESCE(SUM(t.status = 'unassigned'),0), COALESCE(SUM(t.status = 'suggested'),0) {FROM}{w}");
+        Ok(self.conn.query_row(&sql, refs, |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)))?)
     }
 
     fn by_category_rows(&self, w: &str, refs: &[&dyn rusqlite::ToSql]) -> Result<Vec<CatTotal>> {
@@ -77,7 +81,7 @@ impl Store {
     }
 
     fn by_month_rows(&self, w: &str, refs: &[&dyn rusqlite::ToSql]) -> Result<Vec<MonthRow>> {
-        self.rows(&format!("SELECT substr(t.tx_date,1,7) AS m, SUM({INCOME}), SUM({EXPENSE}) {FROM}{w} GROUP BY m ORDER BY m"), refs, |r| Ok(MonthRow { month: r.get(0)?, income_cents: r.get(1)?, expense_cents: r.get(2)? }))
+        self.rows(&format!("SELECT substr(t.tx_date,1,7) AS m, SUM({INCOME}), SUM({EXPENSE}), SUM({FEE}) {FROM}{w} GROUP BY m ORDER BY m"), refs, |r| Ok(MonthRow { month: r.get(0)?, income_cents: r.get(1)?, expense_cents: r.get(2)?, fee_cents: r.get(3)? }))
     }
 
     fn by_month_category_rows(&self, w: &str, refs: &[&dyn rusqlite::ToSql]) -> Result<Vec<MonthCat>> {

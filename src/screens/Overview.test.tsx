@@ -6,6 +6,13 @@ import { ChecksumBanner, Overview } from './Overview'
 
 afterEach(() => cleanup())
 
+// Fixed so statement-reminder tests (day-8-of-month grace rule) never depend
+// on the real calendar date the suite happens to run on.
+vi.mock('../lib/recurring-labels', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/recurring-labels')>()
+  return { ...actual, localTodayIso: () => '2026-03-08' }
+})
+
 vi.mock('../api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api')>()
   return {
@@ -103,11 +110,12 @@ const nonEmptySummary: Summary = {
   income_cents: 0,
   expense_cents: 0,
   transfer_cents: 0,
+  fee_cents: 0,
   net_cents: 0,
   unassigned_count: 3,
   suggested_count: 1,
   by_category: [],
-  by_month: [{ month: '2026-06', income_cents: 0, expense_cents: 0 }],
+  by_month: [{ month: '2026-06', income_cents: 0, expense_cents: 0, fee_cents: 0 }],
   by_month_category: [],
   top_merchants: [],
 }
@@ -192,7 +200,7 @@ describe('Overview keeps insights visible when the transaction summary is empty'
     vi.mocked(api.recentStatements).mockResolvedValueOnce([])
     vi.mocked(api.listAccounts).mockResolvedValueOnce([{ id: 1, iban: 'SK00', kind: 'personal', label: 'Osobný', has_password: false }])
     vi.mocked(api.statementHistory).mockResolvedValueOnce([
-      { statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 3, period_start: '2026-06-01', period_end: '2026-06-30', opening_cents: 1000, closing_cents: 2000, checksum: { status: 'ok' } },
+      { statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 3, period_start: '2026-06-01', period_end: '2026-06-30', opening_cents: 1000, closing_cents: 2000, transaction_count: 1, total_cents: 1000, checksum: { status: 'ok' } },
     ])
     render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
     expect(await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')).toBeInTheDocument()
@@ -208,5 +216,107 @@ describe('Overview keeps the recurring panel visible when the transaction summar
     expect(await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')).toBeInTheDocument()
     expect(await screen.findByText('Pravidelné platby')).toBeInTheDocument()
     expect(await screen.findByText(/tri mesačné/)).toBeInTheDocument()
+  })
+})
+
+// Point 16/18: a statement-coverage gap is surfaced near the top of Overview
+// (localTodayIso is pinned to 2026-03-08 above, so the day-8 grace rule is
+// deterministic) and its Import button (point 18) reuses the same
+// onNavigateToImport wiring as the empty-state card.
+describe('Overview statement coverage reminder (points 16/18)', () => {
+  it('shows a coverage-gap reminder that names it as a gap, not missing transactions, with a link to Import', async () => {
+    vi.mocked(api.summary).mockResolvedValue(emptySummary)
+    vi.mocked(api.recentStatements).mockResolvedValue([])
+    vi.mocked(api.listAccounts).mockResolvedValue([{ id: 1, iban: 'SK00', kind: 'personal', label: 'Osobný', has_password: false }])
+    vi.mocked(api.statementHistory).mockResolvedValue([
+      { statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 1, period_start: '2026-01-01', period_end: '2026-01-31', opening_cents: 0, closing_cents: 0, transaction_count: 1, total_cents: 0, checksum: { status: 'ok' } },
+    ])
+    const onNavigateToImport = vi.fn()
+    render(<Overview onNavigateToImport={onNavigateToImport} onNavigateToTransactions={() => {}} />)
+
+    expect(await screen.findByText(/chýba výpis za obdobie/)).toHaveTextContent(
+      'Toto je medzera v pokrytí výpismi, nie dôkaz chýbajúcich transakcií.',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Prejsť na import' }))
+    expect(onNavigateToImport).toHaveBeenCalled()
+  })
+
+  it('stays silent when statement coverage has no gap', async () => {
+    vi.mocked(api.summary).mockResolvedValue(emptySummary)
+    vi.mocked(api.recentStatements).mockResolvedValue([])
+    vi.mocked(api.listAccounts).mockResolvedValue([])
+    vi.mocked(api.statementHistory).mockResolvedValue([])
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+    await screen.findByText('Zatiaľ nič. Importuj prvý výpis.')
+    expect(screen.queryByText(/chýba výpis za obdobie/)).not.toBeInTheDocument()
+  })
+})
+
+// Point 17: a merchant name in the Overview top-merchants table is a
+// navigation affordance into Transactions, pre-filtered by that merchant's
+// text (the substring search already used by point 9).
+describe('Overview merchant drilldown (point 17)', () => {
+  it('navigates to Transactions with the merchant name as the search text', async () => {
+    vi.mocked(api.summary).mockResolvedValue({
+      ...nonEmptySummary,
+      top_merchants: [{ merchant: 'Kaufland', cents: -4321, count: 3 }],
+    })
+    const onNavigateToTransactions = vi.fn()
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={onNavigateToTransactions} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Kaufland' }))
+
+    expect(onNavigateToTransactions).toHaveBeenCalledWith({ merchantText: 'Kaufland' })
+  })
+
+  it('carries the selected account kind filter into the merchant drilldown', async () => {
+    vi.mocked(api.summary).mockResolvedValue({
+      ...nonEmptySummary,
+      top_merchants: [{ merchant: 'Kaufland', cents: -4321, count: 3 }],
+    })
+    const onNavigateToTransactions = vi.fn()
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={onNavigateToTransactions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Osobný' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Kaufland' }))
+
+    expect(onNavigateToTransactions).toHaveBeenCalledWith({ merchantText: 'Kaufland', accountKind: 'personal' })
+  })
+})
+
+// Point 20: same-period-last-year comparison, with a choice between a
+// one-month and a three-month window, and both compared ranges visible next
+// to the numbers. localTodayIso is pinned to 2026-03-08 above.
+describe('Overview year-over-year comparison (point 20)', () => {
+  it('mounts the comparison with a one-month default and both visible date ranges', async () => {
+    vi.mocked(api.summary).mockResolvedValue(emptySummary)
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+
+    expect(await screen.findByText('Porovnanie s rovnakým obdobím vlani')).toBeInTheDocument()
+    expect(await screen.findByText('1. 3. 2026–31. 3. 2026')).toBeInTheDocument()
+    expect(screen.getByText('1. 3. 2025–31. 3. 2025')).toBeInTheDocument()
+  })
+
+  it('switches to a three-month window and shows both wider ranges', async () => {
+    vi.mocked(api.summary).mockResolvedValue(emptySummary)
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+    await screen.findByText('Porovnanie s rovnakým obdobím vlani')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tri mesiace' }))
+
+    expect(await screen.findByText('1. 1. 2026–31. 3. 2026')).toBeInTheDocument()
+    expect(screen.getByText('1. 1. 2025–31. 3. 2025')).toBeInTheDocument()
+  })
+})
+
+// Point 13: fees already exist as their own Summary field; they must be
+// visible in Overview, not just filterable in Transactions.
+describe('Overview shows fee totals (point 13)', () => {
+  it('shows a Poplatky KPI for summary.fee_cents', async () => {
+    vi.mocked(api.summary).mockResolvedValue({ ...nonEmptySummary, fee_cents: -1234 })
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+
+    expect(await screen.findByText('Poplatky')).toBeInTheDocument()
+    expect(screen.getByText('-12,34 €')).toBeInTheDocument()
   })
 })

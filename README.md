@@ -15,7 +15,7 @@ Lokálna desktopová appka na PDF výpisy z Tatra banky.
 
 Abakus is a local Windows desktop app for Tatra banka PDF statements. It imports statements, checks checksums, assigns categories with learned rules, tracks recurring payments, stores notes, and builds PDF reports with charts. Bank data stays on your computer. The only network use is an opt-in update check and a user-triggered installer download from GitHub Releases. Both are written to the in-app network log. There is no telemetry.
 
-Version 0.1.6 is the current release. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
+Version 0.2.0 is the current release. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
 
 ## Čo to je
 
@@ -23,7 +23,11 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 ## Stav
 
-**0.1.6.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+**0.2.0.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a červené tlačidlo na zmazanie. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
+
+Pribudol aj malý odznak novej verzie v hornej lište appky, viditeľný na každej obrazovke, nielen v Nastaveniach; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) už predtým nájde novšie vydanie. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
 
 ## Prečo
 
@@ -38,7 +42,15 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 1. Otvorte [stránku vydaní](https://github.com/SouthCarpet/Abakus/releases/latest).
 2. Stiahnite `abakus-setup-<verzia>.exe`. Inštalátor je Inno Setup pre aktuálneho používateľa. Práva správcu nie sú potrebné.
 3. Spustite inštalátor. Windows SmartScreen môže varovať, lebo súbor nie je podpísaný. Ak dôverujete zdroju, zvoľte **Ďalšie informácie** a **Spustiť napriek tomu**.
-4. Appka potrebuje Microsoft Edge WebView2 Runtime. Inštalátor 0.1.6 ho vie skontrolovať a ponúkne stiahnutie, ak chýba. Windows 10 (2004 a novší) a Windows 11 ho často už majú.
+4. Appka potrebuje Windows 10 alebo novší, prostredie kompatibilné s x64
+   a Microsoft Edge WebView2 Runtime. Pripravovaný inštalátor overí balený
+   EXE a PDFium. Existujúci platný záznam WebView2 použije. Ak runtime chýba,
+   ponúkne jeho inštaláciu. Pri odmietnutí alebo chybe zostane Abakus
+   nainštalovaný bez ponuky spustenia. Tichá inštalácia bez runtime skončí
+   pred kopírovaním a nič nestiahne. Kontrola registra nie je test funkčnosti
+   WebView2. Podrobnosti sú v [inštalačnom návode](packaging/INSTALL.md).
+   [Natívne prijatie a ARM64](docs/plan-091-installer-dependencies.md)
+   zostávajú neoverené.
 5. Appka sa nainštaluje do `%LOCALAPPDATA%\Programs\Abakus`. Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`.
 
 Ak Abakus už máte nainštalovaný, druhé spustenie inštalátora ho aktualizuje na mieste. Sprievodca povie, akú verziu má nainštalovanú a na akú ju aktualizuje. Dáta a heslá zostanú.
@@ -48,21 +60,39 @@ Ak Abakus už máte nainštalovaný, druhé spustenie inštalátora ho aktualizu
 ## Ako to funguje
 
 1. V **Nastaveniach** pridajte účty. Zadajte IBAN alebo zápis `kód banky/prefix-číslo účtu`.
-2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu. Ak výpis patrí účtu, ktorý appka ešte nepozná, otvorí sa hneď dialóg na jeho nastavenie s druhom účtu a prípadným heslom. Nastavenia zostávajú druhou cestou, ako účet pridať aj bez importu.
+2. V **Import** pridajte mesačné PDF. Pri zamknutom PDF zadajte heslo. Voľba **Zapamätať pre tento účet** uloží heslo do Správcu poverení systému Windows. Heslo môžete nastaviť alebo zmeniť aj v Nastaveniach, bez importu. Ak výpis patrí účtu, ktorý appka ešte nepozná, otvorí sa hneď dialóg na jeho nastavenie s druhom účtu a prípadným heslom. Nastavenia zostávajú druhou cestou, ako účet pridať aj bez importu. Pod dropzónou appka ukáže úplný zoznam všetkých doteraz importovaných výpisov so sumou, kontrolným súčtom a stavom kontroly; staršie výpisy sú zbalené pod samostatným tlačidlom.
 3. V **Transakciách** skontrolujte navrhnuté kategórie. Odhad potvrdíte jedným kliknutím.
 4. V **Prehľade** uvidíte príjmy, výdavky, kategórie, pravidelné platby a vývoj v čase.
 
-Graf **Podľa kategórií** zachováva znamienko súčtu. Záporné hodnoty vľavo znižujú výdavky. Kladné vpravo ich zvyšujú. Kliknutie na kategóriu otvorí príslušné transakcie. Tabuľky v menšom okne umožňujú vodorovné posúvanie. Suma a mena ostávajú spolu.
+Graf **Podľa kategórií** zachováva znamienko súčtu. Záporné hodnoty vľavo znižujú výdavky. Kladné vpravo ich zvyšujú. Kliknutie na kategóriu otvorí príslušné transakcie. Kliknutie na obchodníka v tabuľke **Najčastejší obchodníci** otvorí Transakcie s vyplneným hľadaním podľa jeho mena. Tabuľky v menšom okne umožňujú vodorovné posúvanie. Suma a mena ostávajú spolu.
 
 Každý importovaný výpis má odznak kontrolného súčtu. Appka overí, či počiatočný zostatok a všetky transakcie dávajú konečný zostatok. Text **Kontrolný súčet nesedí** znamená, že sa tieto hodnoty líšia o uvedenú sumu. Výpis sa importuje. Ostane označený na kontrolu. Ak chýba potrebný zostatok, appka uvedie, že súčet nevie overiť.
 
-Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Zálohu databázy** a vyberte nový súbor. Appka uloží konzistentnú kópiu aj počas behu. Existujúci cieľový súbor neprepíše. Záloha obsahuje účty, výpisy, kategórie, naučené pravidlá, poznámky, voľby pravidelných platieb a nastavenia databázy. Nie je šifrovaná. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF. Obnova zo zálohy zatiaľ nemá ovládanie v appke.
+Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Zálohu databázy** a vyberte nový súbor. Appka uloží konzistentnú kópiu aj počas behu. Existujúci cieľový súbor neprepíše. Záloha obsahuje účty, výpisy, kategórie, naučené pravidlá, poznámky, voľby pravidelných platieb a nastavenia databázy. Nie je šifrovaná. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF.
+
+## Obnova zo zálohy
+
+V Nastaveniach, hneď pod zálohou, tlačidlo **Vybrať zálohu** otvorí súborový dialóg. Appka vybraný súbor najprv iba prečíta a ukáže náhľad: počet účtov, výpisov a transakcií v zálohe. Súbor, ktorý nie je zálohou Abakusu, alebo zálohu z novšej appky, appka odmietne so zrozumiteľnou správou a k obnove vôbec nepristúpi.
+
+Dialóg s náhľadom pripomenie, že appka pred obnovou najprv vytvorí bezpečnostnú kópiu súčasnej databázy s časovou pečiatkou v priečinku s dátami (rovnaký mechanizmus ako **Zálohovať databázu**), aj to, že heslá zo Správcu poverení v zálohe nie sú a obnovou sa nezmenia. Po potvrdení appka bezpečnostnú kópiu skutočne vytvorí a cestu k nej ukáže. Až potom nahradí databázu obsahom zálohy. Pri zlyhaní väčšiny krokov appka vráti pôvodnú databázu a znova ju otvorí. Jeden krok zlyhať vrátiť nedá úplne: keď sa už nahradená databáza nedá znova otvoriť, appka najprv odsunie tento neotvoriteľný súbor nabok (nikdy ho nezmaže) a až potom vráti pôvodnú databázu na jej miesto. Ak zlyhá aj toto, appka beží ďalej na prázdnej databáze v pamäti až do reštartu, ale pôvodné dáta ostávajú netknuté v pomenovanom odloženom súbore a nezávisle aj v bezpečnostnej kópii, takže nič sa nestratí, len appka si to sama nevie znova pripojiť. Obnova je odmietnutá, kým prebieha import. Obnova nahradí všetky súčasné dáta, nedá sa čiastočne zlúčiť so zálohou, a bezpečnostné kópie appka nikdy sama nemaže.
 
 ## Ako sa appka učí
 
 Vytvorenie kategórie ani podkategórie samo nevytvorí pravidlo. Po priradení kategórie transakcii alebo potvrdení návrhu si appka zapamätá rozpoznaného obchodníka a miesto. Presná zhoda sa priradí automaticky. Rovnakého obchodníka na inom mieste označí ako **odhad**. Ten potvrdíte jedným kliknutím. Platby bez rozpoznaného obchodníka sa takto neučia ako jedna spoločná skupina.
 
-Voľba **Použiť aj na podobné** zaradí podobné už importované transakcie, ktoré ešte nie sú potvrdené. Potvrdené priradenia ponechá. V detaile transakcie možno zmeniť cieľ pôvodného vstavaného pravidla, ak ju zaradilo také pravidlo. Samostatný formulár na ručné vytváranie pravidiel zatiaľ nie je dostupný.
+Voľba **Použiť aj na podobné** zaradí podobné už importované transakcie, ktoré ešte nie sú potvrdené. Potvrdené priradenia ponechá. V detaile transakcie možno zmeniť cieľ pôvodného vstavaného pravidla, ak ju zaradilo také pravidlo. V **Kategóriách** má každé pravidlo priamo v tabuľke výber cieľovej kategórie na zmenu bez opustenia obrazovky. Tlačidlo **Zmazať** pri pravidle najprv ukáže, koľko otvorených riadkov sa naň odkazuje a koľko z nich po zmazaní zmení zaradenie. Samostatný formulár na ručné vytváranie pravidiel zatiaľ nie je dostupný.
+
+## Hromadné akcie a Späť
+
+Pri potvrdení odhadu appka ukáže, koľko ďalších nepotvrdených transakcií má rovnakého obchodníka (alebo rovnaký účet protistrany pri prevodoch). Zaškrtávacie políčko pri tlačidle **Potvrdiť** potvrdí aj tieto transakcie naraz. Bez zaškrtnutia sa potvrdí iba vybraný riadok.
+
+Vo výbere transakcií pribudlo tlačidlo **Potvrdiť vybrané**. Potvrdí odhady z aktuálneho výberu naraz, rovnako ako doterajšie hromadné priradenie kategórie. Voľba **Použiť aj na podobné** platí aj preň. Riadky, ktoré ešte nemajú odhad, sa preskočia.
+
+Po hromadnom priradení kategórie sa na chvíľu zobrazí tlačidlo **Späť**. Vráti práve vykonané priradenie a obnoví tabuľku. Späť platí len pre poslednú takú akciu v tomto behu appky: zmizne po použití alebo keď ho nahradí ďalšie hromadné priradenie. Hromadné potvrdenie zatiaľ vrátiť nemožno.
+
+Keď má tabuľka nezaradené platby, appka nad ňou ukáže ich skupiny podľa obchodníka, napríklad „Twitch, 15 platieb, nepriradené“. Kliknutie na skupinu vyberie presne jej riadky, takže ich hneď môžete hromadne priradiť alebo potvrdiť. Skupiny zmiznú, keď nezaradené platby v tabuľke nie sú.
+
+V tabuľke Transakcií fungujú aj šípky hore a dole. Presúvajú zvýraznený riadok. Enter potvrdí odhad zvýrazneného riadku rovnako ako tlačidlo **Potvrdiť**. Šípky a Enter nič nerobia, keď je fokus v poli na hľadanie, v poznámke alebo vo vyhľadávaní kategórie.
 
 ## Pravidelné platby a kategórie
 
@@ -72,7 +102,7 @@ Platbu možno potvrdiť, ignorovať alebo obnoviť jej automatický odhad. V det
 
 Panel ukazuje mesačný alebo ročný prepočet a očakávané platby do konca mesiaca. Podiel na výdavkoch je dostupný iba pri dostatočnom overenom pokrytí všetkých vybraných účtov. Tieto hodnoty sú odhady z importovaných údajov. Nie sú bankové príkazy ani aktuálny zostatok.
 
-Kategóriu možno vytvoriť priamo pri priraďovaní transakcie. V **Kategóriách** ju možno presunúť pod inú nadradenú kategóriu alebo osamostatniť. Kategórie majú najviac dve úrovne. Podkategória preberá druh príjem alebo výdavok od rodiča. Zmena druhu s dopadom na staršie transakcie vyžaduje potvrdenie zobrazených počtov. Spotify má vlastnú podkategóriu. Úprava starých údajov zachováva používateľské zmeny pravidiel.
+Kategóriu aj podkategóriu možno vytvoriť priamo pri priraďovaní transakcie v **Transakciách**, bez prechodu do Kategórií: výber **Nová kategória...** v zozname kategórií opýta na názov a nadradenú kategóriu, po uložení appka rovno priradí novú kategóriu danej transakcii. V **Kategóriách** ju možno presunúť pod inú nadradenú kategóriu alebo osamostatniť. Kategórie majú najviac dve úrovne. Podkategória preberá druh príjem alebo výdavok od rodiča. Zmena druhu s dopadom na staršie transakcie vyžaduje potvrdenie zobrazených počtov. Spotify má vlastnú podkategóriu. Úprava starých údajov zachováva používateľské zmeny pravidiel.
 
 ## PDF s grafmi a výpisom
 
@@ -95,6 +125,10 @@ Porovnanie kategórií ukáže výdavky vo vybranom období a v bezprostredne pr
 
 Historické konečné zostatky sú hodnoty z výpisov ku konkrétnemu dňu. Nie sú aktuálnym zostatkom bankového účtu. Chýbajúci zostatok zostáva neznámy. Kontrolný súčet ukazuje stav overenia výpisu.
 
+Ak appke chýba výpis za predchádzajúci mesiac, sedem dní po konci toho mesiaca sa v Prehľade zobrazí pripomienka. Text hovorí o medzere v pokrytí výpismi, nie o dôkaze chýbajúcich transakcií. Tlačidlo **Prejsť na import** pri pripomienke otvorí obrazovku Import.
+
+**Porovnanie s rovnakým obdobím vlani** má vlastný výber mesiaca a voľbu dĺžky: jeden mesiac alebo tri mesiace končiace vybraným mesiacom. Aktuálne aj vlaňajšie obdobie sú vypísané pri číslach príjmov, výdavkov a čistého súčtu. Toto porovnanie je nezávislé od hlavného výberu obdobia hore na obrazovke.
+
 ## Poznámky k transakciám
 
 V detaile transakcie možno uložiť poznámku do 2 000 znakov vrátane nových riadkov. Prázdny text poznámku odstráni. Poznámky sa dajú vyhľadávať aj bez diakritiky. Exportujú sa v stĺpci **poznamka** v CSV. Uloženie poznámky nemení kategóriu ani naučené pravidlo.
@@ -109,8 +143,11 @@ Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, *
 
 ## Filtre a CSV
 
+- **Vyhľadávanie** spája obchodníka s miestom, takže `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku, zjednotí nadbytočné medzery a ponechá pôvodné hľadanie v poznámke a názve protistrany. Znaky `%` a `_` sú doslovné. Podrobnosti sú v [technickom kontrakte vyhľadávania](docs/plan-091-transaction-search.md).
 - **Exportovať filtrované CSV** v Transakciách exportuje aktuálne obdobie, účet, druh účtu, kategóriu, stav, hľadaný text aj obmedzenie na konkrétny výpis. Použije text viditeľný pri kliknutí, aj keď tabuľka ešte čaká na dokončenie hľadania. Filter sa zachytí pri kliknutí. CSV číta údaje z databázy pri exporte. Zrušenie výberu súboru nič neexportuje. Zlyhanie zápisu sa zobrazí. Pôvodný export v Nastaveniach naďalej používa iba uložené obdobie.
 - **Filter kategórie** umožňuje vybrať aj nadradenú kategóriu s podkategóriami a zobrazuje kategóriu prevzatú z grafu. Archivovaný alebo nedostupný výber zostáva označený. Neznamená Všetky kategórie.
+- **Filter Druh** vyberá presne jeden druh transakcie vrátane bankového poplatku (**Poplatok**). Kombinuje sa s ostatnými filtrami a s exportom CSV.
+- Výber kategórie (filter aj priradenie transakcii) má pole na vyhľadávanie podľa názvu. Hľadanie ignoruje diakritiku a veľkosť písmen. Ak nič nesedí, zobrazí sa text **Žiadna kategória sa nenašla.**. Zoznam sa dá ovládať aj klávesnicou: šípky hore a dole prechádzajú kategóriami, Enter vyberie a Escape zoznam zavrie.
 - **Vymazať všetky filtre** zobrazí všetky obdobia, účty, druhy, kategórie a stavy bez vyhľadávania a bez obmedzenia na výpis. Vymaže aj hromadný výber. Obdobie Všetko sa uloží pre ďalšie obrazovky.
 - Panel **Súčty zobrazených transakcií** počíta presne načítané riadky tabuľky. Príjem, výdavky a čistá suma sa sčítajú v celých centoch podľa rovnakých pravidiel ako Prehľad, vrátane druhu priradenej kategórie a refundácií znižujúcich výdavky. Interné prevody majú samostatný počet a do týchto súm nevstupujú. Pri načítavaní alebo chybe sa staré súčty nezobrazujú. Nejde o zostatok bankového účtu.
 
@@ -119,6 +156,10 @@ Vlastné obdobie potrebuje dva platné dátumy so začiatkom najneskôr v deň k
 ## Aktualizácia
 
 Kontrola aktualizácií je predvolene vypnutá. Zapnete ju v Nastaveniach voľbou **Kontrolovať aktualizácie (GitHub)**. Appka potom urobí jeden neautentifikovaný `GET` na najnovšie vydanie v GitHub Releases. Neposiela bankové údaje, heslá ani telemetriu.
+
+Voľba sa ukladá v databáze. Nastavenia ju pri každom otvorení znova načítajú. Prepínač je neaktívny, kým sa hodnota nenačíta. Ak načítanie zlyhá, zobrazí sa chyba. Ak sa vrátite do Nastavení počas ukladania, načítanie počká na dokončenie zápisu. Neúspešný zápis ponechá poslednú uloženú hodnotu. Podrobnosti a limity overenia sú v [docs/plan-091-update-preference.md](docs/plan-091-update-preference.md).
+
+Keď Nastavenia nájdu novšie vydanie, malý odznak sa objaví aj v hornej lište appky na každej obrazovke. Kliknutím naň prejdete do Nastavení. Odznak sám nič nekontroluje ani nesťahuje. Pri vypnutej voľbe alebo bez doterajšej kontroly sa nezobrazí nič.
 
 Keď je na GitHub novšie vydanie, appka ukáže jeho poznámky k vydaniu. Ukáže aj tlačidlo `Aktualizovať na v<verzia>`. Až po kliknutí stiahne inštalátor. Sťahovanie overí voči `SHA256SUMS.txt` publikovanému s tým vydaním. Bez kliknutia sa nič nestiahne a nič sa nespustí.
 
@@ -146,10 +187,10 @@ Od vydania 0.1.4 obsahuje každé vydanie na GitHub súbor `SHA256SUMS.txt`. Vyd
 Kontrola stiahnutého súboru v PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\abakus-setup-0.1.6.exe
+Get-FileHash -Algorithm SHA256 .\abakus-setup-0.2.0.exe
 ```
 
-Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.1.6 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
+Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.2.0 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
 
 Známe kontrolné súčty SHA-256 pre **0.1.3**:
 
@@ -190,6 +231,48 @@ npm test
 cargo clippy --workspace --all-targets
 ```
 
+Backend verzie 0.2.0 rozširuje existujúci výsledok
+`statement_history` o povinné polia `transaction_count` a `total_cents`.
+Polia opisujú uložené transakcie, ktoré patria danému výpisu. Zoznam výpisov
+v Importe tieto polia zobrazuje priamo.
+
+Pomocná funkcia `yearComparisonRanges` pripravuje celý mesiac alebo tri celé
+mesiace a rovnaké kalendárne obdobie vlani. Oba rozsahy obsahujú začiatok aj
+koniec. Voľbu obdobia a oba rozsahy zobrazuje karta **Porovnanie s rovnakým obdobím vlani** v Prehľade.
+Kontrakt: [porovnanie s vlaňajškom](docs/plan-091-year-comparison.md).
+
+Abakus zoskupuje viditeľné nezaradené transakcie podľa obchodníka a miesta; pás **Skupiny nezaradených platieb** v Transakciách ich ukáže navrchu a klik vyberie riadky skupiny. Helper zachováva poradie, vracia iba explicitné ID a nepredpokladá backendové rozšírenie zhody; presný kontrakt a hranice zobrazenia opisuje [dokumentácia skupín transakcií](docs/plan-091-transaction-groups.md).
+
+Bankové poplatky majú druh `fee`. Filter **Druh** v Transakciách ho ponúka ako
+**Poplatok**. Súhrn a mesačné riadky vracajú `fee_cents`, podpísanú časť už
+započítaných výdavkov. V **Prehľade** má dlaždica **Poplatky** a graf **Príjmy
+a výdavky** vlastný stĺpec Poplatky vedľa Príjmu a Výdavkov; nejde o druhý
+súčet, len o zvýraznenie časti, ktorá je už vo Výdavkoch. Migrácia schémy na
+verziu 5 mení iba druh rozpoznaných starších poplatkov. Kontrakt: [bankové
+poplatky](docs/plan-091-fees.md).
+
+Backend kontroly výpisu vracia uloženú kontrolu zostatku, upozornenia parsera
+a aktuálne počty nezaradených a navrhnutých riadkov. Pri starších importoch sú
+upozornenia neznáme. Stav bez otvorených kontrol nepotvrdzuje úplnosť bankových
+dát. Zoznam výpisov v Importe ukazuje tento stav ako odznak s rozbaliteľným
+zoznamom otvorených položiek.
+[Kontrakt kontroly výpisu](docs/plan-091-statement-review.md).
+
+Backend hromadného priradenia teraz vráti identifikátor poslednej vratnej
+operácie. Vrátenie obnoví iba zmenené polia priradenia, naučené pravidlá a
+nové záznamy pôvodu. Starší alebo neplatný identifikátor novšiu operáciu
+nezruší. V Transakciách ju ovláda dočasné tlačidlo Späť po hromadnom priradení. Zdrojové testy nepotvrdzujú
+správanie natívnej aplikácie.
+[Kontrakt vratného priradenia](docs/plan-091-assignment-undo.md).
+
+Pomocná logika pripomienok kontroluje pokrytie minulého kalendárneho mesiaca.
+Upozornenie je splatné od 8. dňa, po siedmich dňoch tolerancie. Kontrola nezačne
+pred prvým platným výpisom účtu a oddeľuje účty aj ich druhy. Neplatné rozsahy
+vráti na samostatnú kontrolu a pripomienku daného účtu potlačí. Vyžaduje úplnú,
+úspešne načítanú históriu a platný lokálny dátum. Pokrytie Všetko nemení.
+Rozhranie je pripojené ako pripomienkový pás navrchu Prehľadu.
+[Kontrakt pripomienok výpisov](docs/plan-091-statement-reminders.md).
+
 Inštalátor (Inno Setup 6):
 
 ```powershell
@@ -198,11 +281,26 @@ Inštalátor (Inno Setup 6):
 
 Skript zostaví frontend cez `tsc` a `vite`, potom `tauri build --no-bundle` a nakoniec Inno Setup. Podrobnosti sú v [packaging/INSTALL.md](packaging/INSTALL.md).
 
+Aj `-SkipBuild` overuje PE, importy a dôveryhodný hash PDFium. Samotný hash
+EXE identifikuje súbor, nedokazuje správne zostavenie. Rust, Node, npm
+a Inno Setup sú build nástroje, používateľ ich nepotrebuje.
+
 ## Dokumentácia
 
 - [CHANGELOG.md](CHANGELOG.md): poznámky k vydaniu, ktoré appka ukáže ako **Poznámky k vydaniu**.
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md): známe obmedzenia.
 - [docs/](docs/): interné poznámky k dráham a vydaniam, vrátane [docs/release-0.1.2.md](docs/release-0.1.2.md) a [docs/release-0.1.3.md](docs/release-0.1.3.md).
+- [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): kontrakt úpravy a náhľadu zmazania pravidiel pre verziu 0.2.0; rozhranie v Kategóriách je zapojené.
+- [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md): explicitný preview/apply kontrakt zmazania kategórie, jej potomkov, priradení a pravidiel; ikonové ovládanie v Kategóriách je zapojené.
+- [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre verziu 0.2.0.
+- [docs/plan-091-statement-history.md](docs/plan-091-statement-history.md): backendový kontrakt počtu a podpísaného súčtu uložených transakcií vo výsledku histórie výpisov.
+- [docs/plan-091-transaction-search.md](docs/plan-091-transaction-search.md): kontrakt doslovného vyhľadávania cez obchodníka a miesto bez zmeny API alebo databázy.
+- [docs/plan-091-fees.md](docs/plan-091-fees.md): rozpoznanie poplatkov, filter,
+  súhrny a migrácia schémy na verziu 5 pre verziu 0.2.0; filter
+  Druh a zobrazenie v Prehľade sú zapojené.
+- [docs/plan-091-backup-restore.md](docs/plan-091-backup-restore.md): kontrakt
+  náhľadu, bezpečnostnej kópie, zámeny súborov a rollbacku pri obnove databázy
+  pre verziu 0.2.0; ovládanie v Nastaveniach je zapojené.
 - [packaging/INSTALL.md](packaging/INSTALL.md): inštalátor, odinštalovanie a WebView2.
 - [CONTRIBUTING.md](CONTRIBUTING.md): ako prispievať.
 - [SECURITY.md](SECURITY.md): ako nahlásiť bezpečnostnú chybu.
@@ -214,7 +312,7 @@ Pozrite [CONTRIBUTING.md](CONTRIBUTING.md). Pull requesty idú do `main`. Texty 
 
 ## Známe obmedzenia
 
-Pozrite [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Pravidelné platby sú odhady z importov. Záloha nie je šifrovaná. Obnova zo zálohy v appke nie je. PDF report má limity veľkosti.
+Pozrite [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Pravidelné platby sú odhady z importov. Záloha nie je šifrovaná. Obnova nahradí celú databázu naraz, čiastočné zlúčenie nepodporuje. PDF report má limity veľkosti.
 
 ## Licencia
 
