@@ -17,7 +17,11 @@ const CREDENTIALS_NOTE = 'Heslá k účtom zo Správcu poverení systému Window
 // alone must already know a safety copy exists and where appka puts it.
 const SAFETY_COPY_NOTE = 'Pred obnovou appka najprv vytvorí bezpečnostnú kópiu súčasnej databázy v priečinku s dátami appky a cestu k nej ukáže.'
 
-export function RestoreSection() {
+// 091/B10 p3 fix: `onRestored` fires only after `restoreDatabase` itself
+// resolves, never after a cancelled pick or a failed restore, so a caller
+// (Settings, and through it App's cross-screen generation bump) only ever
+// reacts to a restore that actually landed.
+export function RestoreSection({ onRestored }: { onRestored?: () => void } = {}) {
   const pickAction = useAction()
   const confirmAction = useAction()
   const [pickedPath, setPickedPath] = useState('')
@@ -41,6 +45,7 @@ export function RestoreSection() {
     setPreview(null)
     setPickedPath('')
     setSafetyCopyPath(result.safety_copy_path)
+    onRestored?.()
   }
 
   function cancel() {

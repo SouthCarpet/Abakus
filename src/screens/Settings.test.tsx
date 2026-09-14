@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { open } from '@tauri-apps/plugin-dialog'
 import type { Account, AuditFailure, NetLogRow, Release } from '../api'
 import { api } from '../api'
 import { getLatestRelease, setLatestRelease } from '../lib/updateStatus'
@@ -8,7 +9,7 @@ import { Settings } from './Settings'
 afterEach(() => cleanup())
 beforeEach(() => { vi.clearAllMocks(); setLatestRelease(null) })
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({ save: vi.fn() }))
+vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn(), save: vi.fn() }))
 
 const release: Release = {
   tag: '0.2.0',
@@ -41,6 +42,8 @@ function mockApi(overrides: Partial<typeof api> = {}) {
   vi.mocked(api.setCheckUpdates).mockResolvedValue(undefined)
   vi.mocked(api.openReleasePage).mockResolvedValue(undefined)
   vi.mocked(api.runNetAudit).mockResolvedValue(0)
+  vi.mocked(api.restorePreview).mockResolvedValue({ accounts: 0, statements: 0, transactions: 0, schema_version: 6 })
+  vi.mocked(api.restoreDatabase).mockResolvedValue({ safety_copy_path: 'C:/safety.db' })
   Object.assign(api, overrides)
 }
 
@@ -63,6 +66,8 @@ vi.mock('../api', async (importOriginal) => {
       runNetAudit: vi.fn(),
       updateAccount: vi.fn(),
       setAccountPassword: vi.fn(),
+      restorePreview: vi.fn(),
+      restoreDatabase: vi.fn(),
     },
   }
 })
@@ -499,5 +504,32 @@ describe('Settings: account password', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
     expect(setAccountPassword).not.toHaveBeenCalled()
+  })
+})
+
+// 091/B10 p3 fix: a restore swaps the whole database file. Settings must
+// refetch its own account list right after, or it keeps showing accounts
+// from the database that restore just replaced.
+describe('Settings: restore refetches the account list', () => {
+  const accountA: Account = { id: 1, iban: 'SK4411000000000012345678', kind: 'personal', label: 'Účet A', has_password: false }
+  const accountB: Account = { id: 2, iban: 'SK3711000000000098765432', kind: 'business', label: 'Účet B', has_password: false }
+
+  it('shows accounts from the restored database, not the ones fetched before the restore', async () => {
+    const listAccounts = vi.fn().mockResolvedValueOnce([accountA]).mockResolvedValueOnce([accountB])
+    mockApi({ listAccounts } as Partial<typeof api>)
+    vi.mocked(open).mockResolvedValue('C:/zálohy/abakus-zaloha.db')
+    vi.mocked(api.restorePreview).mockResolvedValue({ accounts: 1, statements: 2, transactions: 10, schema_version: 6 })
+    vi.mocked(api.restoreDatabase).mockResolvedValue({ safety_copy_path: 'C:/safety.db' })
+
+    render(<Settings />)
+    expect(await screen.findByText('Účet A')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať zálohu' }))
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: 'Obnoviť databázu' }))
+
+    await waitFor(() => expect(listAccounts).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Účet B')).toBeInTheDocument()
+    expect(screen.queryByText('Účet A')).not.toBeInTheDocument()
   })
 })

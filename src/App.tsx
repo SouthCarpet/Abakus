@@ -36,6 +36,17 @@ export function App() {
 
   const [entryVersion, setEntryVersion] = useState(0)
 
+  // 091/B10 p3 fix: bumped once a restore actually lands (RestoreSection's
+  // onRestored, bubbled through Settings), so any screen whose data effects
+  // depend on it drops its pre-restore DB state and refetches. Settings
+  // refetches its own accounts/statements directly (it triggers the
+  // restore), so it never needs this value fed back to itself.
+  const [dbGeneration, setDbGeneration] = useState(0)
+
+  function handleDatabaseRestored() {
+    setDbGeneration((value) => value + 1)
+  }
+
   function goToTransactions(entry: TransactionsEntry = {}) {
     setTransactionsEntry(entry)
     setEntryVersion((version) => version + 1)
@@ -63,6 +74,7 @@ export function App() {
         {screen === 'transactions' ? (
           <Transactions
             key={entryVersion}
+            dbGeneration={dbGeneration}
             statementId={transactionsEntry.statementId}
             initialStatus={transactionsEntry.status ?? null}
             initialCategoryId={transactionsEntry.categoryId ?? null}
@@ -72,7 +84,7 @@ export function App() {
         ) : null}
         {screen === 'import' ? <Import onNavigateToTransactions={(statementId) => goToTransactions({ statementId })} /> : null}
         {screen === 'categories' ? <Categories /> : null}
-        {screen === 'settings' ? <Settings /> : null}
+        {screen === 'settings' ? <Settings onRestored={handleDatabaseRestored} /> : null}
       </section>
     </div>
   )

@@ -221,7 +221,12 @@ function AccountRow({
   )
 }
 
-export function Settings() {
+// 091/B10 p3 fix: `onRestored` bubbles a landed restore up to App, so screens
+// other than Settings can bump their own dbGeneration and drop old-DB
+// state. Settings never needs that same signal fed back to itself: it
+// refetches its own accounts/statements/net log directly below, the moment
+// the restore lands, through the same handler.
+export function Settings({ onRestored }: { onRestored?: () => void }) {
   const action = useAction()
   const accountRequest = useRef(0)
   const netRequest = useRef(0)
@@ -264,6 +269,19 @@ export function Settings() {
     if (request !== netRequest.current) return
     setNetLog(rows)
     setAuditFailures(failures)
+  }
+
+  // 091/B10 p3 fix: a restore swaps the whole database file, so the account
+  // list and the statement/net-log tables it feeds are all stale the moment
+  // `restoreDatabase` resolves. `dataDir` (a folder path, not DB content),
+  // the update preference and the found release (both outside the DB) stay
+  // as they are. Audit failures live only in the running process (see
+  // AuditFailuresSection), not in the DB, so they are not reset either;
+  // `refreshNetLog` still re-reads them alongside the log as its normal pair.
+  async function handleRestored() {
+    await refresh().catch((e) => action.setError(String(e)))
+    await refreshNetLog().catch((e) => action.setError(String(e)))
+    onRestored?.()
   }
 
   useEffect(() => {
@@ -425,7 +443,7 @@ export function Settings() {
               </Button>
             </Card>
             <BackupSection />
-            <RestoreSection />
+            <RestoreSection onRestored={() => void handleRestored()} />
           </div>
           <div>
             <Card title="Stav">

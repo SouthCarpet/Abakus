@@ -373,6 +373,7 @@ export function Transactions({
   initialCategoryId = null,
   initialAccountKind,
   initialText,
+  dbGeneration,
 }: {
   statementId?: number | null
   initialStatus?: Status | null
@@ -383,6 +384,12 @@ export function Transactions({
   // Point 17: a merchant click in Overview lands here with the merchant name
   // already applied as the search filter (point 9's substring search).
   initialText?: string
+  // 091/B10 p3 fix: bumped by App once a database restore lands. A plain
+  // remount already gets a fresh start (App gives this screen a fresh `key`
+  // on every navigation into it), so this only matters for an instance that
+  // stays mounted across a generation bump; either way it drops the old-DB
+  // transient state below and refetches.
+  dbGeneration?: number
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -474,6 +481,23 @@ export function Transactions({
   const latestFetchRows = useRef(fetchRows)
   latestFetchRows.current = fetchRows
   const refreshRows = useCallback(() => latestFetchRows.current(), [])
+
+  // 091/B10 p3 fix: a `dbGeneration` bump means the database underneath was
+  // just replaced by a restore. `reload()` alone (via `revision`) already
+  // gets accounts, categories and rows fetched again through the effects
+  // below, but it does not touch `lastUndo`: an undo id from the OLD
+  // database must never be offered against the new one. Selection and the
+  // keyboard focus are old-DB row ids too, so they go with it. The ref skips
+  // only the mount run, so a real second generation still resets and
+  // refetches even if `dbGeneration` never left its initial value before.
+  const isFirstDbGeneration = useRef(true)
+  useEffect(() => {
+    if (isFirstDbGeneration.current) { isFirstDbGeneration.current = false; return }
+    setLastUndo(null)
+    setSelected(new Set())
+    setFocusedRowId(null)
+    reload()
+  }, [dbGeneration, reload])
 
   useEffect(() => {
     let active = true

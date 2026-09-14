@@ -661,3 +661,54 @@ describe('Transactions common search (point 9)', () => {
     }))
   })
 })
+
+// 091/B10 p3 fix: `dbGeneration` is bumped by App once a database restore
+// lands. A Transactions instance that is still mounted at that moment (not
+// just freshly mounted through App's own `key` remount) must drop old-DB
+// transient state and refetch, or it could offer an undo against a
+// database that restore already replaced, or bulk-act on a selection of
+// row ids that no longer mean anything.
+describe('Transactions: dbGeneration bump resets transient state and refetches', () => {
+  afterEach(() => {
+    vi.mocked(api.bulkAssign).mockReset().mockResolvedValue({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: null })
+  })
+
+  it('drops the undo offer and the bulk selection, and refetches accounts/categories/rows', async () => {
+    vi.mocked(api.bulkAssign).mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: 'assignment-undo-1' })
+    const { rerender } = render(<Transactions dbGeneration={1} />)
+    await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
+
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    fireEvent.click(within(bulkBar).getByRole('combobox'))
+    fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
+    fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
+
+    await screen.findByRole('button', { name: 'Späť' })
+    // The bulk assign itself already clears the selection it just acted on
+    // (existing behaviour), and reload()'s revision bump briefly empties
+    // and refetches `rows` in the same beat; wait for the row to be back
+    // before re-selecting it, or the checkbox is not there yet to click.
+    await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    // The generation bump below must clear a selection made AFTER that
+    // assignment too, not just whatever the assignment itself already cleared.
+    expect(screen.getByText('1 vybraných')).toBeInTheDocument()
+    const listAccountsCallsBefore = vi.mocked(api.listAccounts).mock.calls.length
+    const listTransactionsCallsBefore = vi.mocked(api.listTransactions).mock.calls.length
+
+    rerender(<Transactions dbGeneration={2} />)
+
+    await waitFor(() => expect(vi.mocked(api.listAccounts).mock.calls.length).toBeGreaterThan(listAccountsCallsBefore))
+    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.length).toBeGreaterThan(listTransactionsCallsBefore))
+    expect(screen.queryByRole('button', { name: 'Späť' })).not.toBeInTheDocument()
+    expect(screen.queryByText('1 vybraných')).not.toBeInTheDocument()
+  })
+
+  it('does not refetch on the very first render, only a real generation change after mount', async () => {
+    const callsBefore = vi.mocked(api.listTransactions).mock.calls.length
+    render(<Transactions dbGeneration={3} />)
+    await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
+    expect(vi.mocked(api.listTransactions).mock.calls.length).toBe(callsBefore + 1)
+  })
+})

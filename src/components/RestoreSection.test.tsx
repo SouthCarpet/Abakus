@@ -163,3 +163,37 @@ describe('RestoreSection: busy covers pick, preview and confirm as their own flo
     await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })
+
+// 091/B10 p3 fix: a caller (Settings) needs to know exactly when a restore
+// landed, to refetch its own DB-derived state. This is that signal.
+describe('RestoreSection: onRestored callback', () => {
+  it('calls onRestored once, only after a successful restore', async () => {
+    vi.mocked(open).mockResolvedValue('C:/zálohy/abakus-zaloha.db')
+    vi.mocked(api.restorePreview).mockResolvedValue(PREVIEW)
+    vi.mocked(api.restoreDatabase).mockResolvedValue({ safety_copy_path: 'C:/safety.db' })
+    const onRestored = vi.fn()
+    render(<RestoreSection onRestored={onRestored} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať zálohu' }))
+    await screen.findByRole('dialog')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Obnoviť databázu' }))
+
+    await screen.findByText(/Skontrolujte dáta/)
+    expect(onRestored).toHaveBeenCalledOnce()
+  })
+
+  it('never calls onRestored when the restore itself fails', async () => {
+    vi.mocked(open).mockResolvedValue('C:/zálohy/abakus-zaloha.db')
+    vi.mocked(api.restorePreview).mockResolvedValue(PREVIEW)
+    vi.mocked(api.restoreDatabase).mockRejectedValue(new Error('Obnovu nemožno spustiť, kým prebieha import.'))
+    const onRestored = vi.fn()
+    render(<RestoreSection onRestored={onRestored} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať zálohu' }))
+    await screen.findByRole('dialog')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Obnoviť databázu' }))
+
+    await screen.findByRole('alert')
+    expect(onRestored).not.toHaveBeenCalled()
+  })
+})
