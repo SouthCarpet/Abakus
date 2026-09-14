@@ -2,7 +2,9 @@
 
 This slice adds the backend contract for one reversible bulk assignment in
 Abakus 0.2.0. It includes the store operation, Tauri commands and TypeScript
-API. The user interface and native application acceptance are pending.
+API. The user interface shipped in `src/screens/Transactions.tsx` as the
+transient "Späť" control after a bulk assignment. Native application
+acceptance is still pending.
 
 ## Store contract
 

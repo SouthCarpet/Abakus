@@ -1,8 +1,9 @@
 # Plan 091 bulk confirmation backend
 
 This slice implements the backend contract for accepted points 1 and 11 of
-Abakus 0.2.0. The store, Tauri command and TypeScript API are ready. The bulk
-confirmation controls are still pending.
+Abakus 0.2.0. The store, Tauri command and TypeScript API are ready. The UI
+controls shipped in `src/screens/Transactions.tsx`: the per-row checkbox
+"Potvrdiť aj podobné (N)" and the bulk-bar button "Potvrdiť vybrané".
 
 ## API contract
 

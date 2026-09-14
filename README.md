@@ -238,10 +238,10 @@ v Importe tieto polia zobrazuje priamo.
 
 Pomocná funkcia `yearComparisonRanges` pripravuje celý mesiac alebo tri celé
 mesiace a rovnaké kalendárne obdobie vlani. Oba rozsahy obsahujú začiatok aj
-koniec. Voľba obdobia a zobrazenie rozsahov v UI ešte čakajú na zapojenie.
+koniec. Voľbu obdobia a oba rozsahy zobrazuje karta **Porovnanie s rovnakým obdobím vlani** v Prehľade.
 Kontrakt: [porovnanie s vlaňajškom](docs/plan-091-year-comparison.md).
 
-Abakus pripravuje konzervatívne zoskupenie viditeľných nezaradených transakcií podľa obchodníka a miesta. Helper zachováva poradie, vracia iba explicitné ID a nepredpokladá backendové rozšírenie zhody; presný kontrakt a hranice zobrazenia opisuje [dokumentácia skupín transakcií](docs/plan-091-transaction-groups.md).
+Abakus zoskupuje viditeľné nezaradené transakcie podľa obchodníka a miesta; pás **Skupiny nezaradených platieb** v Transakciách ich ukáže navrchu a klik vyberie riadky skupiny. Helper zachováva poradie, vracia iba explicitné ID a nepredpokladá backendové rozšírenie zhody; presný kontrakt a hranice zobrazenia opisuje [dokumentácia skupín transakcií](docs/plan-091-transaction-groups.md).
 
 Bankové poplatky majú druh `fee`. Filter **Druh** v Transakciách ho ponúka ako
 **Poplatok**. Súhrn a mesačné riadky vracajú `fee_cents`, podpísanú časť už

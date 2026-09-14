@@ -125,9 +125,9 @@
   `abakus-cli geometry` diagnostic. Other pages from the same generator are
   not covered by an automated fixture; they are verified only by Michal's
   own `abakus-cli check` runs on his real statements.
-- **Fee filtering and charting do not have UI controls yet.** The parser and
-  store now use `TxKind::Fee`, accept `TxFilter.kind`, and return fee totals.
-  The current Transactions and Overview screens do not expose these backend
-  fields. A description that does not fold to start with `poplat` remains
-  `Other` and reports the existing unknown-type warning.
+- **Fee detection is prefix-based.** The parser and store use `TxKind::Fee`,
+  the Transactions **Druh** filter offers **Poplatok**, and Overview shows the
+  **Poplatky** tile and chart series. A description that does not fold to
+  start with `poplat` remains `Other` and reports the existing unknown-type
+  warning.
 

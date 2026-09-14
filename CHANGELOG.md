@@ -4,6 +4,7 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
 ## 0.2.0 (nevydané)
 
+- Vyhľadávanie v Transakciách spája obchodníka s miestom: `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku a znaky `%` a `_` berie doslovne.
 - Výber kategórie (priradenie aj filter v Transakciách) má nové ovládanie s vyhľadávaním podľa názvu. Písanie ignoruje diakritiku aj veľkosť písmen. Prázdny výsledok ukáže text „Žiadna kategória sa nenašla.“. Šípky hore a dole a Enter vyberú kategóriu z klávesnice, Escape zavrie zoznam a vráti fokus na pôvodné tlačidlo.
 - Potvrdenie odhadu ponúka aj potvrdenie ostatných nepotvrdených transakcií rovnakého obchodníka. Počet takých transakcií je vidieť pri tlačidle **Potvrdiť**.
 - Nové tlačidlo **Potvrdiť vybrané** potvrdí odhady vo vybraných riadkoch naraz, rovnako ako doterajšie hromadné priradenie kategórie.
