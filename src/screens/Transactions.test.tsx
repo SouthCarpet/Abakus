@@ -632,7 +632,14 @@ describe('Transactions common search (point 9)', () => {
     )).toBe(false)
 
     await waitFor(() => expect(vi.mocked(api.exportCsv)).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(api.exportCsv).mock.calls[0][0]).toEqual(expect.objectContaining({ text: 'Penny Neuss' }))
+    // The export payload is the contract: every unset filter is null and the
+    // typed text travels as-is (README, Exportovať filtrované CSV).
+    expect(vi.mocked(api.exportCsv).mock.calls[0][0]).toEqual({
+      from: null, to: null,
+      account_id: null, account_kind: null,
+      category_id: null, status: null, kind: null,
+      text: 'Penny Neuss', statement_id: null,
+    })
   })
 
   it('clears the search text together with every other filter, so the next list call carries text: null', async () => {
@@ -645,6 +652,12 @@ describe('Transactions common search (point 9)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Vymazať všetky filtre' }))
 
     expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
-    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: null })))
+    // Clear-all resets the whole filter: the next list call carries only nulls.
+    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual({
+      from: null, to: null,
+      account_id: null, account_kind: null,
+      category_id: null, status: null, kind: null,
+      text: null, statement_id: null,
+    }))
   })
 })
