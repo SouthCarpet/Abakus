@@ -66,6 +66,16 @@ describe('RestoreSection: a valid backup shows a preview before touching anythin
     const dialog = await screen.findByRole('dialog')
     expect(dialog.textContent ?? '').toMatch(/Heslá.*Správcu poverení.*nie sú súčasťou zálohy/)
   })
+
+  it('states the safety-copy notice inside the confirmation dialog itself, not only on the card underneath', async () => {
+    vi.mocked(open).mockResolvedValue('C:/zálohy/abakus-zaloha.db')
+    vi.mocked(api.restorePreview).mockResolvedValue(PREVIEW)
+    render(<RestoreSection />)
+    fireEvent.click(screen.getByRole('button', { name: 'Vybrať zálohu' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent ?? '').toMatch(/bezpečnostnú kópiu súčasnej databázy/)
+  })
 })
 
 describe('RestoreSection: an invalid or foreign backup is refused before any dialog opens', () => {

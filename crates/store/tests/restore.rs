@@ -201,6 +201,72 @@ fn a_rename_failure_publishing_the_staged_backup_rolls_back_to_the_original_data
     assert_eq!(reopened.list_accounts().unwrap()[0].iban, IBAN_A);
 }
 
+/// I2, occupied destination on Windows: `rename_in` PUBLISHES the staged
+/// backup to `db_path` successfully, and only THEN does reopening it fail.
+/// `db_path` is occupied by that just-published file at the moment the
+/// rollback has to run, which the two rename-failure tests above never
+/// exercise (neither ever gets past a rename). This is the branch the
+/// verify report named as broken on Windows: `rollback` alone cannot land
+/// the aside file back onto an occupied destination.
+#[test]
+fn a_reopen_failure_after_a_successful_publish_restores_the_original_and_keeps_both_recovery_copies() {
+    let dir = TempDir::new("restore-reopen-after-publish-fails");
+    let db_path = dir.0.join("abakus.db");
+    let backup_path = dir.0.join("incoming-backup.db");
+    let mut live = seeded_store(&db_path);
+    let backup_store = store_with_account(&backup_path, IBAN_B, "Zo zálohy");
+    drop(backup_store);
+    let already_failed = std::cell::Cell::new(false);
+    let failing_once_open = |path: &std::path::Path| -> store::Result<rusqlite::Connection> {
+        if !already_failed.replace(true) {
+            return Err(store::StoreError::Db("simulated: the just-published file will not open".to_string()));
+        }
+        rusqlite::Connection::open(path).map_err(store::StoreError::from)
+    };
+
+    let e = live.restore_from_with_seams(&backup_path, &db_path, &real_rename, &real_rename, &failing_once_open).unwrap_err();
+
+    assert!(matches!(e, StoreError::Db(_)), "got {e:?}");
+    // The SAME in-process store must be restored and reopened, no restart
+    // needed, even though `db_path` was occupied by the failed publish.
+    assert_eq!(live.list_accounts().unwrap()[0].iban, IBAN_A, "the original database must be live again in this same session");
+    assert!(db_path.exists());
+    let reopened = Store::open(&db_path).unwrap();
+    assert_eq!(reopened.list_accounts().unwrap()[0].iban, IBAN_A, "a fresh handle on db_path must see the original content too");
+
+    let names = dir.file_names();
+    assert!(names.iter().any(|n| n.contains("pred-obnovou")), "the safety copy made before anything touched the live database must survive: {names:?}");
+    assert!(names.iter().any(|n| n.contains("obnova-zlyhala")), "the unopenable published file must survive under its own failed name, never lost: {names:?}");
+    assert!(!names.iter().any(|n| n.contains("restore-aside")), "the aside name is consumed by the rename back onto db_path: {names:?}");
+    assert!(!names.iter().any(|n| n.contains("restore-staged")), "the transient staged file must not survive a finished restore attempt: {names:?}");
+}
+
+/// I2/R5, docs "obnova nikdy sama nezmaže": a supported OLDER schema backup
+/// (preview only refuses NEWER than `CURRENT_SCHEMA_VERSION`) must reach
+/// `CURRENT_SCHEMA_VERSION` on reopen, in the SAME session, not only after a
+/// process restart. This is what distinguishes reopening through
+/// `Store::open_connection` (runs `migrate_tx`) from a bare
+/// `Connection::open` (skips it): the exact bug the verify report flagged.
+#[test]
+fn restoring_a_supported_older_schema_backup_migrates_it_to_current_on_reopen_in_the_same_session() {
+    let dir = TempDir::new("restore-older-schema");
+    let db_path = dir.0.join("abakus.db");
+    let backup_path = dir.0.join("older-backup.db");
+    let mut live = seeded_store(&db_path);
+    let backup_store = store_with_account(&backup_path, IBAN_B, "Zo zálohy");
+    drop(backup_store);
+    let older = store::migrate::CURRENT_SCHEMA_VERSION - 1;
+    let raw = rusqlite::Connection::open(&backup_path).unwrap();
+    raw.execute("UPDATE settings SET value = ?1 WHERE key = 'schema_version'", [older.to_string()]).unwrap();
+    drop(raw);
+
+    live.restore_from(&backup_path, &db_path).unwrap();
+
+    assert_eq!(live.schema_version().unwrap(), store::migrate::CURRENT_SCHEMA_VERSION, "the same in-process store must already be migrated, not just readable");
+    let reopened = Store::open(&db_path).unwrap();
+    assert_eq!(reopened.schema_version().unwrap(), store::migrate::CURRENT_SCHEMA_VERSION, "a fresh handle on db_path must see the migrated schema too");
+}
+
 /// Per the brief: "the aside/safety copies are never deleted by this flow".
 /// A successful restore therefore deliberately leaves BOTH the explicit
 /// safety copy AND the renamed-aside original on disk, an intentional

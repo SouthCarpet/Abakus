@@ -24,8 +24,17 @@
   obnova nemajú plánovač, obe treba spustiť ručne.
 - **Obnova nahradí celú databázu naraz.** Nedá sa vybrať len časť zálohy ani
   zlúčiť zálohu so súčasnými dátami. Bezpečnostné kópie (pred obnovou aj
-  odložený pôvodný súbor pri zámene) appka nikdy sama nezmaže, takže sa v
-  priečinku s dátami postupne hromadia a treba ich mazať ručne.
+  odložený pôvodný súbor pri zámene, prípadne súbor
+  `abakus-obnova-zlyhala-*` po zlyhanom opätovnom otvorení) appka nikdy sama
+  nezmaže, takže sa v priečinku s dátami postupne hromadia a treba ich
+  mazať ručne.
+- **Obnova nerieši sidecar súbory WAL/SHM.** Táto appka zatiaľ nenastavuje
+  `journal_mode=WAL`, takže bežne žiadne `-wal`/`-shm` súbory nevznikajú.
+  Ak by sa vedľa `abakus.db` objavili (napríklad skopírované z inej appky
+  alebo po budúcej zmene na WAL), obnova ich pri premenovaní neprenesie ani
+  neodstráni; mohli by sa pripojiť k novej databáze s neplatným obsahom.
+  Vonkajšie zámky súboru (antivírus, indexovanie) môžu zhodiť premenovanie
+  a vtedy sa spustí rovnaký rollback ako pri zlyhaní zámeny.
 - **Pokrytie sa vzťahuje na obdobia výpisov.** Úplné pokrytie nie je dôkazom,
   že existujú všetky transakcie pre daný rozsah dátumov. Transakcia sa môže
   objaviť až vo výpise za neskorší mesiac. Historický zostatok je stav ku dňu

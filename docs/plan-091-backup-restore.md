@@ -43,18 +43,39 @@ vráti počty riadkov (`accounts`, `statements`, `transactions`) a
 7. Znova otvorí pripojenie na tomto mene.
 
 Pri zlyhaní ktoréhokoľvek z krokov 5 až 7 sa spustí rollback: odložený
-súbor sa premenuje späť na pôvodné meno a znova otvorí. Volanie tak vždy
-skončí s `self` pripojeným na skutočnú, otvoriteľnú databázu: obnovenú pri
-úspechu, pôvodnú pri akomkoľvek zlyhaní. Ak zlyhá aj samotné vrátenie
+súbor sa premenuje späť na pôvodné meno a znova otvorí cez
+`Store::open_connection` (rovnaký `PRAGMA foreign_keys = ON` a migračná
+sekvencia ako `Store::open`, nie holé `Connection::open`). Vďaka tomu sa
+záloha so staršou, ale ešte podporovanou schémou zmigruje na aktuálnu
+verziu hneď v tomto behu appky, nielen po reštarte procesu. Volanie tak
+vždy skončí s `self` pripojeným na skutočnú, otvoriteľnú databázu: obnovenú
+pri úspechu, pôvodnú pri akomkoľvek zlyhaní, ktoré sa dá vrátiť vôbec (pozri
+nižšie ten jeden prípad, kde sa nedá). Ak zlyhá aj samotné vrátenie
 (premenovanie späť alebo opätovné otvorenie), chybová správa menuje presnú
 cestu k odloženému súboru aj k bezpečnostnej kópii, takže dáta nie sú
 stratené, len appka ich sama nevie znova pripojiť.
 
-Ani bezpečnostná kópia, ani odložený súbor sa týmto tokom nikdy nemažú, ani
-pri úspešnej obnove. Ide o zámerne duplicitnú poistku: úspešná obnova
-necháva na disku pôvodný súbor aj pod pôvodným, aj pod bezpečnostným
-menom. Iba prechodný skopírovaný súbor zálohy (krok 3) sa po zámene
-odstráni.
+**Windows: obsadený cieľ po kroku 6.** `std::fs::rename` na tomto systéme
+nikdy neprepíše existujúci cieľ. Ak sa krok 6 (`rename_in`) podarí, ale krok
+7 (opätovné otvorenie) zlyhá, `db_path` už obsahuje uverejnený, ale
+neotvoriteľný súbor zálohy: jednoduché "premenuj odložený súbor späť" by na
+tomto mieste vždy zlyhalo, lebo cieľ je obsadený. Pre presne tento prípad
+`rollback_after_publish` najprv premenuje obsadený, neotvoriteľný súbor
+nabok pod meno `abakus-obnova-zlyhala-<časová pečiatka>-<pid>.db` (nikdy sa
+nemaže, viditeľný súbor v priečinku s dátami appky, nie skrytý dočasný
+súbor), čím uvoľní `db_path` pre bežný rollback, ktorý potom vráti pôvodnú
+databázu z odloženého súboru presne ako v ostatných prípadoch.
+
+Ani bezpečnostná kópia, ani odložený súbor, ani prípadný súbor
+`abakus-obnova-zlyhala-*` sa týmto tokom nikdy nemažú, ani pri úspešnej
+obnove. Ide o zámerne duplicitnú poistku: úspešná obnova necháva na disku
+pôvodný súbor aj pod pôvodným, aj pod bezpečnostným menom. Iba prechodný
+skopírovaný súbor zálohy (krok 3) sa po zámene odstráni. `backup_to`
+(bezpečnostná kópia aj bežné zálohovanie) navyše po úspešnom uverejnení
+zavolá `File::sync_all` na výsledný súbor (na POSIX aj na priečinok, kde to
+platforma umožňuje; na Windows stačí súbor samotný), čo je mierne zlepšenie
+trvanlivosti nad už kompletným a viditeľným súborom, nie podmienka
+správnosti.
 
 ## Testovací hák pre zámeny
 
@@ -65,6 +86,12 @@ kód posiela `std::fs::rename` pre oba parametre. Testy vkladajú zlyhávajúcu
 uzáverovú funkciu pre ktorýkoľvek z nich, aby dokázali rollback bez
 spoliehania sa na skutočné, ťažko reprodukovateľné zamykanie súborov vo
 Windows.
+
+`Store::restore_from_with_seams(backup_path, db_path, rename_out, rename_in,
+open_conn)` je širší hák, ktorý `restore_from_with` interne používa
+(s `Store::open_connection` ako produkčným `open_conn`). Testy ním vedia
+vložiť zlyhávajúce opätovné otvorenie presne raz, aby dokázali práve
+scenár obsadeného cieľa vyššie bez skutočného zamykania súboru vo Windows.
 
 ## Odmietnutie počas importu
 
@@ -95,6 +122,12 @@ vysvetlenia.
 - `BackupTooNew { found, supported }`: záloha má vyššiu `schema_version`,
   než akú appka podporuje.
 
+### `Store::schema_version` (teraz verejná)
+
+Predtým `pub(crate)`. Vracia `schema_version` živého úložiska; testy a
+prípadná budúca diagnostika ňou vedia priamo overiť, že obnova zálohy
+zmigrovala schému na `CURRENT_SCHEMA_VERSION` hneď v tom istom behu.
+
 ### Príkazy
 
 - `restore_preview` prijíma Tauri argument `backupPath` a vracia
@@ -116,7 +149,17 @@ obnovu s dokázateľne obnoviteľným pôvodným stavom z bezpečnostnej kópie,
 odmietnutie neplatnej zálohy bez akéhokoľvek dotyku živej databázy,
 zlyhanie premenovania na oboch stranách zámeny s rollbackom, a že úspešná
 obnova nemaže bezpečnostnú kópiu ani odložený súbor, ale odstráni prechodný
-kopírovaný súbor.
+kopírovaný súbor. Ďalej testuje presne scenár obsadeného cieľa (krok 6
+uspeje, krok 7 zlyhá cez `restore_from_with_seams`): pôvodná databáza je po
+rollbacku živá v tom istom behu aj po opätovnom otvorení, bezpečnostná
+kópia aj súbor `abakus-obnova-zlyhala-*` oba prežijú, a dočasné mená
+`restore-aside`/`restore-staged` po dobehnutí zmiznú. Samostatný test
+overuje, že záloha so staršou, ale podporovanou schémou dosiahne
+`CURRENT_SCHEMA_VERSION` hneď v tom istom behu appky (nie až po reštarte).
+Jednotkový test priamo v `crates/store/src/restore.rs` (`rollback_after_publish_moves_the_occupied_destination_aside_before_restoring_the_original`)
+overuje samotný mechanizmus obsadeného cieľa v izolácii: súbor vopred
+umiestnený na `db_path` sa musí odsunúť skôr, než sa naň premenuje odložený
+originál.
 
 `src-tauri/src/commands.rs` testuje `refuse_if_importing` (odmietnutie iba
 počas nastaveného príznaku) a `ImportGuard` (príznak sa vypne pri bežnom aj
@@ -128,8 +171,10 @@ panikou ukončenom behu).
 
 `src/components/RestoreSection.test.tsx` kontroluje: text o
 Správcovi poverení je viditeľný pred akýmkoľvek kliknutím aj v dialógu
-náhľadu; zrušenie dialógu výberu súboru nič nevolá; platná záloha ukáže
-presné počty a nezavolá `restoreDatabase` sama od seba; neplatná záloha sa
-odmietne pred otvorením dialógu; úspešná obnova zavrie dialóg a ukáže cestu
-k bezpečnostnej kópii; zlyhaná obnova nechá dialóg otvorený a opakovanie
-funguje; tlačidlá sú počas vlastného behu vypnuté.
+náhľadu; veta o bezpečnostnej kópii je viditeľná priamo v potvrdzujúcom
+dialógu, nie iba na karte pod ním; zrušenie dialógu výberu súboru nič
+nevolá; platná záloha ukáže presné počty a nezavolá `restoreDatabase` sama
+od seba; neplatná záloha sa odmietne pred otvorením dialógu; úspešná
+obnova zavrie dialóg a ukáže cestu k bezpečnostnej kópii; zlyhaná obnova
+nechá dialóg otvorený a opakovanie funguje; tlačidlá sú počas vlastného
+behu vypnuté.

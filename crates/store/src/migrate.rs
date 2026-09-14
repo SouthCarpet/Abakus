@@ -101,7 +101,11 @@ impl Store {
         self.set_setting(VERSION_KEY, &SCHEMA_VERSION.to_string())
     }
 
-    pub(crate) fn schema_version(&self) -> Result<i64> {
+    /// Public (091/B10) so a test, or any future diagnostic, can confirm a
+    /// live store's schema version without a private accessor: in
+    /// particular that a restore of an older-but-supported backup lands on
+    /// `CURRENT_SCHEMA_VERSION` immediately, in the same session.
+    pub fn schema_version(&self) -> Result<i64> {
         Ok(self.setting(VERSION_KEY)?.and_then(|v| v.parse().ok()).unwrap_or(1))
     }
 

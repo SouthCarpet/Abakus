@@ -22,6 +22,15 @@
 //! openable database: the restored one on success, the original one on any
 //! failure. Neither the safety copy nor the aside file is ever deleted by
 //! this flow.
+//!
+//! **Windows note.** `std::fs::rename` never overwrites an existing
+//! destination on this OS. That matters once `rename_in` has already
+//! published the staged backup to `db_path`: if reopening that published
+//! file then fails, `db_path` is OCCUPIED, so the plain "rename the aside
+//! file back" rollback cannot land there. `rollback_after_publish` handles
+//! exactly that case: it moves the unopenable published file aside first
+//! (under an `abakus-obnova-zlyhala-*.db` name, never deleted), which frees
+//! `db_path` for the normal rollback to put the original back.
 use crate::{Result, Store, StoreError};
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
@@ -78,30 +87,88 @@ fn read_schema_version(conn: &Connection) -> i64 {
         .unwrap_or(1)
 }
 
-/// Renames `aside_path` back to `db_path` and reopens it. Called only once
-/// the live connection has already been closed and the live file has
-/// already been renamed to `aside_path`, so this is the one path back to a
+/// Where `rollback_after_publish` moves a published-but-unopenable database,
+/// so it is never lost, just renamed out of the way under a name that says
+/// what happened. Visible (not dot-prefixed) and Slovak, like the safety
+/// copy: this is a recovery artifact a user might need to hand to support,
+/// not internal plumbing like the `staged`/`aside` temp files.
+fn failed_restore_path(db_path: &Path) -> PathBuf {
+    let dir = db_path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let pid = std::process::id();
+    let stamp = chrono::Local::now().format("%Y-%m-%d-%H%M%S%3f");
+    dir.join(format!("abakus-obnova-zlyhala-{stamp}-{pid}.db"))
+}
+
+/// The paths one restore attempt works with, grouped so the swap and
+/// rollback functions below take one argument for them instead of four
+/// (`clippy::too_many_arguments`, kept as a deny-by-proxy discipline here:
+/// four unrelated `&Path`s in a row is exactly the shape that invites a
+/// caller to pass two of them in the wrong order).
+struct RestorePaths<'a> {
+    db_path: &'a Path,
+    aside_path: &'a Path,
+    staged_path: &'a Path,
+    safety_path: &'a Path,
+}
+
+/// Renames `aside_path` back to `db_path` and reopens it through
+/// `open_conn`. Called only once the live connection has already been
+/// closed and `db_path` is free (either it never moved, or `swap_and_reopen`
+/// already stopped before publishing, or `rollback_after_publish` has just
+/// moved the occupying file out of the way). This is the one path back to a
 /// working database. Never deletes `aside_path`: a failed rollback rename
-/// leaves it in place as the last resort recovery copy, alongside the
-/// safety copy already made before any of this started.
-fn rollback(store: &mut Store, db_path: &Path, aside_path: &Path, reason: String) -> StoreError {
-    if let Err(rollback_err) = std::fs::rename(aside_path, db_path) {
+/// leaves it in place as a recovery copy, alongside `safety_path`, already
+/// made before any of this started, and named in every error this function
+/// can return so a failure is never a dead end.
+fn rollback(store: &mut Store, paths: &RestorePaths, reason: String, open_conn: &dyn Fn(&Path) -> Result<Connection>) -> StoreError {
+    if let Err(rollback_err) = std::fs::rename(paths.aside_path, paths.db_path) {
         store.conn = Connection::open_in_memory().expect("opening an in-memory SQLite connection cannot fail");
         return StoreError::Db(format!(
-            "{reason} Obnova pôvodnej databázy tiež zlyhala ({rollback_err}). Databáza je momentálne nedostupná. Pôvodné dáta sú v súbore {}.",
-            aside_path.display()
+            "{reason} Obnova pôvodnej databázy tiež zlyhala ({rollback_err}). Databáza je momentálne nedostupná. \
+             Pôvodné dáta sú v súbore {}, bezpečnostná kópia je v súbore {}.",
+            paths.aside_path.display(),
+            paths.safety_path.display()
         ));
     }
-    match Connection::open(db_path) {
+    match open_conn(paths.db_path) {
         Ok(conn) => {
             store.conn = conn;
             StoreError::Db(reason)
         }
         Err(open_err) => {
             store.conn = Connection::open_in_memory().expect("opening an in-memory SQLite connection cannot fail");
-            StoreError::Db(format!("{reason} Pôvodná databáza bola vrátená, ale nedala sa otvoriť ({open_err})."))
+            StoreError::Db(format!(
+                "{reason} Pôvodná databáza bola vrátená do súboru {}, ale nedala sa znova otvoriť ({open_err}). Bezpečnostná kópia je v súbore {}.",
+                paths.db_path.display(),
+                paths.safety_path.display()
+            ))
         }
     }
+}
+
+/// Called once `rename_in` has already published the staged backup to
+/// `db_path` and opening that published file has failed. Unlike a bare
+/// `rollback`, `db_path` is OCCUPIED here by the file that just failed to
+/// open, and Windows `std::fs::rename` never overwrites an existing
+/// destination (see the module doc comment). So the occupying file is moved
+/// aside first, under `failed_restore_path`, never deleted, which frees
+/// `db_path` for the exact same rollback every other failure path uses.
+fn rollback_after_publish(store: &mut Store, paths: &RestorePaths, reason: String, open_conn: &dyn Fn(&Path) -> Result<Connection>) -> StoreError {
+    let failed_path = failed_restore_path(paths.db_path);
+    if let Err(move_err) = std::fs::rename(paths.db_path, &failed_path) {
+        // `db_path` still holds the unopenable published file, so the
+        // original cannot be put back there either. Both existing recovery
+        // copies are untouched and named in full.
+        store.conn = Connection::open_in_memory().expect("opening an in-memory SQLite connection cannot fail");
+        return StoreError::Db(format!(
+            "{reason} Odsunutie neotvoriteľnej obnovenej databázy spod cesty {} zlyhalo ({move_err}). Databáza je momentálne nedostupná. \
+             Pôvodné dáta sú v súbore {}, bezpečnostná kópia je v súbore {}.",
+            paths.db_path.display(),
+            paths.aside_path.display(),
+            paths.safety_path.display()
+        ));
+    }
+    rollback(store, paths, format!("{reason} Neotvoriteľná obnovená databáza je odložená v súbore {}.", failed_path.display()), open_conn)
 }
 
 impl Store {
@@ -145,12 +212,34 @@ impl Store {
     /// `std::fs::rename` for both; tests inject a failing fake for either to
     /// prove the rollback path deterministically, since a real Windows
     /// file-locking failure is not reliably reproducible in a unit test.
+    /// Reopens always go through `Store::open_connection` (same
+    /// `PRAGMA foreign_keys = ON` plus migration pipeline `Store::open`
+    /// uses), so a restored backup on an older-but-supported schema is
+    /// migrated to current immediately, in this same session.
     pub fn restore_from_with(
         &mut self,
         backup_path: &Path,
         db_path: &Path,
         rename_out: &dyn Fn(&Path, &Path) -> io::Result<()>,
         rename_in: &dyn Fn(&Path, &Path) -> io::Result<()>,
+    ) -> Result<RestoreOutcome> {
+        self.restore_from_with_seams(backup_path, db_path, rename_out, rename_in, &Store::open_connection)
+    }
+
+    /// The fuller seam behind [`Store::restore_from_with`], additionally
+    /// exposing the reopen step itself. Production code (via
+    /// `restore_from_with`) always passes `Store::open_connection`. Tests
+    /// use this directly to inject a reopen failure exactly once, proving
+    /// the occupied-destination rollback (`rollback_after_publish`) runs
+    /// correctly on the one OS where a real file lock is not reliably
+    /// reproducible in a unit test: Windows.
+    pub fn restore_from_with_seams(
+        &mut self,
+        backup_path: &Path,
+        db_path: &Path,
+        rename_out: &dyn Fn(&Path, &Path) -> io::Result<()>,
+        rename_in: &dyn Fn(&Path, &Path) -> io::Result<()>,
+        open_conn: &dyn Fn(&Path) -> Result<Connection>,
     ) -> Result<RestoreOutcome> {
         // 1) Validate the candidate file BEFORE anything about the live
         // database is touched. A corrupt or foreign file, or one from a
@@ -176,7 +265,8 @@ impl Store {
         // and the live database completely untouched.
         stage_backup_copy(backup_path, &staged_path)?;
 
-        let result = self.swap_and_reopen(db_path, &aside_path, &staged_path, rename_out, rename_in);
+        let paths = RestorePaths { db_path, aside_path: &aside_path, staged_path: &staged_path, safety_path: &safety_path };
+        let result = self.swap_and_reopen(&paths, rename_out, rename_in, open_conn);
         // On success `rename_in` already consumed `staged_path`; this is a
         // no-op then. On a failure before that rename, it removes the
         // leftover staging file so a failed restore leaves no stray temp
@@ -190,15 +280,17 @@ impl Store {
     /// whichever file ends up at `db_path`. On any failure, rolls back to
     /// `aside_path` and reopens it, so `self.conn` is always left pointing
     /// at a real database: the restored one on success, the original one on
-    /// any failure. Never observable from outside this call: the caller
-    /// holds the store's mutex for the whole operation.
+    /// any failure that can be recovered from at all (see the module doc
+    /// comment for the one Windows case that cannot: an occupied
+    /// destination that also cannot be moved aside). Never observable from
+    /// outside this call: the caller holds the store's mutex for the whole
+    /// operation.
     fn swap_and_reopen(
         &mut self,
-        db_path: &Path,
-        aside_path: &Path,
-        staged_path: &Path,
+        paths: &RestorePaths,
         rename_out: &dyn Fn(&Path, &Path) -> io::Result<()>,
         rename_in: &dyn Fn(&Path, &Path) -> io::Result<()>,
+        open_conn: &dyn Fn(&Path) -> Result<Connection>,
     ) -> Result<()> {
         // Close the live connection so Windows releases its handle on
         // `db_path` before any rename touches it. The store always holds a
@@ -206,23 +298,44 @@ impl Store {
         // instant between closing the old file and opening its replacement.
         self.conn = Connection::open_in_memory()?;
 
-        if let Err(e) = rename_out(db_path, aside_path) {
-            // The live file never moved: it is still at `db_path` exactly as
-            // it was, so recovery here is just reopening it.
-            self.conn = Connection::open(db_path)?;
-            return Err(StoreError::Db(format!("Obnova zlyhala pri odložení pôvodnej databázy, pôvodné dáta ostali nezmenené: {e}")));
+        if let Err(e) = rename_out(paths.db_path, paths.aside_path) {
+            return Err(self.recover_from_failed_move_out(paths, open_conn, e));
         }
 
-        if let Err(e) = rename_in(staged_path, db_path) {
-            return Err(rollback(self, db_path, aside_path, format!("Obnova zlyhala pri zápise obnovenej databázy: {e}")));
+        if let Err(e) = rename_in(paths.staged_path, paths.db_path) {
+            return Err(rollback(self, paths, format!("Obnova zlyhala pri zápise obnovenej databázy: {e}"), open_conn));
         }
 
-        match Connection::open(db_path) {
+        match open_conn(paths.db_path) {
             Ok(conn) => {
                 self.conn = conn;
                 Ok(())
             }
-            Err(e) => Err(rollback(self, db_path, aside_path, format!("Obnovená databáza sa nedala otvoriť: {e}"))),
+            Err(e) => Err(rollback_after_publish(self, paths, format!("Obnovená databáza sa nedala otvoriť: {e}"), open_conn)),
+        }
+    }
+
+    /// `rename_out` itself failed, so the live file never moved: it is still
+    /// exactly at `db_path`. Recovery here is just reopening it, but that
+    /// reopen can itself fail (for example the very lock that made the
+    /// rename fail also blocks the open), so this names both `db_path` and
+    /// the mandatory safety copy in that case rather than propagating a bare
+    /// error with no recovery path in it at all.
+    fn recover_from_failed_move_out(&mut self, paths: &RestorePaths, open_conn: &dyn Fn(&Path) -> Result<Connection>, move_err: io::Error) -> StoreError {
+        match open_conn(paths.db_path) {
+            Ok(conn) => {
+                self.conn = conn;
+                StoreError::Db(format!("Obnova zlyhala pri odložení pôvodnej databázy, pôvodné dáta ostali nezmenené: {move_err}"))
+            }
+            Err(open_err) => {
+                self.conn = Connection::open_in_memory().expect("opening an in-memory SQLite connection cannot fail");
+                StoreError::Db(format!(
+                    "Obnova zlyhala pri odložení pôvodnej databázy: {move_err} Pôvodné dáta ostali v súbore {}, ale nedali sa znova otvoriť ({open_err}). \
+                     Bezpečnostná kópia je v súbore {}.",
+                    paths.db_path.display(),
+                    paths.safety_path.display()
+                ))
+            }
         }
     }
 }
@@ -233,4 +346,55 @@ fn stage_backup_copy(backup_path: &Path, staged_path: &Path) -> Result<()> {
         return Err(StoreError::Db(format!("Príprava zálohy na obnovu zlyhala: {e}")));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parser::AccountKind;
+
+    fn tmp_dir(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("abakus-restore-unit-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    /// I2, occupied destination on Windows: `db_path` already holds a real
+    /// file (the just-published database that failed to open) when
+    /// `rollback_after_publish` runs. `std::fs::rename` never overwrites an
+    /// existing destination, so this proves the occupying file is moved
+    /// aside FIRST, under its own failed name, before the original comes
+    /// back from `aside_path` and reopens successfully.
+    #[test]
+    fn rollback_after_publish_moves_the_occupied_destination_aside_before_restoring_the_original() {
+        let dir = tmp_dir("occupied-dest");
+        let db_path = dir.join("abakus.db");
+        let aside_path = dir.join(".abakus-restore-aside-test.tmp");
+        let safety_path = dir.join("abakus-pred-obnovou-test.db");
+        // The just-published file currently occupying `db_path`: a real,
+        // openable database (this test is about the RENAME being blocked by
+        // an occupied destination, not about the file being unopenable).
+        Store::open(&db_path).unwrap();
+        // The real original database, already renamed aside, waiting to be
+        // restored.
+        {
+            let mut original = Store::open(&aside_path).unwrap();
+            original.upsert_account("SK4411000000000012345678", AccountKind::Personal, "Test").unwrap();
+        }
+        std::fs::write(&safety_path, b"safety copy bytes").unwrap();
+        let mut store = Store::open_in_memory().unwrap();
+
+        let paths = RestorePaths { db_path: &db_path, aside_path: &aside_path, staged_path: &db_path, safety_path: &safety_path };
+        let err = rollback_after_publish(&mut store, &paths, "Obnovená databáza sa nedala otvoriť: simulated".to_string(), &Store::open_connection);
+
+        assert!(matches!(err, StoreError::Db(_)), "got {err:?}");
+        assert_eq!(store.list_accounts().unwrap()[0].iban, "SK4411000000000012345678", "self.conn must be the reopened original, restored and usable");
+        assert!(db_path.exists(), "the original must be back at db_path");
+        assert!(!aside_path.exists(), "the aside name is consumed by the rename back onto db_path");
+        let names: Vec<String> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        assert_eq!(names.iter().filter(|n| n.contains("obnova-zlyhala")).count(), 1, "the unopenable published file must survive under its failed name: {names:?}");
+        assert!(safety_path.exists(), "the safety copy must survive untouched");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

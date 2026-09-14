@@ -12,6 +12,11 @@ import { OperationStatus } from './OperationStatus'
 // inside the confirmation dialog, right before the irreversible click.
 const CREDENTIALS_NOTE = 'Heslá k účtom zo Správcu poverení systému Windows nie sú súčasťou zálohy a obnovou sa nezmenia.'
 
+// Same rule as CREDENTIALS_NOTE: the confirmation dialog itself must say
+// this, not just the card underneath it. A user confirming from the dialog
+// alone must already know a safety copy exists and where appka puts it.
+const SAFETY_COPY_NOTE = 'Pred obnovou appka najprv vytvorí bezpečnostnú kópiu súčasnej databázy v priečinku s dátami appky a cestu k nej ukáže.'
+
 export function RestoreSection() {
   const pickAction = useAction()
   const confirmAction = useAction()
@@ -82,6 +87,7 @@ export function RestoreSection() {
             <p>Účty: {preview.accounts}</p>
             <p>Výpisy: {preview.statements}</p>
             <p>Transakcie: {preview.transactions}</p>
+            <p>{SAFETY_COPY_NOTE}</p>
             <p>{CREDENTIALS_NOTE}</p>
           </>
         ) : null}

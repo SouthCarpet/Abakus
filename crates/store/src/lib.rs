@@ -92,6 +92,17 @@ impl Store {
     pub fn open(path: &Path) -> Result<Self> { Self::init(Connection::open(path)?) }
     pub fn open_in_memory() -> Result<Self> { Self::init(Connection::open_in_memory()?) }
 
+    /// Runs the exact same init pipeline as `Store::open`
+    /// (`PRAGMA foreign_keys = ON`, every migration, the schema-version
+    /// marker) but returns just the connection, for a caller that already
+    /// owns a `Store` and wants to put a freshly opened connection straight
+    /// into `self.conn` in place, rather than build then discard a second
+    /// `Store`. 091/B10: this is what `restore.rs`'s reopen-after-swap steps
+    /// use instead of a bare `Connection::open`, so a restored backup on an
+    /// older-but-supported schema is migrated to current immediately, in
+    /// the same session, not only after the next process restart.
+    pub(crate) fn open_connection(path: &Path) -> Result<Connection> { Ok(Self::init(Connection::open(path)?)?.conn) }
+
     /// Base DDL, every migration, fresh-only category/rule seeding, the exact
     /// Spotify repair and the final version marker share one transaction.
     /// A failed body or COMMIT therefore leaves an existing database at its
