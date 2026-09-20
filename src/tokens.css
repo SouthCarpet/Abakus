@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --color-background: oklch(0.98 0.012 260);
   --color-well: oklch(0.96 0.012 260);
   --color-surface-raised: oklch(1 0.012 260);
@@ -59,9 +60,9 @@
   --motion-live: 1200ms;
   --ease-standard: cubic-bezier(.2,0,0,1);
   --control-h: 32px;
-  color-scheme: light;
 }
 [data-theme="dark"] {
+  color-scheme: dark;
   --color-background: oklch(0.14 0.012 260);
   --color-well: oklch(0.11 0.012 260);
   --color-surface-raised: oklch(0.2 0.012 260);
@@ -98,5 +99,4 @@
   --color-chart-band-alpha: 0.12;
   --color-chart-grid: oklch(0.32 0.012 260 / 0.4);
   --shadow-raise: 0 1px 4px oklch(0.02 0.012 260 / 0.24);
-  color-scheme: dark;
 }
