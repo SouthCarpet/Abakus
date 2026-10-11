@@ -8,6 +8,10 @@
   textu, 2 000 strán a 100 MiB výsledného súboru. Prekročenie ukončí export
   chybou, nie skráteným výpisom. Nepodporovaný znak má viditeľný zápis
   `[U+...]`. PDF používa vlastný výber účtov a obdobia, nie filtre tabuľky.
+  Sumáre (1 a 3 strany) majú pevný strop riadkov v každej tabuľke a napíšu
+  „a ďalších N“. Porovnanie používa predchádzajúce obdobie rovnakého počtu dní,
+  nie kalendárny mesiac, a pre Celé obdobie nie je. 10 najväčších transakcií
+  vynecháva prevody. Pravidelné platby v sumári sú odhady z importov.
 - **Detail pravidelnej platby s veľmi dlhým názvom obchodníka rozšíri stránku.**
   Tabuľka obchodníkov v detaile (Prehľad) nemá vlastné vodorovné posúvanie.
   Názov obchodníka s niekoľkými stovkami znakov (nameraný syntetický prípad:

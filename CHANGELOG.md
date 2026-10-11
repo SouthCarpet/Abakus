@@ -4,6 +4,7 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
 ## 0.2.0 (2026-09-14)
 
+- Export do PDF má okrem úplného výpisu dva sumáre: **Sumár na 1 stranu** (KPI, graf, najväčšie kategórie, pokrytie výpismi) a **Sumár do 3 strán** (navyše porovnanie s predchádzajúcim obdobím rovnakej dĺžky, súčty po účtoch, vývoj po mesiacoch, 10 najväčších transakcií a pravidelné platby ako odhady). Sumáre netvrdia úplnosť transakcií.
 - Vyhľadávanie v Transakciách spája obchodníka s miestom: `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku a znaky `%` a `_` berie doslovne.
 - Výber kategórie (priradenie aj filter v Transakciách) má nové ovládanie s vyhľadávaním podľa názvu. Písanie ignoruje diakritiku aj veľkosť písmen. Prázdny výsledok ukáže text „Žiadna kategória sa nenašla.“. Šípky hore a dole a Enter vyberú kategóriu z klávesnice, Escape zavrie zoznam a vráti fokus na pôvodné tlačidlo.
 - Potvrdenie odhadu ponúka aj potvrdenie ostatných nepotvrdených transakcií rovnakého obchodníka. Počet takých transakcií je vidieť pri tlačidle **Potvrdiť**.

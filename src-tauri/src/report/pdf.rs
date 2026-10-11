@@ -36,6 +36,7 @@ fn build_document(
     encodings: &BTreeMap<FontKind, FontEncoding>,
 ) -> Result<Document, String> {
     let mut document = Document::with_version("1.7");
+    let title = rendered.title;
     let pages_id = document.new_object_id();
     let font_ids = add_fonts(&mut document, encodings)?;
     let resources_id = add_resources(&mut document, &font_ids);
@@ -72,7 +73,7 @@ fn build_document(
     );
     let catalog_id = document.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
     let info_id = document.add_object(dictionary! {
-        "Title" => Object::string_literal("Abakus · Prehľad transakcií"),
+        "Title" => Object::string_literal(title),
         "Producer" => Object::string_literal("Abakus 0.1.2"),
     });
     document.trailer.set("Root", catalog_id);

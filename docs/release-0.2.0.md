@@ -22,3 +22,7 @@ Podrobnosti a poctivé limity sú v README (sekcie Transakcie, Kategórie, Preh�
 - Lokálne brány na vydávanom commite `fb2d7c3` (2026-09-14, log `p4-controller-gates-fb2d7c3.log` v ANIMUS artefaktoch plánu 091): `cargo test --workspace --jobs 4` 49 testových blokov, 0 zlyhaní; `cargo clippy --workspace --all-targets` bez varovaní; `npx vitest run --exclude '**/.worktrees/**'` 52 súborov, 475 testov, všetky prešli; `tsc --noEmit` a `eslint src` bez nálezov. Repo nemá CI workflow; tieto lokálne brány sú bránou vydania.
 - Inštalátor `abakus-setup-0.2.0.exe` zostavený z tohto commitu cez `packaging\build-installer.ps1` (Inno Setup, x64 PE a PDFium pin overené skriptom `check-payload.mjs`): SHA-256 `13f48cb56f96669276c1bb919585688794b89dbff4b0ef779c0ff6239d3be4ca`; balený `abakus.exe` `da4b30f0deeeea3cdc0f158a10e3720f0c872b0b5fd82188437884e5e6bf6b2e`, `pdfium.dll` `215c405d13963395b38872a656a18f161a294e80bbcaa00849b842f524e5474b`. Riadok pre `SHA256SUMS.txt` vydania je v `packaging/output/SHA256SUMS.txt`.
 - Natívne prijatie inštalátora a kontrola obrazoviek prebiehajú na strane používateľa pred tagom.
+
+## Doplnené po kandidátovi
+
+Sumárne PDF exporty (plán 084) idú do 0.2.0. Backend (dáta, stránkovanie, príkazy so `scope`) je hotový v `docs/plan-084-summary-pdf.md`, výber rozsahu v dialógu je rozpracovaný. Kandidát 0.2.0 sa po dokončení znova overí a tieto poznámky prepíše kontrolér.

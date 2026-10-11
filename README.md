@@ -115,6 +115,16 @@ Na každej obrazovke je pri voľbe vzhľadu tlačidlo **Exportovať PDF**. Vyber
 
 Náhľad ukáže rozsah a počet transakcií. PDF obsahuje súhrn, grafy, informáciu o pokrytí výpismi a úplný výpis vrátane poznámok. Použije všetky transakcie vo vybranom období a účtoch. Filtre tabuľky sa nepoužijú. Aktuálne obdobie je označené ako neukončené. Údaje sa zachytia pri uložení. Ich počet sa preto môže od náhľadu líšiť.
 
+### Rozsah dokumentu
+
+Export má tri rozsahy (parameter `scope` príkazov `preview_pdf_report` a `export_pdf_report`, predvolený je `full`):
+
+- **Úplný výpis** (`full`): dnešný dokument so všetkými transakciami.
+- **Sumár na 1 stranu** (`summary_one_page`): presne jedna strana A4 so štyrmi KPI (príjmy, výdavky, rozdiel, prevody), grafom po dňoch (mesiac) alebo po mesiacoch, ôsmimi najväčšími kategóriami výdavkov a zvyškom ako Ostatné, riadkom pokrytia výpismi a počtom transakcií podľa stavu.
+- **Sumár do 3 strán** (`summary_three_pages`): vždy tri strany. Strana 1 je jednostránkový sumár. Strana 2 porovná príjmy, výdavky a rozdiel s bezprostredne predchádzajúcim obdobím rovnakej dĺžky (celé obdobie porovnanie nemá) a ukáže rozdiel po kategóriách a všetky kategórie s podielom. Strana 3 má súčty po účtoch, vývoj po mesiacoch s kumulatívnym stĺpcom, 10 najväčších transakcií (bez prevodov) a pravidelné platby ako odhady.
+
+Sumáre nikdy netvrdia úplnosť transakcií a neúplné pokrytie označia. Tabuľky majú pevný strop riadkov a napíšu „a ďalších N“, takže sa nezalamujú na ďalšiu stranu. Výber rozsahu v dialógu exportu pribudne s rozhraním tejto časti; dátové rozhranie, stránkovanie a oracle hodnoty sú v [docs/plan-084-summary-pdf.md](docs/plan-084-summary-pdf.md).
+
 Report má svetlé strany A4, vložené písmo so slovenčinou a číslovanie strán. Export pracuje lokálne. Vyberte nový súbor PDF. Existujúci súbor sa neprepíše. Zrušenie dialógu nič nevytvorí. Pri prekročení limitu reportu sa zobrazí chyba. Výpis sa potichu neskráti.
 
 ## Pokrytie, porovnanie a historické zostatky
