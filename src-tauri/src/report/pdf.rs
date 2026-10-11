@@ -74,7 +74,7 @@ fn build_document(
     let catalog_id = document.add_object(dictionary! { "Type" => "Catalog", "Pages" => pages_id });
     let info_id = document.add_object(dictionary! {
         "Title" => Object::string_literal(title),
-        "Producer" => Object::string_literal("Abakus 0.1.2"),
+        "Producer" => Object::string_literal(concat!("Abakus ", env!("CARGO_PKG_VERSION"))),
     });
     document.trailer.set("Root", catalog_id);
     document.trailer.set("Info", info_id);

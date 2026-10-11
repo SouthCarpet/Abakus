@@ -19,4 +19,19 @@ describe('reportFiles: save destination', () => {
     expect(save).toHaveBeenCalledTimes(1)
     expect(save).toHaveBeenCalledWith({ filters: [{ name: 'PDF', extensions: ['pdf'] }], defaultPath: expect.stringMatching(/^abakus-prehlad-\d{4}-\d{2}\.pdf$/) })
   })
+
+  it('tells a summary apart from the full report by a suffix', () => {
+    const date = new Date(2026, 8, 7)
+    expect(defaultReportFilename(date, 'full')).toBe('abakus-prehlad-2026-09.pdf')
+    expect(defaultReportFilename(date, 'summary_one_page')).toBe('abakus-prehlad-2026-09-sumar-1.pdf')
+    expect(defaultReportFilename(date, 'summary_three_pages')).toBe('abakus-prehlad-2026-09-sumar-3.pdf')
+  })
+
+  it('suggests the summary file name in the native save dialog', async () => {
+    vi.mocked(save).mockResolvedValue(null)
+
+    await reportFiles.save('summary_three_pages')
+
+    expect(save).toHaveBeenCalledWith({ filters: [{ name: 'PDF', extensions: ['pdf'] }], defaultPath: expect.stringMatching(/^abakus-prehlad-\d{4}-\d{2}-sumar-3\.pdf$/) })
+  })
 })

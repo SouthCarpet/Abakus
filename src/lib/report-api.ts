@@ -12,6 +12,9 @@ export type ReportScope =
   | { kind: 'kind'; account_kind: AccountKind }
   | { kind: 'account'; account_id: number }
 
+/** Wire values of `ReportDocumentScope` in the Rust commands. An absent value means `full`. */
+export type ReportDocumentScope = 'full' | 'summary_one_page' | 'summary_three_pages'
+
 export interface ReportRequest { period: ReportPeriod; scope: ReportScope }
 export interface ReportDateRange { from: string; to: string }
 export interface ReportAccount { id: number; label: string; kind: AccountKind; iban_suffix: string }
@@ -30,7 +33,13 @@ export interface ReportPreview {
 }
 export interface PdfReportOutcome { path: string; bytes: number; pages: number; report: ReportPreview }
 
+function withScope<T extends object>(body: T, scope?: ReportDocumentScope): T | (T & { scope: ReportDocumentScope }) {
+  return scope === undefined ? body : { ...body, scope }
+}
+
 export const reportApi = {
-  preview: (request: ReportRequest) => invoke<ReportPreview>('preview_pdf_report', { request }),
-  export: (request: ReportRequest, path: string) => invoke<PdfReportOutcome>('export_pdf_report', { request, path }),
+  preview: (request: ReportRequest, scope?: ReportDocumentScope) =>
+    invoke<ReportPreview>('preview_pdf_report', withScope({ request }, scope)),
+  export: (request: ReportRequest, path: string, scope?: ReportDocumentScope) =>
+    invoke<PdfReportOutcome>('export_pdf_report', withScope({ request, path }, scope)),
 }

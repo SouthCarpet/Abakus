@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../../api'
 import { reportApi } from '../../lib/report-api'
@@ -123,5 +123,83 @@ describe('ExportPdfDialog: P16 native save and stale state', () => {
     })
     expect(screen.queryByText('Všetky účty (1)')).not.toBeInTheDocument()
     expect(screen.getByText('Firemné účty (1)')).toBeInTheDocument()
+  })
+})
+
+describe('ExportPdfDialog: document scope', () => {
+  it('offers the full report by default in a labelled radio group and keeps the old request shape', async () => {
+    await renderReady()
+    const group = screen.getByRole('group', { name: 'Rozsah dokumentu' })
+
+    const radios = within(group).getAllByRole('radio')
+    expect(radios.map((radio) => (radio as HTMLInputElement).labels?.[0]?.textContent)).toEqual(['Úplný výpis', 'Sumár na 1 stranu', 'Sumár do 3 strán'])
+    expect(screen.getByRole('radio', { name: 'Úplný výpis' })).toBeChecked()
+    expect(new Set(radios.map((radio) => (radio as HTMLInputElement).name)).size).toBe(1)
+    expect(vi.mocked(reportApi.preview).mock.calls.at(-1)).toHaveLength(1)
+    expect(screen.queryByText('Strany')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['Sumár na 1 stranu', 'summary_one_page', '1 strana'],
+    ['Sumár do 3 strán', 'summary_three_pages', '3 strany'],
+  ] as const)('selecting %s requests that preview and shows the page count', async (name, scope, pages) => {
+    await renderReady()
+    fireEvent.click(screen.getByRole('radio', { name }))
+
+    await vi.waitFor(() => expect(reportApi.preview).toHaveBeenLastCalledWith({ period: { kind: 'month', month: expect.any(String) }, scope: { kind: 'all' } }, scope))
+    expect(screen.getByRole('radio', { name })).toBeChecked()
+    expect(await screen.findByText(pages)).toBeInTheDocument()
+  })
+
+  it('keeps period and account selection working with a summary', async () => {
+    await renderReady()
+    fireEvent.click(screen.getByRole('radio', { name: 'Sumár na 1 stranu' }))
+    fireEvent.change(screen.getByLabelText('Účty'), { target: { value: 'account:22' } })
+
+    await vi.waitFor(() => expect(reportApi.preview).toHaveBeenLastCalledWith({ period: { kind: 'month', month: expect.any(String) }, scope: { kind: 'account', account_id: 22 } }, 'summary_one_page'))
+  })
+
+  it('is reachable from the keyboard as native radios after the account field and before the actions', async () => {
+    await renderReady()
+    const radios = screen.getAllByRole('radio')
+    const order = Array.from(document.querySelectorAll('select, input, button')).filter((element) => !(element as HTMLInputElement).disabled)
+
+    expect(radios.every((radio) => (radio as HTMLInputElement).type === 'radio' && (radio as HTMLInputElement).tabIndex !== -1)).toBe(true)
+    expect(order.indexOf(screen.getByLabelText('Účty'))).toBeLessThan(order.indexOf(radios[0]))
+    expect(order.indexOf(radios[2])).toBeLessThan(order.indexOf(screen.getByRole('button', { name: 'Uložiť PDF' })))
+  })
+
+  it('passes the chosen scope to the save dialog and the export', async () => {
+    await renderReady()
+    fireEvent.click(screen.getByRole('radio', { name: 'Sumár do 3 strán' }))
+    await screen.findByText('3 strany')
+    vi.mocked(reportFiles.save).mockResolvedValue('C:/reports/x-sumar-3.pdf')
+    vi.mocked(reportApi.export).mockResolvedValue({ path: 'C:/reports/x-sumar-3.pdf', bytes: 1, pages: 3, report: preview() })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť PDF' }))
+
+    await vi.waitFor(() => expect(reportApi.export).toHaveBeenCalledTimes(1))
+    expect(reportFiles.save).toHaveBeenCalledWith('summary_three_pages')
+    expect(reportApi.export).toHaveBeenCalledWith({ period: { kind: 'month', month: expect.any(String) }, scope: { kind: 'all' } }, 'C:/reports/x-sumar-3.pdf', 'summary_three_pages')
+  })
+
+  it('exports the full report without a scope argument', async () => {
+    await renderReady()
+    vi.mocked(reportFiles.save).mockResolvedValue('C:/reports/x.pdf')
+    vi.mocked(reportApi.export).mockResolvedValue({ path: 'C:/reports/x.pdf', bytes: 1, pages: 2, report: preview() })
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť PDF' }))
+
+    await vi.waitFor(() => expect(reportApi.export).toHaveBeenCalledTimes(1))
+    expect(reportFiles.save).toHaveBeenCalledWith('full')
+    expect(reportApi.export).toHaveBeenCalledWith({ period: { kind: 'month', month: expect.any(String) }, scope: { kind: 'all' } }, 'C:/reports/x.pdf')
+  })
+
+  it('freezes the scope choice while an export runs', async () => {
+    await renderReady()
+    vi.mocked(reportFiles.save).mockResolvedValue('C:/reports/x.pdf')
+    vi.mocked(reportApi.export).mockReturnValue(new Promise(() => {}))
+    fireEvent.click(screen.getByRole('button', { name: 'Uložiť PDF' }))
+
+    await vi.waitFor(() => expect(reportApi.export).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('radio', { name: 'Sumár na 1 stranu' })).toBeDisabled()
   })
 })

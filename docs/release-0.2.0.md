@@ -25,4 +25,4 @@ Podrobnosti a poctivé limity sú v README (sekcie Transakcie, Kategórie, Preh�
 
 ## Doplnené po kandidátovi
 
-Sumárne PDF exporty (plán 084) idú do 0.2.0. Backend (dáta, stránkovanie, príkazy so `scope`) je hotový v `docs/plan-084-summary-pdf.md`, výber rozsahu v dialógu je rozpracovaný. Kandidát 0.2.0 sa po dokončení znova overí a tieto poznámky prepíše kontrolér.
+Sumárne PDF exporty (plán 084) idú do 0.2.0. Backend (dáta, stránkovanie, príkazy so `scope`) je v `docs/plan-084-summary-pdf.md`, výber rozsahu (**Rozsah dokumentu**: Úplný výpis, Sumár na 1 stranu, Sumár do 3 strán) je v dialógu exportu. PDF v metadátach uvádza verziu aplikácie (`Abakus 0.2.0`). Kandidát 0.2.0 sa po dokončení znova overí a tieto poznámky prepíše kontrolér.
