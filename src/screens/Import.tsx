@@ -584,7 +584,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
         actions={
           <>
             <Button variant="secondary" data-k-autofocus="" disabled={deletion.busy} onClick={closeDelete}>
-              Späť
+              Zrušiť
             </Button>
             <Button variant="danger" disabled={!deletePreview || deletion.busy} onClick={() => void deletion.run(confirmDelete)}>
               Natrvalo zmazať

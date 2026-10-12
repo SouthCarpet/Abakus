@@ -22,4 +22,13 @@ describe('Kaliber keys', () => {
     expect(matchKey(key({ key: ',', ctrlKey: true }), 'primary+comma', 'windows')).toBe(true)
     expect(matchKey(key({ key: 'o', metaKey: true }), 'primary+o', 'mac')).toBe(true)
   })
+
+  // Oracle: components.md "Matching rules": AltGr is typing, never a shortcut. On Windows AltGr
+  // reports ctrlKey and altKey; a layout can report only the AltGraph state, so it is tested alone.
+  it('never matches while AltGraph is held, even with Ctrl alone', () => {
+    const altGr = key({ key: 'z', code: 'KeyZ', ctrlKey: true, modifierAltGraph: true })
+    expect(altGr.getModifierState('AltGraph')).toBe(true)
+    expect(matchKey(altGr, 'primary+z', 'windows')).toBe(false)
+    expect(matchKey(key({ key: 'z', code: 'KeyZ', ctrlKey: true }), 'primary+z', 'windows')).toBe(true)
+  })
 })

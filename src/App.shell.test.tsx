@@ -73,6 +73,25 @@ describe('App shell', () => {
     expect(document.activeElement).toBe(link)
   })
 
+  // Oracle: Kaliber map, F5 and Ctrl+R. A reload drops text typed in a dialog, so every reload chord
+  // is cancelled, with or without a dialog open. fireEvent returns false when preventDefault ran.
+  it.each([
+    ['F5', { key: 'F5', code: 'F5' }],
+    ['Ctrl+R', { key: 'r', code: 'KeyR', ctrlKey: true }],
+    ['Ctrl+Shift+R', { key: 'R', code: 'KeyR', ctrlKey: true, shiftKey: true }],
+  ])('cancels the reload chord %s, also while a dialog is open', (_name, init) => {
+    render(<App />)
+    expect(fireEvent.keyDown(window, init)).toBe(false)
+    fireEvent.keyDown(window, { key: 'F1' })
+    expect(screen.getByRole('dialog', { name: 'Pomocník' })).toBeInTheDocument()
+    expect(fireEvent.keyDown(window, init)).toBe(false)
+  })
+
+  it('leaves AltGr+R alone so it can type', () => {
+    render(<App />)
+    expect(fireEvent.keyDown(window, { key: 'r', code: 'KeyR', ctrlKey: true, altKey: true })).toBe(true)
+  })
+
   it('makes no update request at start while checking is off', async () => {
     render(<App />)
     await waitFor(() => expect(api.getCheckUpdates).toHaveBeenCalledTimes(1))

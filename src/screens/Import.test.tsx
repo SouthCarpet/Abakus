@@ -243,7 +243,9 @@ describe('Statement list: delete a statement', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
     await screen.findByText(/Odstráni sa 8 transakcií/)
-    fireEvent.click(screen.getByRole('button', { name: 'Späť' }))
+    // Oracle: README, "Del": the confirm opens with the focus on Zrušiť, like the account and category confirms.
+    expect(screen.getByRole('button', { name: 'Zrušiť' })).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
 
     expect(api.deleteStatement).not.toHaveBeenCalled()
   })
@@ -297,7 +299,7 @@ describe('Import audit failure boundaries', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Zmazať' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Náhľad výpisu zlyhal')
     expect(screen.getByRole('button', { name: 'Natrvalo zmazať' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Späť' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
