@@ -61,20 +61,22 @@ const FAKTURY: import('../api').Category = { id: 3, parent_id: null, name: 'Fakt
 
 // Oracle: live r4 measure at 1024/1280; minWidth 560 wraps the Pravidlá card
 // onto its own row at 1024 and keeps both columns at 1280 with every header
-// inside .ab-table-scroll (scrollLeft = 0, no page overflow).
+// inside .ab-table-scroll (scrollLeft = 0, no page overflow). Kaliber r3 phone check
+// (390 px, r3/shots/metrics.json): a fixed 560px pushed the page to 576 px wide, so the floor
+// is capped at the container width.
 describe('Categories rules column wrap threshold', () => {
   afterEach(() => {
     cleanup()
     vi.mocked(api.listCategories).mockReset()
   })
 
-  it('sets the rules column min-width to 560px so the flex row wraps before the table clips', async () => {
+  it('sets the rules column min-width to 560px, capped at the window width, so the flex row wraps before the table clips', async () => {
     vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
     const { container } = render(<Categories />)
     await waitFor(() => expect(screen.getByText('Pravidlá')).toBeInTheDocument())
     const col = container.querySelector('.ab-rules-card-col')
     expect(col).toBeInstanceOf(HTMLElement)
-    expect((col as HTMLElement).style.minWidth).toBe('560px')
+    expect((col as HTMLElement).style.minWidth).toBe('min(560px, 100%)')
   })
 })
 

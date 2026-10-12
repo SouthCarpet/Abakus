@@ -604,7 +604,7 @@ export function Categories() {
               </div>
             </Card>
           </div>
-          <div className="ab-rules-card-col" style={{ flex: 1, minWidth: 560 }}>
+          <div className="ab-rules-card-col" style={{ flex: 1, minWidth: 'min(560px, 100%)' }}>
             <Card title="Pravidlá">
               <p className="ab-field-label">
                 Pravidlá vzniknú po priradení kategórie alebo potvrdení návrhu pri rozpoznateľnom obchodníkovi. Samotné vytvorenie kategórie pravidlo nevytvorí.

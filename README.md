@@ -13,9 +13,9 @@ Lokálna desktopová appka na PDF výpisy z Tatra banky.
 
 ## About
 
-Abakus is a local Windows desktop app for Tatra banka PDF statements. It imports statements, checks checksums, assigns categories with learned rules, tracks recurring payments, stores notes, and builds PDF reports with charts. Bank data stays on your computer. The only network use is an opt-in update check and a user-triggered installer download from GitHub Releases. Both are written to the in-app network log. There is no telemetry.
+Abakus is a local Windows desktop app for Tatra banka PDF statements. It imports statements, checks checksums, assigns categories with learned rules, tracks recurring payments, stores notes, and builds PDF reports with charts. Bank data stays on your computer. The only network use is an opt-in update check (at start, when Settings > About opens and on its button, only after you turn it on) and a user-triggered installer download from GitHub Releases. Both are written to the in-app network log. There is no telemetry.
 
-Version 0.2.0 is the current release. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
+Version 0.2.0 is the current release. It also adopts the Kaliber design language, revision 3: header tabs, Help on F1, an About section, a shared theme key and a keyboard set for the transaction register. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
 
 ## Čo to je
 
@@ -25,9 +25,11 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 **0.2.0.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
-Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a červené tlačidlo na zmazanie. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
+Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a ikonové tlačidlo na zmazanie. Červené tlačidlo je až v potvrdzovacom dialógu. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
-Pribudol aj malý odznak novej verzie v hornej lište appky, viditeľný na každej obrazovke, nielen v Nastaveniach; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) už predtým nájde novšie vydanie. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
+Pribudol aj tichý riadok **Nová verzia** v hlavičke appky, viditeľný na každej obrazovke; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) nájde novšie vydanie, a vedie do sekcie **O aplikácii**. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
+
+Verzia 0.2.0 tiež preberá jazyk dizajnu Kaliber, revíziu 3: písmo Atkinson Hyperlegible Next, plochý register bez tieňov, súhrnnú tabuľku namiesto dlaždíc a rovnaké miesto pre navigáciu, Pomocníka, vzhľad a O aplikácii ako v ostatných appkách rodiny. Opis je v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy). Plán a kontrolný zoznam sú v [docs/plan-091-kaliber-r3.md](docs/plan-091-kaliber-r3.md).
 
 ## Prečo
 
@@ -70,6 +72,35 @@ Každý importovaný výpis má odznak kontrolného súčtu. Appka overí, či p
 
 Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Zálohu databázy** a vyberte nový súbor. Appka uloží konzistentnú kópiu aj počas behu. Existujúci cieľový súbor neprepíše. Záloha obsahuje účty, výpisy, kategórie, naučené pravidlá, poznámky, voľby pravidelných platieb a nastavenia databázy. Nie je šifrovaná. Neobsahuje heslá zo Správcu poverení ani pôvodné PDF.
 
+## Rozhranie a klávesy
+
+- **Navigácia:** päť záložiek v hlavičke: **Transakcie** (otvorí sa ako prvá), **Prehľad**, **Import**, **Kategórie**, **Nastavenia** (posledné, aj Ctrl+čiarka).
+- **Hlavička obrazovky:** názov, jedna hlavná akcia a menu **Ďalšie**. Prehľad má hlavnú akciu **Exportovať PDF**, Import **Vybrať PDF**, Kategórie **Nová kategória**. Transakcie majú v menu **Ďalšie** položky **Obnoviť**, **Exportovať filtrované CSV** a **Exportovať PDF**.
+- **Nástroje hlavičky:** prepínač so slnkom a mesiacom (rýchla zmena vzhľadu) a tichý riadok **Nová verzia**, keď kontrola nájde novšie vydanie.
+- **Pätička:** stav práce (napríklad počas importu, potom „Import dokončený, súbory: N. 14:05“) a odkaz **Pomocník**. Pomocník (aj F1) otvorí panel vpravo s hľadaním, témami podľa obrazovky a zoznamom klávesov.
+- **Hlásenia** výsledku akcie sú vpravo dole. Hlásenie po hromadnom priradení má tlačidlo **Späť**.
+- **Pohyb:** riadok, ktorému zápis zmení kategóriu alebo stav, sa na 1,6 s podfarbí. Pri viac ako 6 zmenách za sekundu sa nepodfarbí nič a pätička vymenuje zmenené riadky. Počas importu beží v hlavičke tenká čiara. Vzhľad sa po kliknutí prelína, zmena systému sa prejaví hneď. Systémové obmedzenie pohybu vypne všetky prechody.
+
+Klávesy (zoznam je aj v Pomocníkovi):
+
+| Kláves | Akcia | Kde |
+| --- | --- | --- |
+| F1 | Pomocník | všade |
+| Ctrl+čiarka | Nastavenia | všade |
+| Ctrl+O | Import a výber PDF | všade |
+| Ctrl+F | Pole Hľadať | Transakcie |
+| Ctrl+Z | Vrátiť posledné hromadné priradenie | Transakcie |
+| Ctrl+Y, Ctrl+Shift+Z | Znova vykonať vrátené hromadné priradenie | Transakcie |
+| Šípky, Home, End, PgUp, PgDn | Presun zvýrazneného riadku (PgUp a PgDn o 10) | tabuľka Transakcie |
+| Shift+šípky, Shift+klik | Rozšíriť výber | tabuľka Transakcie |
+| Medzerník | Vybrať alebo zrušiť zvýraznený riadok | tabuľka Transakcie |
+| Ctrl+A | Vybrať všetky viditeľné riadky okrem prevodov, druhé stlačenie výber zruší | tabuľka Transakcie |
+| Enter | Prijať odhad zvýrazneného riadku | tabuľka Transakcie |
+| Del | Otvoriť potvrdenie zmazania (účet, výpis, kategória), fokus na Zrušiť | zoznamy s mazaním |
+| Esc | Zavrie jednu vrstvu: hlásenie, zoznam, text hľadania, výber, dialóg alebo panel | všade |
+
+Del nikdy nemaže bez dialógu, lebo každé mazanie v Abakuse je nevratné. Po zmazaní prejde fokus na ďalší riadok. F5 a Ctrl+R stránku neobnovia, aby sa nestratil rozpísaný text. Appka nemá jednoznakové skratky ani paletu príkazov (Ctrl+K). Klávesy s AltGr na slovenskej klávesnici nič nespustia.
+
 ## Obnova zo zálohy
 
 V Nastaveniach, hneď pod zálohou, tlačidlo **Vybrať zálohu** otvorí súborový dialóg. Appka vybraný súbor najprv iba prečíta a ukáže náhľad: počet účtov, výpisov a transakcií v zálohe. Súbor, ktorý nie je zálohou Abakusu, alebo zálohu z novšej appky, appka odmietne so zrozumiteľnou správou a k obnove vôbec nepristúpi.
@@ -88,11 +119,11 @@ Pri potvrdení odhadu appka ukáže, koľko ďalších nepotvrdených transakci�
 
 Vo výbere transakcií pribudlo tlačidlo **Potvrdiť vybrané**. Potvrdí odhady z aktuálneho výberu naraz, rovnako ako doterajšie hromadné priradenie kategórie. Voľba **Použiť aj na podobné** platí aj preň. Riadky, ktoré ešte nemajú odhad, sa preskočia.
 
-Po hromadnom priradení kategórie sa na chvíľu zobrazí tlačidlo **Späť**. Vráti práve vykonané priradenie a obnoví tabuľku. Späť platí len pre poslednú takú akciu v tomto behu appky: zmizne po použití alebo keď ho nahradí ďalšie hromadné priradenie. Hromadné potvrdenie zatiaľ vrátiť nemožno.
+Po hromadnom priradení kategórie sa vpravo dole na 8 sekúnd zobrazí hlásenie s tlačidlom **Späť**. Vráti práve vykonané priradenie a obnoví tabuľku. Rovnako funguje Ctrl+Z, aj keď hlásenie už zmizlo. Ctrl+Y alebo Ctrl+Shift+Z vrátené priradenie znova vykoná. Späť platí len pre poslednú takú akciu v tomto behu appky: zmizne po použití, keď ho nahradí ďalšie hromadné priradenie alebo po inom zápise. Hromadné potvrdenie zatiaľ vrátiť nemožno.
 
 Keď má tabuľka nezaradené platby, appka nad ňou ukáže ich skupiny podľa obchodníka, napríklad „Twitch, 15 platieb, nepriradené“. Kliknutie na skupinu vyberie presne jej riadky, takže ich hneď môžete hromadne priradiť alebo potvrdiť. Skupiny zmiznú, keď nezaradené platby v tabuľke nie sú.
 
-V tabuľke Transakcií fungujú aj šípky hore a dole. Presúvajú zvýraznený riadok. Enter potvrdí odhad zvýrazneného riadku rovnako ako tlačidlo **Potvrdiť**. Šípky a Enter nič nerobia, keď je fokus v poli na hľadanie, v poznámke alebo vo vyhľadávaní kategórie.
+V tabuľke Transakcií fungujú šípky, Home, End, PgUp a PgDn. Presúvajú zvýraznený riadok. Enter potvrdí odhad zvýrazneného riadku rovnako ako tlačidlo **Potvrdiť**. Medzerník, Shift+šípky, Shift+klik a Ctrl+A menia výber, Esc ho zruší. Tieto klávesy nič nerobia, keď je fokus v poli na hľadanie, v poznámke alebo vo vyhľadávaní kategórie. Úplný zoznam je v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy).
 
 ## Pravidelné platby a kategórie
 
@@ -106,7 +137,7 @@ Kategóriu aj podkategóriu možno vytvoriť priamo pri priraďovaní transakcie
 
 ## PDF s grafmi a výpisom
 
-Na každej obrazovke je pri voľbe vzhľadu tlačidlo **Exportovať PDF**. Vyberte účty a obdobie:
+Tlačidlo **Exportovať PDF** je hlavná akcia v hlavičke **Prehľadu** a položka menu **Ďalšie** v **Transakciách**. Vyberte účty a obdobie:
 
 - **Mesiac:** celý vybraný kalendárny mesiac.
 - **Šesť mesiacov:** šesť po sebe idúcich mesiacov vrátane vybraného koncového mesiaca.
@@ -145,19 +176,20 @@ V detaile transakcie možno uložiť poznámku do 2 000 znakov vrátane nových 
 
 ## Odstránenie účtu a vzhľad
 
-V **Nastaveniach** kliknite v riadku účtu na **Zmazať účet**. Náhľad uvedie názov a počty výpisov, transakcií a pravidiel. Na potvrdenie napíšte presný názov účtu a kliknite na **Natrvalo zmazať účet**. Zrušenie nič neodstráni. Odstránenie importovaných údajov je nezvratné. Pôvodné bankové PDF súbory zostanú na disku. Prípadné zlyhanie databázy alebo odstránenia hesla sa zobrazí v dialógu. Obnovenie zobrazenia po úspešnom odstránení neopakuje odstránenie.
+V **Nastaveniach** kliknite v riadku účtu na **Zmazať účet** alebo stlačte Del na zvýraznenom riadku (fokus je potom na **Zrušiť**). Náhľad uvedie názov a počty výpisov, transakcií a pravidiel. Na potvrdenie napíšte presný názov účtu a kliknite na **Natrvalo zmazať účet**. Zrušenie nič neodstráni. Odstránenie importovaných údajov je nezvratné. Pôvodné bankové PDF súbory zostanú na disku. Prípadné zlyhanie databázy alebo odstránenia hesla sa zobrazí v dialógu. Obnovenie zobrazenia po úspešnom odstránení neopakuje odstránenie.
 
 V riadku účtu je aj tlačidlo **Nastaviť heslo** (alebo **Zmeniť heslo**, ak je už uložené). Otvorí dialóg s dvomi poľami: heslo a jeho zopakovanie. Pri každom poli je tlačidlo **Zobraziť**, ktoré heslo odkryje a zostane funkčné aj po kliknutí mimo poľa. **Uložiť** je dostupné, až keď sa obe zhodujú a nie sú prázdne. Po úspechu appka zobrazí potvrdenie a heslo uloží do Správcu poverení systému Windows. Riadok potom ukáže **heslo uložené**. Pri zlyhaní appka zachová rozpísané heslo a zobrazí dôvod.
 
-Výber **Vzhľad** je dostupný na každej obrazovke: **Svetlý**, **Tmavý**, **Podľa systému**. Prvé dve možnosti ignorujú zmeny systému. Tretia ich sleduje. Voľba sa uloží pre ďalšie spustenie. Pri poškodenom alebo nedostupnom úložisku sa použije systémový režim. Pri zlyhaní zápisu platí nová voľba len v aktuálnom behu.
+Vzhľad má dve ovládania s jedným stavom: prepínač so slnkom a mesiacom v hlavičke a voľbu **Svetlý**, **Tmavý**, **Podľa systému** v **Nastavenia > Vzhľad** (predvolene Podľa systému). Prvé dve možnosti ignorujú zmeny systému. Tretia ich sleduje. Voľba sa uloží pre ďalšie spustenie pod kľúčom `kaliber-theme`, spoločným pre appky rodiny Kaliber. Voľba z verzie 0.1.x (kľúč `abakus.theme`) sa pri prvom spustení prenesie a nestratí sa. Pri poškodenom alebo nedostupnom úložisku sa použije systémový režim. Pri zlyhaní zápisu platí nová voľba len v aktuálnom behu.
 
 ## Filtre a CSV
 
 - **Vyhľadávanie** spája obchodníka s miestom, takže `Penny Neuss` nájde daného obchodníka v Neusse a vylúči `Penny Berlin`. Nerozlišuje veľkosť písmen ani diakritiku, zjednotí nadbytočné medzery a ponechá pôvodné hľadanie v poznámke a názve protistrany. Znaky `%` a `_` sú doslovné. Podrobnosti sú v [technickom kontrakte vyhľadávania](docs/plan-091-transaction-search.md).
-- **Exportovať filtrované CSV** v Transakciách exportuje aktuálne obdobie, účet, druh účtu, kategóriu, stav, hľadaný text aj obmedzenie na konkrétny výpis. Použije text viditeľný pri kliknutí, aj keď tabuľka ešte čaká na dokončenie hľadania. Filter sa zachytí pri kliknutí. CSV číta údaje z databázy pri exporte. Zrušenie výberu súboru nič neexportuje. Zlyhanie zápisu sa zobrazí. Pôvodný export v Nastaveniach naďalej používa iba uložené obdobie.
+- **Exportovať filtrované CSV** (menu **Ďalšie** v Transakciách) exportuje aktuálne obdobie, účet, druh účtu, kategóriu, stav, hľadaný text aj obmedzenie na konkrétny výpis. Použije text viditeľný pri kliknutí, aj keď tabuľka ešte čaká na dokončenie hľadania. Filter sa zachytí pri kliknutí. CSV číta údaje z databázy pri exporte. Zrušenie výberu súboru nič neexportuje. Zlyhanie zápisu sa zobrazí. Pôvodný export v Nastaveniach naďalej používa iba uložené obdobie.
 - **Filter kategórie** umožňuje vybrať aj nadradenú kategóriu s podkategóriami a zobrazuje kategóriu prevzatú z grafu. Archivovaný alebo nedostupný výber zostáva označený. Neznamená Všetky kategórie.
 - **Filter Druh** vyberá presne jeden druh transakcie vrátane bankového poplatku (**Poplatok**). Kombinuje sa s ostatnými filtrami a s exportom CSV.
 - Výber kategórie (filter aj priradenie transakcii) má pole na vyhľadávanie podľa názvu. Hľadanie ignoruje diakritiku a veľkosť písmen. Ak nič nesedí, zobrazí sa text **Žiadna kategória sa nenašla.**. Zoznam sa dá ovládať aj klávesnicou: šípky hore a dole prechádzajú kategóriami, Enter vyberie a Escape zoznam zavrie.
+- Ctrl+F zameria pole **Hľadať**. Esc v ňom najprv vymaže text a fokus ostane v poli.
 - **Vymazať všetky filtre** zobrazí všetky obdobia, účty, druhy, kategórie a stavy bez vyhľadávania a bez obmedzenia na výpis. Vymaže aj hromadný výber. Obdobie Všetko sa uloží pre ďalšie obrazovky.
 - Panel **Súčty zobrazených transakcií** počíta presne načítané riadky tabuľky. Príjem, výdavky a čistá suma sa sčítajú v celých centoch podľa rovnakých pravidiel ako Prehľad, vrátane druhu priradenej kategórie a refundácií znižujúcich výdavky. Interné prevody majú samostatný počet a do týchto súm nevstupujú. Pri načítavaní alebo chybe sa staré súčty nezobrazujú. Nejde o zostatok bankového účtu.
 
@@ -165,11 +197,13 @@ Vlastné obdobie potrebuje dva platné dátumy so začiatkom najneskôr v deň k
 
 ## Aktualizácia
 
-Kontrola aktualizácií je predvolene vypnutá. Zapnete ju v Nastaveniach voľbou **Kontrolovať aktualizácie (GitHub)**. Appka potom urobí jeden neautentifikovaný `GET` na najnovšie vydanie v GitHub Releases. Neposiela bankové údaje, heslá ani telemetriu.
+Kontrola aktualizácií je predvolene vypnutá. Zapnete ju v **Nastavenia > O aplikácii** prepínačom **Kontrolovať aktualizácie (GitHub)**. Zapnutá kontrola urobí jeden neautentifikovaný `GET` na najnovšie vydanie v GitHub Releases v troch chvíľach: pri spustení appky, pri otvorení sekcie **O aplikácii** a po kliknutí na **Skontrolovať aktualizácie**. Samotné zapnutie prepínača nič neposiela. Pri vypnutej kontrole neodíde žiadna požiadavka na žiadnej z týchto ciest a tlačidlo je neaktívne. Appka neposiela bankové údaje, heslá ani telemetriu.
 
-Voľba sa ukladá v databáze. Nastavenia ju pri každom otvorení znova načítajú. Prepínač je neaktívny, kým sa hodnota nenačíta. Ak načítanie zlyhá, zobrazí sa chyba. Ak sa vrátite do Nastavení počas ukladania, načítanie počká na dokončenie zápisu. Neúspešný zápis ponechá poslednú uloženú hodnotu. Podrobnosti a limity overenia sú v [docs/plan-091-update-preference.md](docs/plan-091-update-preference.md).
+Kontrola pri spustení je tichá: neotvorí dialóg ani chybové hlásenie. Nájdenú verziu len označí riadkom **Nová verzia** v hlavičke a značkou pri nadpise **O aplikácii**. Sekcia **O aplikácii** ukáže čas a výsledok poslednej kontroly. Chyba spojenia („bez spojenia so serverom GitHub“), chyba GitHubu (napríklad HTTP 403 pri obmedzení) a „máte najnovšiu verziu“ sú rôzne vety.
 
-Keď Nastavenia nájdu novšie vydanie, malý odznak sa objaví aj v hornej lište appky na každej obrazovke. Kliknutím naň prejdete do Nastavení. Odznak sám nič nekontroluje ani nesťahuje. Pri vypnutej voľbe alebo bez doterajšej kontroly sa nezobrazí nič.
+Voľba sa ukladá v databáze. Nastavenia ju pri každom otvorení znova načítajú. Prepínač je neaktívny, kým sa hodnota nenačíta. Ak načítanie zlyhá, zobrazí sa chyba. Ak sa vrátite do Nastavení počas ukladania, načítanie počká na dokončenie zápisu. Neúspešný zápis ponechá poslednú uloženú hodnotu. Vypnutie zruší výsledok kontroly, ktorá ešte beží. Podrobnosti a limity overenia sú v [docs/plan-091-update-preference.md](docs/plan-091-update-preference.md).
+
+Sekcia **O aplikácii** je posledná v Nastaveniach. Ukáže názov, značku, verziu, zostavenie (krátky commit), licenciu a odkazy **Poznámky k vydaniu**, **Nahlásiť problém** a **Licencie**. Odkazy otvorí prehliadač; appka sama nič nesťahuje.
 
 Keď je na GitHub novšie vydanie, appka ukáže jeho poznámky k vydaniu. Ukáže aj tlačidlo `Aktualizovať na v<verzia>`. Až po kliknutí stiahne inštalátor. Sťahovanie overí voči `SHA256SUMS.txt` publikovanému s tým vydaním. Bez kliknutia sa nič nestiahne a nič sa nespustí.
 
@@ -183,7 +217,7 @@ Appka nezbiera telemetriu. Nesynchronizuje dáta do cloudu. Nepoužíva LLM ani 
 
 Sieťové volania sú len dve:
 
-1. Voliteľná kontrola aktualizácií na GitHub Releases. Predvolene vypnutá.
+1. Voliteľná kontrola aktualizácií na GitHub Releases. Predvolene vypnutá. Zapnutá beží pri spustení, pri otvorení O aplikácii a na tlačidlo.
 2. Sťahovanie inštalátora z GitHub Releases. Len po kliknutí na `Aktualizovať na v<verzia>`.
 
 Obidve sú v denníku **Sieťová aktivita**. CSP webového okna povoľuje pripojenie len pre internú komunikáciu Tauri. Nepovoľuje externý `connect-src`. Automatický test zakazuje sieťové knižnice a sieťové pluginy Tauri okrem klienta pre tieto volania.
@@ -255,7 +289,7 @@ Abakus zoskupuje viditeľné nezaradené transakcie podľa obchodníka a miesta;
 
 Bankové poplatky majú druh `fee`. Filter **Druh** v Transakciách ho ponúka ako
 **Poplatok**. Súhrn a mesačné riadky vracajú `fee_cents`, podpísanú časť už
-započítaných výdavkov. V **Prehľade** má dlaždica **Poplatky** a graf **Príjmy
+započítaných výdavkov. V **Prehľade** má súhrnná tabuľka riadok **Poplatky** a graf **Príjmy
 a výdavky** vlastný stĺpec Poplatky vedľa Príjmu a Výdavkov; nejde o druhý
 súčet, len o zvýraznenie časti, ktorá je už vo Výdavkoch. Migrácia schémy na
 verziu 5 mení iba druh rozpoznaných starších poplatkov. Kontrakt: [bankové
@@ -300,6 +334,7 @@ a Inno Setup sú build nástroje, používateľ ich nepotrebuje.
 - [CHANGELOG.md](CHANGELOG.md): poznámky k vydaniu, ktoré appka ukáže ako **Poznámky k vydaniu**.
 - [KNOWN_ISSUES.md](KNOWN_ISSUES.md): známe obmedzenia.
 - [docs/](docs/): interné poznámky k dráham a vydaniam, vrátane [docs/release-0.1.2.md](docs/release-0.1.2.md) a [docs/release-0.1.3.md](docs/release-0.1.3.md).
+- [docs/plan-091-kaliber-r3.md](docs/plan-091-kaliber-r3.md): prevzatie jazyka Kaliber r3 vo verzii 0.2.0, identita appky, zvolené klávesy a kontrolný zoznam App shell.
 - [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md): kontrakt úpravy a náhľadu zmazania pravidiel pre verziu 0.2.0; rozhranie v Kategóriách je zapojené.
 - [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md): explicitný preview/apply kontrakt zmazania kategórie, jej potomkov, priradení a pravidiel; ikonové ovládanie v Kategóriách je zapojené.
 - [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md): backendový kontrakt atómového hromadného potvrdenia a presných zhôd pre verziu 0.2.0.

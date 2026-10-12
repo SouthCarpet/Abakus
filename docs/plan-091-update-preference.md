@@ -39,8 +39,15 @@ kliknutia a oneskorené dokončenie. Test databázy prešiel aj pred opravou.
 Strata hodnoty pri skutočnom reštarte alebo inštalácii novej verzie sa
 nepotvrdila. Natívna aplikácia ani inštalátor sa pri tomto overení nespustili.
 
-Globálny indikátor aktualizácie je zapojený v hornej lište appky
+Globálny indikátor aktualizácie je tichý riadok v nástrojoch hlavičky
 (`src/components/UpdateIndicator.tsx`, `src/lib/updateStatus.ts`). Ukáže sa,
-len keď Nastavenia už predtým samé zistili novšie vydanie; indikátor sám nič
-nekontroluje a nevolá sieť. Kliknutie otvorí Nastavenia. Podrobné dôkazy sú
+len keď kontrola našla novšie vydanie; indikátor sám nič nekontroluje a
+nevolá sieť. Kliknutie otvorí **Nastavenia > O aplikácii**.
+
+Od Kaliber r3 (Michal 2026-10-12) kontrola beží len so súhlasom a len na
+troch cestách: pri spustení (ticho, `checkAtStart`), pri otvorení sekcie
+O aplikácii a na tlačidlo (`checkNow`), všetko v `src/lib/updateCheck.ts`.
+Zapnutie prepínača samo nekontroluje. `check_update_now` vracia pri zlyhaní
+požiadavky, HTTP chybe alebo nečitateľnej odpovedi `Err`; čas a výsledok
+poslednej kontroly sa ukladajú v `localStorage["abakus.update.lastCheck"]`. Podrobné dôkazy sú
 v artefaktoch plánu 091 s predponou `update5-`.

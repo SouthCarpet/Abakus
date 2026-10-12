@@ -111,7 +111,7 @@
 - **Audit-write failures exist only in the current process.** Nastavenia shows
   them until the application closes.
 - **Two chips share the label "Všetko".** On Prehľad the period cluster and the account-type cluster each end with a chip named "Všetko" (`src/screens/Overview.tsx`). Position tells them apart, wording does not. Reported by the closing visual verification (2026-09-01) as a SHOULD, left as a residual rather than reopening the round.
-- **Poznámky k vydaniu v karte Stav vykresľujú iba nadpisy a odrážky.** Vnorený
+- **Poznámky k vydaniu v sekcii O aplikácii vykresľujú iba nadpisy a odrážky.** Vnorený
   Markdown (`**tučné**`, odkazy, spätné apostrofy) sa zobrazí doslovne, nie
   naformátovaný.
 - **Stav "Overujem podpis súboru…" sa nikdy nevykreslí.** Overenie beží v tom
@@ -134,4 +134,25 @@
   **Poplatky** tile and chart series. A description that does not fold to
   start with `poplat` remains `Other` and reports the existing unknown-type
   warning.
-
+- **Kaliber r3 (0.2.0): čo appka zámerne nemá.** Nemá paletu príkazov
+  (Ctrl+K) ani globálne hľadanie v hlavičke; Ctrl+F zameria pole Hľadať
+  v Transakciách. Nemá jednoznakové skratky, preto ani ich prepínač
+  v Nastaveniach. Nemá úvodnú prehliadku, preto Pomocník neponúka
+  „Zobraziť prehliadku znova“. Del na zozname len otvorí potvrdenie,
+  lebo všetky mazania sú nevratné.
+- **Čiara činnosti pri importe je neurčitá.** Backend nehlási priebeh
+  po súboroch, takže čiara v hlavičke nemá percentá. Na konci ostane
+  v pätičke datovaná poznámka „Import dokončený, súbory: N.“.
+- **Zvýraznenie zmenených riadkov porovnáva stav a kategóriu.** Riadok,
+  ktorý zápis presunie mimo aktuálny filter, sa nepodfarbí, lebo v tabuľke
+  už nie je. Riadky, ktoré pribudnú len zmenou filtra, sa nepodfarbia nikdy.
+- **Miesto hlásení vpravo dole nemá primárny zdroj.** Kaliber ho vedie ako
+  `unverified`. Na úzkom okne (do 599 px) sa hlásenie roztiahne cez celú
+  šírku dole.
+- **Úzke okno (390 px) posúva široké tabuľky vo vlastnej oblasti.** Kontrola
+  pri 390 px (svetlý aj tmavý vzhľad, syntetické dáta namiesto backendu) nenašla vodorovné
+  posúvanie celej stránky. Tabuľky Transakcie a Účty a zoznam výpisov
+  v Importe sa posúvajú vo svojej oblasti, takže stĺpce Kategória, Stav
+  a akcie sú vpravo mimo prvého pohľadu. Popisy osi v grafe Príjmy
+  a výdavky sa pri 390 px zalamujú a kľúč pravidla v Kategóriách sa
+  zalomí uprostred slova.

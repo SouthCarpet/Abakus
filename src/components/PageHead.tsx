@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 export function PageHead({ title, primary, more }: { title: string; primary?: ReactNode; more?: ReactNode }) {
   return (
     <div className="k-pagehead">
-      <h2 className="k-pagehead-title ab-pagehead-title">{title}</h2>
+      <h2 className="k-pagehead-title">{title}</h2>
       {primary}
       {more}
     </div>

@@ -22,7 +22,7 @@ export const HELP_TOPICS: Topic[] = [
       'Stav Odhad znamená, že Abakus navrhol kategóriu podľa pravidla. Potvrďte ho tlačidlom alebo klávesom Enter na zameranom riadku.',
       'Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby.',
       'Použiť aj na podobné zaradí aj už importované nezaradené alebo navrhnuté platby rovnakého obchodníka. Potvrdený riadok sa nikdy neprepíše.',
-      'Hromadné priradenie sa dá vrátiť tlačidlom Späť v hlásení vpravo dole alebo klávesmi Ctrl+Z.',
+      'Hromadné priradenie sa dá vrátiť tlačidlom Späť v hlásení vpravo dole alebo klávesmi Ctrl+Z. Ctrl+Y ho znova vykoná.',
       'Hľadanie spája obchodníka s miestom: Penny Neuss nenájde Penny Berlin.',
     ],
   },
@@ -36,13 +36,13 @@ export const HELP_TOPICS: Topic[] = [
     id: 'import', screen: 'import', title: 'Import výpisov', lines: [
       'Presuňte PDF výpisy Tatra banky do okna alebo stlačte Vybrať PDF (Ctrl+O).',
       'Zamknutý výpis si vypýta heslo. Heslo sa uloží iba vtedy, keď to zaškrtnete.',
-      'Zmazanie výpisu je natrvalo. Dialóg najprv ukáže, koľko transakcií odstráni. Pôvodné PDF súbory zostanú.',
+      'Zmazanie výpisu je natrvalo. Dialóg najprv ukáže, koľko transakcií odstráni. Pôvodné PDF súbory zostanú. Del na riadku výpisu otvorí ten istý dialóg.',
     ],
   },
   {
     id: 'categories', screen: 'categories', title: 'Kategórie a pravidlá', lines: [
       'Pravidlo zaradí ďalšie platby rovnakého obchodníka. Cieľ pravidla zmeníte v detaile ním zaradenej transakcie.',
-      'Kategóriu s transakciami možno archivovať. Zmazanie najprv ukáže, čo sa zmení.',
+      'Kategóriu s transakciami možno archivovať. Zmazanie najprv ukáže, čo sa zmení. Del na riadku kategórie otvorí ten istý dialóg.',
     ],
   },
   {

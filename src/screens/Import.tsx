@@ -340,7 +340,8 @@ function StatementList({
 
   return (
     <Card title="Všetky výpisy">
-      <div ref={keys.containerRef}>
+      {/* A phone (390 px) scrolls the statement rows inside this region, not the page. */}
+      <div ref={keys.containerRef} className="ab-table-scroll" role="region" aria-label="Všetky výpisy" tabIndex={0}>
       {sorted.length === 0 ? (
         <p>Zatiaľ žiadne importy.</p>
       ) : (
