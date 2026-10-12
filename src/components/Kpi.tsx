@@ -3,8 +3,8 @@ import { formatEur } from '../lib/format'
 export type KpiTone = 'default' | 'danger' | 'success'
 
 function toneClass(tone: KpiTone): string {
-  if (tone === 'danger') return ' k-text-danger'
-  if (tone === 'success') return ' k-text-success'
+  if (tone === 'danger') return ' ab-text-danger'
+  if (tone === 'success') return ' ab-text-success'
   return ''
 }
 
@@ -14,6 +14,8 @@ function gaugePercent(cents: number, min: number, max: number): number {
   return Math.min(100, Math.max(0, ((cents - min) / span) * 100))
 }
 
+// One row of a `.k-summary` table (Kaliber, replaces the hero KPI tile, SLOP-LAYOUT-05):
+// the label, the value and a micro-gauge under a metric with a monthly min and max.
 export function Kpi({
   label,
   cents,
@@ -35,12 +37,14 @@ export function Kpi({
   const span = max ?? Math.max(Math.abs(cents), 1)
   const pct = gaugePercent(cents, min, span)
   return (
-    <div className="k-kpi">
-      <span className="k-kpi-label">{label}</span>
-      <span className={`k-kpi-value k-num${toneClass(tone)}`}>{formatEur(cents)}</span>
-      <div className="k-gauge">
-        {baselineOnly ? null : <div className="k-gauge-fill" style={{ width: `${pct}%` }} />}
-      </div>
+    <div className="k-summary-row">
+      <dt>{label}</dt>
+      <dd className={`k-summary-value k-num${toneClass(tone)}`}>{formatEur(cents)}</dd>
+      <dd className="k-summary-gauge">
+        <div className="k-gauge">
+          {baselineOnly ? null : <div className="k-gauge-fill" style={{ width: `${pct}%` }} />}
+        </div>
+      </dd>
     </div>
   )
 }

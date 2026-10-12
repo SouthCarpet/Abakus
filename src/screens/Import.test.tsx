@@ -272,7 +272,7 @@ describe('Statement list: row-level Zmazať weight', () => {
     render(<Import />)
     const button = await screen.findByRole('button', { name: 'Zmazať' })
     expect(button).toHaveClass('k-btn-ghost')
-    expect(button).toHaveClass('k-text-danger')
+    expect(button).toHaveClass('ab-text-danger')
     expect(button).not.toHaveClass('k-btn-danger')
   })
 })

@@ -20,7 +20,7 @@ describe('RecurringTable Akcie column layout', () => {
       />
     )
     const ignoreButton = screen.getByRole('button', { name: 'Toto nie je pravidelná platba: Netflix' })
-    expect(ignoreButton.closest('.k-row')).toHaveClass('k-recurring-actions')
+    expect(ignoreButton.closest('.ab-row')).toHaveClass('ab-recurring-actions')
   })
 
   it('stacks the confirmed row actions in a column too', () => {
@@ -37,10 +37,10 @@ describe('RecurringTable Akcie column layout', () => {
       />
     )
     const ignoreButton = screen.getByRole('button', { name: 'Toto nie je pravidelná platba: Netflix' })
-    expect(ignoreButton.closest('.k-row')).toHaveClass('k-recurring-actions')
+    expect(ignoreButton.closest('.ab-row')).toHaveClass('ab-recurring-actions')
   })
 
-  // Oracle: round-3 finding 1; ignored rows must carry k-recurring-actions
+  // Oracle: round-3 finding 1; ignored rows must carry ab-recurring-actions
   // the same way estimate and confirmed rows already do.
   it('stacks the ignored row actions in a column too', () => {
     render(
@@ -56,6 +56,6 @@ describe('RecurringTable Akcie column layout', () => {
       />
     )
     const restoreButton = screen.getByRole('button', { name: 'Obnoviť odhad Netflix' })
-    expect(restoreButton.closest('.k-row')).toHaveClass('k-recurring-actions')
+    expect(restoreButton.closest('.ab-row')).toHaveClass('ab-recurring-actions')
   })
 })

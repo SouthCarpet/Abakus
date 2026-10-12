@@ -10,6 +10,8 @@ import { InsightsPanel } from '../components/insights/InsightsPanel'
 import { StatementReminderBanner } from '../components/insights/StatementReminderBanner'
 import { YearComparisonCard } from '../components/insights/YearComparisonCard'
 import { Kpi } from '../components/Kpi'
+import { PageHead } from '../components/PageHead'
+import { ExportPdfAction } from '../components/report/ExportPdfAction'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { monthRange, periodRange, validPeriod } from '../lib/period'
 import { localTodayIso } from '../lib/recurring-labels'
@@ -31,7 +33,7 @@ export function ChecksumBanner({ row, onNavigate }: { row: BadChecksum; onNaviga
         </Button>
       }
     >
-      <p className="k-text-danger">
+      <p className="ab-text-danger">
         {`Výpis č. ${row.number} (účet ${row.account_label}) nesedí o ${formatEur(Math.abs(row.off_by_cents))}`}
       </p>
     </Card>
@@ -40,12 +42,14 @@ export function ChecksumBanner({ row, onNavigate }: { row: BadChecksum; onNaviga
 
 function UnassignedTile({ count, suggested, onClick }: { count: number; suggested: number; onClick: () => void }) {
   return (
-    <button type="button" className="k-kpi k-well k-section-body" onClick={onClick}>
-      <span className="k-kpi-label">Nezaradené</span>
-      <span className="k-kpi-value k-num">
-        {count} (odhady {suggested})
-      </span>
-    </button>
+    <div className="k-summary-row">
+      <dt>Nezaradené</dt>
+      <dd className="k-summary-value k-num">
+        <button type="button" className="k-key-link" aria-label={`Nezaradené: ${count} (odhady ${suggested})`} onClick={onClick}>
+          <span className="k-key">{count} (odhady {suggested})</span>
+        </button>
+      </dd>
+    </div>
   )
 }
 
@@ -58,8 +62,8 @@ function TopMerchantsTable({ rows, onMerchantClick }: { rows: Summary['top_merch
         <thead>
           <tr>
             <th>Obchodník</th>
-            <th className="k-num">Suma</th>
-            <th className="k-num">Počet</th>
+            <th className="k-num k-cell-number">Suma</th>
+            <th className="k-num k-cell-number">Počet</th>
           </tr>
         </thead>
         <tbody>
@@ -70,8 +74,8 @@ function TopMerchantsTable({ rows, onMerchantClick }: { rows: Summary['top_merch
                   {r.merchant}
                 </Button>
               </td>
-              <td className="k-num">{formatEur(r.cents)}</td>
-              <td className="k-num">{r.count}</td>
+              <td className="k-num k-cell-number">{formatEur(r.cents)}</td>
+              <td className="k-num k-cell-number">{r.count}</td>
             </tr>
           ))}
         </tbody>
@@ -125,7 +129,7 @@ function SummaryBody({
   const onMerchantClick = (merchant: string) => onNavigateToTransactions({ merchantText: merchant })
   return (
     <>
-      <div className="k-kpi-row">
+      <dl className="k-summary" aria-label="Súhrn obdobia">
         <Kpi label="Príjem" cents={summary.income_cents} min={incomeSpan?.min} max={incomeSpan?.max} tone="success" />
         <Kpi label="Výdavky" cents={summary.expense_cents} min={expenseSpan?.min} max={expenseSpan?.max} tone="danger" />
         {/* Point 13: fee_cents is already a subset of expense_cents above, so
@@ -133,13 +137,13 @@ function SummaryBody({
         <Kpi label="Poplatky" cents={summary.fee_cents} min={feeSpan?.min} max={feeSpan?.max} tone="danger" />
         <Kpi label="Čisté" cents={summary.net_cents} tone={summary.net_cents >= 0 ? 'success' : 'danger'} baselineOnly />
         <Kpi label="Prevody vylúčené" cents={summary.transfer_cents} />
-      </div>
-      <UnassignedTile
-        count={summary.unassigned_count}
-        suggested={summary.suggested_count}
-        onClick={() => onNavigateToTransactions({ status: 'unassigned' })}
-      />
-      <div className="k-row" style={{ alignItems: 'stretch' }}>
+        <UnassignedTile
+          count={summary.unassigned_count}
+          suggested={summary.suggested_count}
+          onClick={() => onNavigateToTransactions({ status: 'unassigned' })}
+        />
+      </dl>
+      <div className="ab-row" style={{ alignItems: 'stretch' }}>
         <div style={{ flex: 1, minWidth: 320 }}>
           <Card title="Podľa kategórií a mesiacov">
             <MonthlyStacked rows={summary.by_month_category} onCategoryClick={onCategoryClick} />
@@ -224,10 +228,11 @@ export function Overview({
   const feeSpan = summary ? monthlySpan(summary.by_month, (m) => m.fee_cents) : undefined
 
   return (
-    <div className="k-section">
-      <div className="k-row">
+    <div className="ab-screen">
+      <PageHead title="Prehľad" primary={<ExportPdfAction variant="primary" />} />
+      <div className="ab-row">
         <PeriodPicker value={period} onChange={setPeriod} />
-        <div className="k-row" role="group" aria-label="Účet">
+        <div className="ab-row" role="group" aria-label="Účet">
           {ACCOUNT_KINDS.map((option) => (
             <Button aria-pressed={accountKind === option.id} key={option.id} variant={accountKind === option.id ? 'primary' : 'secondary'} onClick={() => setAccountKind(option.id)}>
               {option.label}

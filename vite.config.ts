@@ -1,11 +1,21 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+
+// About (Kaliber R12): the version and the build the user runs. The build is the short git
+// commit at build time; without git it says so.
+const version = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version
+function gitBuild(): string {
+  try { return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() } catch { return 'neznáme' }
+}
 
 const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig({
   plugins: [react()],
+  define: { __APP_VERSION__: JSON.stringify(version), __APP_BUILD__: JSON.stringify(gitBuild()) },
   clearScreen: false,
   server: {
     port: 1420,

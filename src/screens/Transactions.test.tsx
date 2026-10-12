@@ -1,8 +1,19 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, type TxRow } from '../api'
 import { files } from '../lib/files'
 import { Transactions, TransactionRow } from './Transactions'
+import { Toasts } from '../components/Toasts'
+import { resetToasts } from '../kaliber/toast'
+
+// Toasts render in the app's one region (Kaliber R12); the screen tests mount it beside the screen.
+beforeEach(() => { resetToasts(); render(<Toasts />) })
+
+// Kaliber R12: secondary commands live in the "Ďalšie" menu of the screen header.
+function menuItem(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: 'Ďalšie' }))
+  return screen.getByRole('menuitem', { name })
+}
 
 function makeTxRow(overrides: Partial<TxRow> & { id: number }): TxRow {
   return {
@@ -310,7 +321,7 @@ it('retains parent drilldown 10 through asynchronous metadata and queries parent
 // debounce wait needed for the initial value.
 it('applies initialText as the search filter immediately, without waiting for the debounce', async () => {
   render(<Transactions initialText="Kaufland" />)
-  expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('Kaufland')
+  expect(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('Kaufland')
   await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'Kaufland' })))
 })
 
@@ -533,7 +544,7 @@ describe('Transactions keyboard row navigation (point 12)', () => {
     render(<Transactions />)
     await screen.findByText('Prvy')
 
-    const search = screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })
+    const search = screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })
     fireEvent.keyDown(search, { key: 'ArrowDown' })
     fireEvent.keyDown(search, { key: 'ArrowDown' })
     fireEvent.keyDown(search, { key: 'Enter' })
@@ -581,7 +592,7 @@ describe('Transactions common search (point 9)', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'Filter kategórie' }))
     fireEvent.click(screen.getByRole('option', { name: 'Jedlo' }))
     fireEvent.change(screen.getByRole('combobox', { name: 'Stav' }), { target: { value: 'unassigned' } })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
 
     const expectedFilter = {
       from: null, to: null,
@@ -604,14 +615,14 @@ describe('Transactions common search (point 9)', () => {
     render(<Transactions />)
     await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'twi' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'twi' } })
     await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'twi' })))
 
     const groupButton = await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
     fireEvent.click(groupButton)
 
     expect(await screen.findByText('15 vybraných')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('twi')
+    expect(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('twi')
   })
 
   it('sends the currently visible search text in the CSV export before the debounce settles', async () => {
@@ -621,8 +632,8 @@ describe('Transactions common search (point 9)', () => {
     await screen.findByText('Obchod')
     vi.mocked(api.listTransactions).mockClear()
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Exportovať filtrované CSV' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
+    fireEvent.click(menuItem('Exportovať filtrované CSV'))
 
     // The 300 ms debounce has not elapsed: no listTransactions refetch has
     // carried the new text yet, so this proves the export used the live
@@ -646,12 +657,12 @@ describe('Transactions common search (point 9)', () => {
     render(<Transactions />)
     await screen.findByText('Obchod')
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
     await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'Penny Neuss' })))
 
     fireEvent.click(screen.getByRole('button', { name: 'Vymazať všetky filtre' }))
 
-    expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
+    expect(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
     // Clear-all resets the whole filter: the next list call carries only nulls.
     await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual({
       from: null, to: null,
@@ -689,7 +700,8 @@ describe('Transactions: dbGeneration bump resets transient state and refetches',
     // (existing behaviour), and reload()'s revision bump briefly empties
     // and refetches `rows` in the same beat; wait for the row to be back
     // before re-selecting it, or the checkbox is not there yet to click.
-    await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
+    await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.length).toBeGreaterThanOrEqual(2))
+    await waitFor(() => expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByRole('checkbox')[0])
     // The generation bump below must clear a selection made AFTER that
     // assignment too, not just whatever the assignment itself already cleared.

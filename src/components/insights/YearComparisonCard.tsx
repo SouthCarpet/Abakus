@@ -36,9 +36,9 @@ function TotalsRow({ label, current, previous }: { label: string; current: numbe
   return (
     <tr>
       <td>{label}</td>
-      <td className="k-num">{formatEur(current)}</td>
-      <td className="k-num">{formatEur(previous)}</td>
-      <td className="k-num">{percentText(percentDelta(current, previous))}</td>
+      <td className="k-num k-cell-number">{formatEur(current)}</td>
+      <td className="k-num k-cell-number">{formatEur(previous)}</td>
+      <td className="k-num k-cell-number">{percentText(percentDelta(current, previous))}</td>
     </tr>
   )
 }
@@ -67,7 +67,7 @@ export function YearComparisonCard({ accountKind, today }: { accountKind: Accoun
 
   return (
     <Card title="Porovnanie s rovnakým obdobím vlani">
-      <div className="k-row" role="group" aria-label="Dĺžka porovnávaného obdobia">
+      <div className="ab-row" role="group" aria-label="Dĺžka porovnávaného obdobia">
         <input
           className="k-input k-well"
           aria-label="Mesiac na porovnanie"
@@ -89,14 +89,14 @@ export function YearComparisonCard({ accountKind, today }: { accountKind: Accoun
       {rangeError ? <p role="alert">{rangeError}</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {ranges && current && previous ? (
-        <div className="k-table-scroll">
+        <div className="ab-table-scroll">
           <table className="k-table">
             <thead>
               <tr>
                 <th></th>
                 <th>{rangeLabel(ranges.current)}</th>
                 <th>{rangeLabel(ranges.previous)}</th>
-                <th className="k-num">Zmena</th>
+                <th className="k-num k-cell-number">Zmena</th>
               </tr>
             </thead>
             <tbody>

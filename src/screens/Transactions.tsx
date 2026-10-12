@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import type { Account, AccountKind, Category, RuleView, Status, TxFilter, TxKind, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
@@ -6,7 +6,16 @@ import { CategoryDialog } from '../components/CategoryDialog'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { OperationStatus } from '../components/OperationStatus'
-import { Toast } from '../components/Toast'
+import { MoreMenu } from '../components/MoreMenu'
+import { PageHead } from '../components/PageHead'
+import { ExportPdfDialog } from '../components/report/ExportPdfDialog'
+import { footerNote } from '../kaliber/activity'
+import { binding, withKey } from '../kaliber/bindings'
+import { popLayer, pushLayer, searchLayer, useEscapeLayer } from '../kaliber/escape'
+import { capNote, changedKeys, InkCap, INK_HOLD_MS } from '../kaliber/ink'
+import { keyLabel, matchKey } from '../kaliber/keys'
+import { dropToastsWithAction, toast } from '../kaliber/toast'
+import { isMoveKey, nextFocus, rangeIds, selectAll } from '../lib/register-keys'
 import { NoteEditor } from '../components/NoteEditor'
 import { RecurringTransactionAction } from '../components/recurring'
 import { statusLabel } from '../lib/categories'
@@ -71,7 +80,7 @@ function UnassignedGroupsBar({ rows, onSelectGroup }: { rows: TxRow[]; onSelectG
   const groups = useMemo(() => groupUnassignedTransactions(rows), [rows])
   if (groups.length === 0) return null
   return (
-    <div className="k-row k-well" role="region" aria-label="Skupiny nezaradených platieb">
+    <div className="ab-row k-well" role="region" aria-label="Skupiny nezaradených platieb">
       {groups.map((group) => (
         <Button key={group.ids[0]} variant="ghost" onClick={() => onSelectGroup(group.ids)}>
           {groupLabel(group)}
@@ -87,14 +96,6 @@ function UnassignedGroupsBar({ rows, onSelectGroup }: { rows: TxRow[]; onSelectG
 function isFormField(target: EventTarget | null): boolean {
   const tag = (target as HTMLElement | null)?.tagName
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-}
-
-function nextFocusedRowId(rows: TxRow[], currentId: number | null, direction: 1 | -1): number | null {
-  if (rows.length === 0) return null
-  const currentIndex = currentId === null ? -1 : rows.findIndex((r) => r.id === currentId)
-  if (currentIndex === -1) return direction === 1 ? rows[0].id : rows[rows.length - 1].id
-  const nextIndex = Math.min(Math.max(currentIndex + direction, 0), rows.length - 1)
-  return rows[nextIndex].id
 }
 
 function useDebouncedText(delay: number, initial = ''): [string, string, (v: string) => void] {
@@ -120,6 +121,7 @@ function FilterBar({
   onStatus,
   onKind,
   onText,
+  searchRef,
 }: {
   accounts: Account[]
   categories: Category[]
@@ -133,9 +135,10 @@ function FilterBar({
   onStatus: (v: Status | null) => void
   onKind: (v: TxKind | null) => void
   onText: (v: string) => void
+  searchRef?: RefObject<HTMLInputElement | null>
 }) {
   return (
-    <div className="k-row">
+    <div className="ab-row">
       <select
         className="k-select k-well"
         aria-label="Účet"
@@ -177,8 +180,13 @@ function FilterBar({
         ))}
       </select>
       <input
-        className="k-input k-well"
+        ref={searchRef}
+        type="search"
+        data-k-search=""
+        className="k-input"
         aria-label="Hľadať obchodníka alebo poznámku"
+        aria-keyshortcuts="Control+F"
+        title={withKey('Hľadať', 'find')}
         placeholder="Hľadať obchodníka alebo poznámku..."
         value={text}
         onChange={(e) => onText(e.target.value)}
@@ -207,10 +215,10 @@ function BulkBar({
   const [applyToMatching, setApplyToMatching] = useState(false)
   if (count === 0) return null
   return (
-    <div className="k-row k-well">
+    <div className="ab-row k-well">
       <span>{count} vybraných</span>
       <CategoryPicker value={categoryId} onChange={onCategoryChange} categories={categories} onCreate={onCreate} />
-      <label className="k-checkbox">
+      <label className="ab-checkbox">
         <input type="checkbox" checked={applyToMatching} onChange={(e) => setApplyToMatching(e.target.checked)} />
         Použiť aj na podobné
       </label>
@@ -261,7 +269,7 @@ function SeedRuleRedirect({ row, categories, onChanged, onCreate }: { row: TxRow
 
   if (!loaded || !rule) return error ? <p role="alert">{error}</p> : null
   return (
-    <div className="k-row">
+    <div className="ab-row">
       {error ? <p role="alert">{error}</p> : null}
       <span>Zaradené podľa slovníka: {rule.parent_name ? `${rule.parent_name} / ${rule.category_name}` : rule.category_name}</span>
       <CategoryPicker
@@ -277,12 +285,17 @@ function SeedRuleRedirect({ row, categories, onChanged, onCreate }: { row: TxRow
   )
 }
 
+function rowClass(focused: boolean, selected: boolean, inked: boolean): string {
+  return ['k-ink', focused && 'is-active', selected && 'is-selected', inked && 'is-inked'].filter(Boolean).join(' ')
+}
+
 export function TransactionRow({
   row,
   categories,
   selected,
   matchingCount = 0,
   focused = false,
+  inked = false,
   onSelect,
   onAssign,
   onConfirm,
@@ -297,7 +310,9 @@ export function TransactionRow({
   matchingCount?: number
   // Point 12: true for the row currently holding the keyboard roving highlight.
   focused?: boolean
-  onSelect: (id: number, checked: boolean) => void
+  // Kaliber F2: the row's category or state changed by the last write (entry ink).
+  inked?: boolean
+  onSelect: (id: number, checked: boolean, range?: boolean) => void
   onAssign: (id: number, categoryId: number | null) => void
   onConfirm: (id: number, applyToMatching: boolean) => void
   onNoteSaved: () => Promise<void>
@@ -308,9 +323,16 @@ export function TransactionRow({
   const isTransfer = row.status === 'transfer'
   return (
     <>
-      <tr className={focused ? 'is-active' : undefined}>
+      <tr className={rowClass(focused, selected, inked)} data-row-id={row.id}>
         <td>
-          <input aria-label={`Vybrať transakciu ${row.id}: ${row.merchant_raw}`} type="checkbox" checked={selected} disabled={isTransfer} onChange={(e) => onSelect(row.id, e.target.checked)} />
+          <input
+            aria-label={`Vybrať transakciu ${row.id}: ${row.merchant_raw}`}
+            type="checkbox"
+            checked={selected}
+            disabled={isTransfer}
+            onChange={() => {}}
+            onClick={(e) => onSelect(row.id, e.currentTarget.checked, e.shiftKey)}
+          />
         </td>
         <td>{formatDate(row.tx_date)}</td>
         <td>
@@ -318,9 +340,9 @@ export function TransactionRow({
         </td>
         <td>
           <div>{row.merchant_raw}</div>
-          {row.place ? <div className="k-field-label">{row.place}</div> : null}
+          {row.place ? <div className="ab-field-label">{row.place}</div> : null}
         </td>
-        <td className="k-num k-money">{formatEur(row.amount_cents)}</td>
+        <td className="k-num k-cell-number ab-money">{formatEur(row.amount_cents)}</td>
         <td>
           <CategoryPicker
             label={`Kategória transakcie ${row.id}`}
@@ -339,7 +361,7 @@ export function TransactionRow({
                 Potvrdiť
               </Button>
               {matchingCount > 0 ? (
-                <label className="k-checkbox">
+                <label className="ab-checkbox">
                   <input type="checkbox" checked={applyToMatching} onChange={(e) => setApplyToMatching(e.target.checked)} />
                   {`Potvrdiť aj podobné (${matchingCount})`}
                 </label>
@@ -374,6 +396,7 @@ export function Transactions({
   initialAccountKind,
   initialText,
   dbGeneration,
+  onNavigateToImport,
 }: {
   statementId?: number | null
   initialStatus?: Status | null
@@ -390,6 +413,7 @@ export function Transactions({
   // stays mounted across a generation bump; either way it drops the old-DB
   // transient state below and refetches.
   dbGeneration?: number
+  onNavigateToImport?: () => void
 }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -403,7 +427,16 @@ export function Transactions({
   const [selected, setSelected] = useState<Set<number>>(new Set())
   // Point 12: which row currently holds the keyboard roving highlight.
   const [focusedRowId, setFocusedRowId] = useState<number | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [anchorId, setAnchorId] = useState<number | null>(null)
+  const [inked, setInked] = useState<ReadonlySet<number>>(new Set())
+  const [pdfOpen, setPdfOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const tableRef = useRef<HTMLDivElement>(null)
+  // F2 entry ink: the signatures of the last loaded rows, and whether the next load follows a
+  // write (only a write inks; a filter change or a refresh never does).
+  const lastSignatures = useRef<Map<number, string> | null>(null)
+  const inkNextLoad = useRef(false)
+  const inkCap = useRef(new InkCap())
   // A17: distinguishes "no rows loaded yet" from "the filter really matches
   // nothing", so the empty sentence only shows once a real load finished.
   const [loaded, setLoaded] = useState(false)
@@ -444,17 +477,39 @@ export function Transactions({
   )
 
   const reload = useCallback(() => setRevision((value) => value + 1), [])
+  const reloadAfterWrite = useCallback(() => { inkNextLoad.current = true; setRevision((value) => value + 1) }, [])
   const fetchRequest = useRef(0)
 
   // Shared by the filter-driven effect below and by a note save's own
   // refresh, so whichever request is actually the latest always wins: a
   // note-triggered refresh in flight when the filter changes again never
   // overwrites rows with a stale answer, and vice versa.
+  function inkRows(data: TxRow[]) {
+    const next = new Map(data.map((r) => [r.id, `${r.status}|${r.category_id ?? ''}`]))
+    const changed = inkNextLoad.current ? changedKeys(lastSignatures.current, next) : []
+    inkNextLoad.current = false
+    lastSignatures.current = next
+    if (changed.length === 0) return
+    if (!inkCap.current.admit(changed.length, Date.now())) {
+      setInked(new Set())
+      footerNote(capNote(changed.map((id) => data.find((r) => r.id === id)?.merchant_raw ?? String(id))))
+      return
+    }
+    setInked(new Set(changed))
+  }
+
+  useEffect(() => {
+    if (inked.size === 0) return
+    const timer = setTimeout(() => setInked(new Set()), INK_HOLD_MS)
+    return () => clearTimeout(timer)
+  }, [inked])
+
   async function fetchRows(): Promise<void> {
     const request = ++fetchRequest.current
     try {
       const data = await api.listTransactions(filter)
       if (request !== fetchRequest.current) return
+      inkRows(data)
       setRows(data); setLoaded(true); setLoadError('')
       // A note save can change which rows the active text filter matches; a
       // row that just dropped out of view must drop out of the bulk
@@ -493,7 +548,7 @@ export function Transactions({
   const isFirstDbGeneration = useRef(true)
   useEffect(() => {
     if (isFirstDbGeneration.current) { isFirstDbGeneration.current = false; return }
-    setLastUndo(null)
+    forgetUndo()
     setSelected(new Set())
     setFocusedRowId(null)
     reload()
@@ -521,19 +576,80 @@ export function Transactions({
     if (focusedRowId !== null && !rows.some((r) => r.id === focusedRowId)) setFocusedRowId(null)
   }, [rows, focusedRowId])
 
+  // The register keys (Kaliber R22, docs/plan-091-kaliber-r3.md): the table region owns them
+  // once the key comes from something that is not a form field, so the search box, a note and
+  // the CategoryPicker's own search keep typing normal keys.
   function onTableKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (isFormField(event.target)) return
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    if (matchKey(event.nativeEvent, 'primary+a')) {
       event.preventDefault()
-      setFocusedRowId(nextFocusedRowId(rows, focusedRowId, event.key === 'ArrowDown' ? 1 : -1))
+      setSelected((prev) => selectAll(rows, prev))
       return
     }
-    if (event.key !== 'Enter') return
+    if (moveWithKey(event)) return
+    rowKey(event)
+  }
+
+  // Arrows, Home, End, PgUp and PgDn move the focus; with Shift they extend the selection.
+  function moveWithKey(event: KeyboardEvent<HTMLDivElement>): boolean {
+    if (!isMoveKey(event.key) || event.ctrlKey || event.metaKey || event.altKey) return false
+    event.preventDefault()
+    const next = nextFocus(rows, focusedRowId, event.key)
+    setFocusedRowId(next)
+    if (!event.shiftKey || next === null) return true
+    const from = anchorId ?? focusedRowId ?? next
+    setAnchorId(from)
+    setSelected((prev) => new Set([...prev, ...rangeIds(rows, from, next)]))
+    return true
+  }
+
+  // Space toggles the focused row; Enter accepts its suggestion.
+  function rowKey(event: KeyboardEvent<HTMLDivElement>) {
     const focusedRow = rows.find((r) => r.id === focusedRowId)
-    if (!focusedRow || focusedRow.status !== 'suggested') return
+    if (!focusedRow) return
+    if (matchKey(event.nativeEvent, 'space')) {
+      event.preventDefault()
+      if (focusedRow.status !== 'transfer') toggleSelect(focusedRow.id, !selected.has(focusedRow.id))
+      return
+    }
+    if (event.key !== 'Enter' || focusedRow.status !== 'suggested') return
     event.preventDefault()
     void action.run(() => confirmOne(focusedRow.id, false))
   }
+
+  // Escape layer 6: the search field with text clears first (the focus stays in it).
+  useEffect(() => {
+    pushLayer(searchLayer)
+    return () => popLayer(searchLayer)
+  }, [])
+
+  // Escape layer 7: a selection clears, the rows stay and the focus stays.
+  useEscapeLayer('selection', selected.size > 0, () => setSelected(new Set()))
+
+  // Ctrl+F focuses the filter field (WebView2 would open its own find bar); Ctrl+Z undoes the
+  // last bulk assignment, but never inside a text field, where Ctrl+Z undoes typing.
+  const latestUndo = useRef<() => void>(() => {})
+  latestUndo.current = () => {
+    const id = lastUndo?.id
+    if (id && !action.busy) void action.run(() => undoAssignment(id))
+  }
+  useEffect(() => {
+    function onKeyDown(event: globalThis.KeyboardEvent) {
+      if (document.querySelector('[aria-modal="true"]')) return
+      if (matchKey(event, 'primary+f')) {
+        event.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+        return
+      }
+      if (matchKey(event, 'primary+z') && !isFormField(event.target)) {
+        event.preventDefault()
+        latestUndo.current()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   function clearFilters() {
     setPeriod({ kind: 'all' }); setAccountId(null); setCategoryId(null)
@@ -544,14 +660,20 @@ export function Transactions({
   async function exportCsv() {
     if (!effectivePeriodValid) return
     const currentFilter = { ...filter, text: text || null }
-    setToast(null)
     const path = await files.saveCsv()
-    if (!path) { setToast('Export zrušený.'); return }
+    if (!path) { toast('Export zrušený.'); return }
     const count = await api.exportCsv(currentFilter, path)
-    setToast(`Exportovaných transakcií: ${count}.`)
+    toast(`Exportovaných transakcií: ${count}.`)
   }
 
-  function toggleSelect(id: number, checked: boolean) {
+  // A click toggles one row and moves the anchor; Shift+click selects from the anchor.
+  function toggleSelect(id: number, checked: boolean, range = false) {
+    setFocusedRowId(id)
+    if (range && anchorId !== null) {
+      setSelected((prev) => new Set([...prev, ...rangeIds(rows, anchorId, id)]))
+      return
+    }
+    setAnchorId(id)
     setSelected((prev) => {
       const next = new Set(prev)
       if (checked) next.add(id)
@@ -560,17 +682,22 @@ export function Transactions({
     })
   }
 
+  function forgetUndo() {
+    setLastUndo(null)
+    dropToastsWithAction()
+  }
+
   async function assignOne(id: number, catId: number | null) {
     if (catId === null) return
-    setLastUndo(null)
+    forgetUndo()
     await api.assign([id], catId, false)
-    reload()
+    reloadAfterWrite()
   }
 
   async function confirmOne(id: number, applyToMatching: boolean) {
-    setLastUndo(null)
+    forgetUndo()
     await api.confirm([id], applyToMatching)
-    reload()
+    reloadAfterWrite()
   }
 
   // Point 15: only the bulk-assign command (`api.bulkAssign`) is undoable;
@@ -581,28 +708,30 @@ export function Transactions({
     const outcome = await api.bulkAssign([...selected], catId, applyToMatching)
     setSelected(new Set())
     setBulkCategoryId(null)
-    setToast(outcome.skipped_transfers > 0 ? `Prevody sa nepriraďujú, preskočené: ${outcome.skipped_transfers}` : null)
+    dropToastsWithAction()
+    if (outcome.skipped_transfers > 0) toast(`Prevody sa nepriraďujú, preskočené: ${outcome.skipped_transfers}`)
     setLastUndo(outcome.undo_id ? { id: outcome.undo_id } : null)
-    reload()
+    const undoId = outcome.undo_id
+    if (undoId) toast('Priradenie dokončené.', { label: 'Späť', run: () => void action.run(() => undoAssignment(undoId)) })
+    reloadAfterWrite()
   }
 
   // Point 11: bulk confirm has no undo id from the backend, so it never
   // touches lastUndo other than invalidating a stale one from an earlier
   // bulk assignment (the write itself makes that old undo id go stale).
   async function bulkConfirm(applyToMatching: boolean) {
-    setLastUndo(null)
+    forgetUndo()
     const outcome = await api.confirm([...selected], applyToMatching)
     setSelected(new Set())
-    setToast(`Potvrdených: ${outcome.updated}.`)
-    reload()
+    toast(`Potvrdených: ${outcome.updated}.`)
+    reloadAfterWrite()
   }
 
-  async function undoLast() {
-    if (!lastUndo) return
-    const outcome = await api.undoLastAssignment(lastUndo.id)
-    setLastUndo(null)
-    setToast(outcome ? `Vrátených transakcií: ${outcome.restored_rows}.` : 'Vrátenie sa nepodarilo, akcia už nie je aktuálna.')
-    if (outcome) reload()
+  async function undoAssignment(id: string) {
+    const outcome = await api.undoLastAssignment(id)
+    forgetUndo()
+    toast(outcome ? `Vrátených transakcií: ${outcome.restored_rows}.` : 'Vrátenie sa nepodarilo, akcia už nie je aktuálna.')
+    if (outcome) reloadAfterWrite()
   }
 
   // Section 9 U05: creation and assignment stay two distinct, explicit
@@ -623,9 +752,20 @@ export function Transactions({
   const suggestedCount = rows.filter((r) => r.status === 'suggested').length
 
   return (
-    <div className="k-section">
-      <div className="k-row">
-        <h2>Transakcie</h2>
+    <div className="ab-screen">
+      <PageHead
+        title="Transakcie"
+        more={
+          <MoreMenu
+            items={[
+              { label: 'Obnoviť', onSelect: reload },
+              { label: 'Exportovať filtrované CSV', disabled: exportAction.busy || !effectivePeriodValid, onSelect: () => void exportAction.run(exportCsv) },
+              { label: 'Exportovať PDF', onSelect: () => setPdfOpen(true) },
+            ]}
+          />
+        }
+      />
+      <div className="ab-row">
         <span className="k-card-badge">Nezaradené: {unassignedCount}</span>
         <span className="k-card-badge">Odhady: {suggestedCount}</span>
       </div>
@@ -644,28 +784,23 @@ export function Transactions({
         onStatus={setStatus}
         onKind={setKind}
         onText={setText}
+        searchRef={searchRef}
       />
-      <div className="k-row">
+      <div className="ab-row">
         <Button variant="secondary" onClick={clearFilters}>Vymazať všetky filtre</Button>
-        <Button variant="secondary" disabled={exportAction.busy || !effectivePeriodValid} onClick={() => void exportAction.run(exportCsv)}>Exportovať filtrované CSV</Button>
-        <Button variant="ghost" onClick={reload}>Obnoviť</Button>
       </div>
       <OperationStatus error={metadataError} />
       <LoadStatus loaded={loaded} error={loadError} valid={effectivePeriodValid} />
       <OperationStatus error={action.error} busy={action.busy} />
       <OperationStatus error={exportAction.error} busy={exportAction.busy} />
       <FilteredTotals rows={rows} categories={categories} loaded={loaded} categoriesLoaded={metadataLoaded} />
-      {toast ? <Toast message={toast} /> : null}
       {lastUndo ? (
-        <div className="k-row k-well" role="status">
-          <span>Priradenie dokončené.</span>
-          <Button variant="ghost" onClick={() => void action.run(undoLast)}>Späť</Button>
-        </div>
+        <p className="ab-field-label">Posledné hromadné priradenie sa dá vrátiť: {keyLabel(binding('undo').spec)}.</p>
       ) : null}
-      <p className="k-field-label">
+      <p className="ab-field-label">
         Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby. Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby rovnakého obchodníka.
       </p>
-      <fieldset disabled={action.busy} className="k-section">
+      <fieldset disabled={action.busy} className="ab-section">
         <UnassignedGroupsBar rows={rows} onSelectGroup={(ids) => setSelected(new Set(ids))} />
         <BulkBar
           count={selected.size}
@@ -676,15 +811,18 @@ export function Transactions({
           onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
           onConfirm={(applyToMatching) => void action.run(() => bulkConfirm(applyToMatching))}
         />
-        <div className="k-table-scroll" role="region" aria-label="Transakcie" tabIndex={0} onKeyDown={onTableKeyDown}>
-        <table className="k-table">
+        <p className="ab-field-label" id="ab-register-keys">
+          Klávesy v tabuľke: šípky a Home, End, PgUp, PgDn presúvajú, medzerník vyberie riadok, Enter prijme odhad, Ctrl+A vyberie všetko, Esc zruší výber. Zoznam je v Pomocníkovi (F1).
+        </p>
+        <div ref={tableRef} className="ab-table-scroll" role="region" aria-label="Transakcie" aria-describedby="ab-register-keys" tabIndex={0} onKeyDown={onTableKeyDown}>
+        <table className="k-table ab-register">
           <thead>
             <tr>
               <th></th>
               <th>Dátum</th>
               <th>Účet</th>
               <th>Obchodník</th>
-              <th className="k-num k-money">Suma</th>
+              <th className="k-num k-cell-number ab-money">Suma</th>
               <th>Kategória</th>
               <th>Stav</th>
               <th></th>
@@ -693,7 +831,10 @@ export function Transactions({
           <tbody>
             {loaded && rows.length === 0 ? (
               <tr>
-                <td colSpan={8}>Za toto obdobie nič nie je. Skús iné obdobie hore.</td>
+                <td colSpan={8}>
+                  <span>Za toto obdobie nič nie je. Skús iné obdobie hore.</span>{' '}
+                  {onNavigateToImport ? <Button variant="ghost" onClick={onNavigateToImport}>Importovať výpis</Button> : null}
+                </td>
               </tr>
             ) : null}
             {rows.map((row) => (
@@ -704,6 +845,7 @@ export function Transactions({
                 selected={selected.has(row.id)}
                 matchingCount={row.status === 'suggested' ? countMatchingUnconfirmed(rows, row) : 0}
                 focused={focusedRowId === row.id}
+                inked={inked.has(row.id)}
                 onSelect={toggleSelect}
                 onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
                 onConfirm={(id, applyToMatching) => void action.run(() => confirmOne(id, applyToMatching))}
@@ -715,6 +857,7 @@ export function Transactions({
         </table>
         </div>
       </fieldset>
+      <ExportPdfDialog open={pdfOpen} onClose={() => setPdfOpen(false)} />
       <CategoryDialog open={createFor !== null} onClose={() => setCreateFor(null)} onCreated={(category) => void categoryCreated(category)} />
     </div>
   )
@@ -738,7 +881,7 @@ function FilteredTotals({ rows, categories, loaded, categoriesLoaded }: {
   const income = money.reduce((sum, row) => sum + row.income, 0)
   const expense = money.reduce((sum, row) => sum + row.expense, 0)
   const transfers = rows.filter((row) => row.status === 'transfer').length
-  return <section aria-label="Súčty zobrazených transakcií" className="k-row k-num">
+  return <section aria-label="Súčty zobrazených transakcií" className="ab-row k-num">
     <span>Zobrazené transakcie: {rows.length}</span>
     <span>Príjem: {formatEur(income)}</span>
     <span>Výdavky: {formatEur(expense)}</span>

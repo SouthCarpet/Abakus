@@ -23,14 +23,14 @@ describe('SetPasswordDialog', () => {
     expect(toggles).toHaveLength(2)
 
     fireEvent.click(toggles[0])
-    const passwordInputs = Array.from(document.querySelectorAll('.k-password-row input')) as HTMLInputElement[]
+    const passwordInputs = Array.from(document.querySelectorAll('.ab-password-row input')) as HTMLInputElement[]
     expect(passwordInputs[0].type).toBe('text')
     expect(passwordInputs[1].type).toBe('password')
   })
 
   it('still requires the two fields to match before Uložiť is enabled, toggle or not', () => {
     render(<SetPasswordDialog account={account} onClose={vi.fn()} onSaved={vi.fn()} />)
-    const [heslo, zopakovat] = Array.from(document.querySelectorAll('.k-password-row input')) as HTMLInputElement[]
+    const [heslo, zopakovat] = Array.from(document.querySelectorAll('.ab-password-row input')) as HTMLInputElement[]
     const save = screen.getByRole('button', { name: 'Uložiť' })
     expect(save).toBeDisabled()
 
@@ -45,7 +45,7 @@ describe('SetPasswordDialog', () => {
     vi.mocked(api.setAccountPassword).mockResolvedValue(undefined)
     const onSaved = vi.fn().mockResolvedValue(undefined)
     render(<SetPasswordDialog account={account} onClose={vi.fn()} onSaved={onSaved} />)
-    const [heslo, zopakovat] = Array.from(document.querySelectorAll('.k-password-row input')) as HTMLInputElement[]
+    const [heslo, zopakovat] = Array.from(document.querySelectorAll('.ab-password-row input')) as HTMLInputElement[]
     fireEvent.change(heslo, { target: { value: 'tajne123' } })
     fireEvent.change(zopakovat, { target: { value: 'tajne123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))

@@ -91,7 +91,7 @@ describe('Overview', () => {
   it('renders a danger banner from the mounted screen once badChecksums resolves', async () => {
     render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
     const banner = await screen.findByText('Výpis č. 4 (účet Osobný) nesedí o 1,50 €')
-    expect(banner).toHaveClass('k-text-danger')
+    expect(banner).toHaveClass('ab-text-danger')
   })
 })
 

@@ -29,7 +29,7 @@ export function RecurringKpis({
   const remainingLabel = remainingMonthLabel(overview.as_of, today)
   return (
     <>
-      <div className="k-row" role="group" aria-label="Projekcia">
+      <div className="ab-row" role="group" aria-label="Projekcia">
         <Button variant={annual ? 'secondary' : 'primary'} aria-pressed={!annual} onClick={() => onAnnualChange(false)}>
           Za mesiac
         </Button>
@@ -37,7 +37,7 @@ export function RecurringKpis({
           Za rok
         </Button>
       </div>
-      <div className="k-kpi-row">
+      <dl className="k-summary" aria-label="Pravidelné platby">
         <AmountTile
           label={annual ? 'Pravidelné výdavky za rok' : 'Pravidelné výdavky za mesiac'}
           cents={expense}
@@ -60,7 +60,7 @@ export function RecurringKpis({
           cents={net}
           tone={net >= 0 ? 'success' : 'danger'}
         />
-      </div>
+      </dl>
       <p>{exclusionLabel(overview)}</p>
       <p>{expenseShareLabel(overview)}</p>
       <p>{cashDirectionCaption()}</p>
@@ -79,12 +79,12 @@ function AmountTile({
   tone: 'danger' | 'success'
   extra?: string
 }) {
-  const toneClass = tone === 'danger' ? ' k-text-danger' : ' k-text-success'
+  const toneClass = tone === 'danger' ? ' ab-text-danger' : ' ab-text-success'
   return (
-    <div className="k-kpi">
-      <span className="k-kpi-label">{label}</span>
-      <span className={`k-kpi-value k-num${toneClass}`}>{formatEur(cents)}</span>
-      {extra ? <span className="k-field-label">{extra}</span> : null}
+    <div className="k-summary-row">
+      <dt>{label}</dt>
+      <dd className={`k-summary-value k-num${toneClass}`}>{formatEur(cents)}</dd>
+      <dd className="k-summary-note">{extra}</dd>
     </div>
   )
 }
@@ -99,13 +99,15 @@ function RemainingTile({
   estimates: RecurringAmounts
 }) {
   return (
-    <div className="k-kpi">
-      <span className="k-kpi-label">{label}</span>
-      <span className="k-kpi-value k-num k-text-danger">{formatEur(confirmed.remaining_expense_cents)}</span>
-      <span className="k-field-label">Potvrdené výdavky {formatEur(confirmed.remaining_expense_cents)}</span>
-      <span className="k-field-label">Potvrdené príjmy {formatEur(confirmed.remaining_income_cents)}</span>
-      <span className="k-field-label">Ďalšie odhady výdavkov {formatEur(estimates.remaining_expense_cents)}</span>
-      <span className="k-field-label">Ďalšie odhady príjmov {formatEur(estimates.remaining_income_cents)}</span>
+    <div className="k-summary-row">
+      <dt>{label}</dt>
+      <dd className="k-summary-value k-num ab-text-danger">{formatEur(confirmed.remaining_expense_cents)}</dd>
+      <dd className="k-summary-note ab-section">
+        <span>Potvrdené výdavky {formatEur(confirmed.remaining_expense_cents)}</span>
+        <span>Potvrdené príjmy {formatEur(confirmed.remaining_income_cents)}</span>
+        <span>Ďalšie odhady výdavkov {formatEur(estimates.remaining_expense_cents)}</span>
+        <span>Ďalšie odhady príjmov {formatEur(estimates.remaining_income_cents)}</span>
+      </dd>
     </div>
   )
 }

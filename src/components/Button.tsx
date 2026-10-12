@@ -8,6 +8,6 @@ export function Button({
   type = 'button',
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
-  const cls = `k-btn k-btn-${variant}${className ? ` ${className}` : ''}`
+  const cls = `k-btn k-btn-auto k-btn-${variant}${className ? ` ${className}` : ''}`
   return <button type={type} className={cls} {...rest} />
 }

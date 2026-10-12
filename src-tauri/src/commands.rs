@@ -357,8 +357,11 @@ pub fn set_check_updates(state: State<AppState>, on: bool) -> Result<(), String>
     lock(&state)?.set_check_updates(on).map_err(|e| e.to_string())
 }
 
-/// Every failure (offline, rate limit, malformed body, nothing newer)
-/// collapses to `None`; the UI never distinguishes them (spec A14).
+/// `Ok(None)` means the check completed and nothing is newer (or checking
+/// is off). A failed check (offline, an HTTP error such as a rate limit, a
+/// body that cannot be read) is an `Err` with the reason, so the UI can tell
+/// a connection error from "you have the latest version" (plan 091,
+/// Kaliber r3, Michal 2026-10-12; replaces the spec A14 collapse).
 #[tauri::command]
 pub async fn check_update_now(state: State<'_, AppState>) -> Result<Option<update::Release>, String> {
     check_update_now_inner(&state.store, env!("CARGO_PKG_VERSION"), net::send_request).await
@@ -383,7 +386,7 @@ where
     if !update::wants_check(check_updates) {
         return Ok(None);
     }
-    Ok(update::check_with(version, store, send).await.ok().flatten())
+    update::check_with(version, store, send).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

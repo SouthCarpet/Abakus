@@ -1,8 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { categoryApi } from '../lib/category-api'
 import { Categories, RulesTable } from './Categories'
+import { Toasts } from '../components/Toasts'
+import { resetToasts } from '../kaliber/toast'
+
+// Toasts render in the app's one region (Kaliber R12); the screen tests mount it beside the screen.
+beforeEach(() => { resetToasts(); render(<Toasts />) })
 
 describe('RulesTable', () => {
   it('labels rule kinds in Slovak and hides delete for seed rules', () => {
@@ -21,7 +26,7 @@ describe('RulesTable', () => {
     ] as const
     const { container } = render(<RulesTable rules={[...rules]} categories={[]} onRedirect={vi.fn()} onDelete={vi.fn()} />)
     const table = container.querySelector('table')
-    expect(table).toHaveClass('k-table', 'k-rules-table')
+    expect(table).toHaveClass('k-table', 'ab-rules-table')
   })
 })
 
@@ -56,7 +61,7 @@ const FAKTURY: import('../api').Category = { id: 3, parent_id: null, name: 'Fakt
 
 // Oracle: live r4 measure at 1024/1280; minWidth 560 wraps the Pravidlá card
 // onto its own row at 1024 and keeps both columns at 1280 with every header
-// inside .k-table-scroll (scrollLeft = 0, no page overflow).
+// inside .ab-table-scroll (scrollLeft = 0, no page overflow).
 describe('Categories rules column wrap threshold', () => {
   afterEach(() => {
     cleanup()
@@ -67,7 +72,7 @@ describe('Categories rules column wrap threshold', () => {
     vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
     const { container } = render(<Categories />)
     await waitFor(() => expect(screen.getByText('Pravidlá')).toBeInTheDocument())
-    const col = container.querySelector('.k-rules-card-col')
+    const col = container.querySelector('.ab-rules-card-col')
     expect(col).toBeInstanceOf(HTMLElement)
     expect((col as HTMLElement).style.minWidth).toBe('560px')
   })

@@ -14,6 +14,7 @@ import {
   type PickerMode,
 } from './category-picker-search'
 import './CategoryPicker.css'
+import { useEscapeLayer } from '../kaliber/escape'
 
 const CREATE_LABEL = 'Nová kategória...'
 const EMPTY_SEARCH_TEXT = 'Žiadna kategória sa nenašla.'
@@ -79,6 +80,9 @@ export function CategoryPicker({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
+  // Escape layer 3 (a popup): closes the list and returns the focus to the trigger.
+  useEscapeLayer('popup', open, () => close(true), () => rootRef.current)
+
   function close(focusTrigger: boolean) {
     setOpen(false)
     setQuery('')
@@ -109,7 +113,7 @@ export function CategoryPicker({
           if (open) close(false)
           else setOpen(true)
         }}
-        onKeyDown={(event) => onTriggerKey(event, disabled, setOpen, setQuery, close)}
+        onKeyDown={(event) => onTriggerKey(event, disabled, setOpen, setQuery)}
       >
         {triggerText}
       </button>
@@ -128,7 +132,6 @@ export function CategoryPicker({
           onQuery={setQuery}
           onActiveIndex={setActiveIndex}
           onPick={pick}
-          onEscape={() => close(true)}
         />
       ) : null}
     </div>
@@ -140,17 +143,11 @@ function onTriggerKey(
   disabled: boolean | undefined,
   setOpen: (open: boolean) => void,
   setQuery: (query: string) => void,
-  close: (focusTrigger: boolean) => void,
 ) {
   if (disabled) return
   if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
     setOpen(true)
-    return
-  }
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    close(true)
     return
   }
   if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return
@@ -173,7 +170,6 @@ function PickerPanel({
   onQuery,
   onActiveIndex,
   onPick,
-  onEscape,
 }: {
   listId: string
   searchRef: RefObject<HTMLInputElement | null>
@@ -188,7 +184,6 @@ function PickerPanel({
   onQuery: (query: string) => void
   onActiveIndex: (index: number) => void
   onPick: (choice: PickerChoice | undefined) => void
-  onEscape: () => void
 }) {
   const active = choices[activeIndex]
   return (
@@ -200,7 +195,7 @@ function PickerPanel({
         aria-label={SEARCH_LABEL}
         value={query}
         onChange={(event) => onQuery(event.target.value)}
-        onKeyDown={(event) => onSearchKey(event, choices, activeIndex, onActiveIndex, onPick, onEscape)}
+        onKeyDown={(event) => onSearchKey(event, choices, activeIndex, onActiveIndex, onPick)}
       />
       <div className="category-picker__list" role="listbox" id={listId} aria-label={SEARCH_LABEL}>
         {searching && visibleGroups.length === 0 ? <p className="category-picker__empty" role="status">{EMPTY_SEARCH_TEXT}</p> : null}
@@ -351,13 +346,7 @@ function onSearchKey(
   activeIndex: number,
   onActiveIndex: (index: number) => void,
   onPick: (choice: PickerChoice | undefined) => void,
-  onEscape: () => void,
 ) {
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    onEscape()
-    return
-  }
   if (event.key === 'ArrowDown') {
     event.preventDefault()
     onActiveIndex(stepIndex(activeIndex, 1, choices.length))

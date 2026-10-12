@@ -7,6 +7,17 @@ import { Transactions } from './Transactions'
 import { Categories } from './Categories'
 import { Overview } from './Overview'
 import { App } from '../App'
+import { Toasts } from '../components/Toasts'
+import { resetToasts } from '../kaliber/toast'
+
+// Toasts render in the app's one region (Kaliber R12); the screen tests mount it beside the screen.
+beforeEach(() => { resetToasts(); render(<Toasts />) })
+
+// Kaliber R12: secondary commands live in the "Ďalšie" menu of the screen header.
+function menuItem(name: string) {
+  fireEvent.click(screen.getByRole('button', { name: 'Ďalšie' }))
+  return screen.getByRole('menuitem', { name })
+}
 
 // Owned IPC and file-picker boundaries. All records are synthetic.
 vi.mock('../api', async (original) => ({
@@ -87,7 +98,7 @@ afterEach(() => { cleanup(); localStorage.clear() })
 // Oracle: contracts.md Account deletion IPC and UI acceptance.
 describe('account deletion from its Settings row', () => {
   it('shows actual preview counts and preserves the account when cancelled', async () => {
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     fireEvent.click(await screen.findByRole('button', { name: 'Zmazať účet' }))
     const dialog = screen.getByRole('dialog', { name: 'Zmazať účet Test účet?' })
     expect(await within(dialog).findByText(/Výpisy: 2. Transakcie: 3/)).toBeVisible()
@@ -100,7 +111,7 @@ describe('account deletion from its Settings row', () => {
   it('requires the exact name and prevents a second delete while pending, then refreshes counts', async () => {
     const pending = deferred<Awaited<ReturnType<typeof api.deleteAccount>>>()
     vi.mocked(api.deleteAccount).mockReturnValue(pending.promise)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     fireEvent.click(await screen.findByRole('button', { name: 'Zmazať účet' }))
     const name = await screen.findByLabelText('Na potvrdenie napíšte názov účtu: Test účet')
     fireEvent.change(name, { target: { value: 'Test' } })
@@ -121,7 +132,7 @@ describe('account deletion from its Settings row', () => {
   })
   it('shows preview failure and permits retry without ever deleting', async () => {
     vi.mocked(api.accountDeletePreview).mockRejectedValueOnce(new Error('Náhľad zlyhal'))
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     fireEvent.click(await screen.findByRole('button', { name: 'Zmazať účet' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Náhľad zlyhal')
     fireEvent.click(screen.getByRole('button', { name: 'Skúsiť znova' }))
@@ -130,7 +141,7 @@ describe('account deletion from its Settings row', () => {
   })
   it('shows credential or database failure inside the confirmation and allows retry', async () => {
     vi.mocked(api.deleteAccount).mockRejectedValueOnce(new Error('Heslo sa nepodarilo odstrániť'))
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     fireEvent.click(await screen.findByRole('button', { name: 'Zmazať účet' }))
     fireEvent.change(await screen.findByLabelText(/Na potvrdenie/), { target: { value: 'Test účet' } })
     fireEvent.click(screen.getByRole('button', { name: 'Natrvalo zmazať účet' }))
@@ -145,8 +156,8 @@ describe('transaction filters, export and sums', () => {
     render(<Transactions statementId={42} initialAccountKind="personal" initialCategoryId={8} initialStatus="unassigned" />)
     await screen.findByText('Mzda')
     fireEvent.change(screen.getByRole('combobox', { name: 'Účet' }), { target: { value: '7' } })
-    fireEvent.change(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'čerstvý text' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Exportovať filtrované CSV' }))
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'čerstvý text' } })
+    fireEvent.click(menuItem('Exportovať filtrované CSV'))
     await waitFor(() => expect(api.exportCsv).toHaveBeenCalledWith({ from: null, to: null, account_id: 7, account_kind: 'personal', category_id: 8, status: 'unassigned', kind: null, text: 'čerstvý text', statement_id: 42 }, 'C:/synthetic/export.csv'))
     expect(await screen.findByText('Exportovaných transakcií: 1.')).toBeVisible()
   })
@@ -157,7 +168,7 @@ describe('transaction filters, export and sums', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Vymazať všetky filtre' }))
     await waitFor(() => expect(api.listTransactions).toHaveBeenLastCalledWith({ from: null, to: null, account_id: null, account_kind: null, category_id: null, status: null, kind: null, text: null, statement_id: null }))
     expect(screen.queryByText('1 vybraných')).not.toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
+    expect(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
   })
   it('counts three rows but excludes a 900 euro transfer from 123.45 income and 23.45 expense', async () => {
     vi.mocked(api.listTransactions).mockResolvedValue([row(), row({ id: 2, amount_cents: -2345 }), row({ id: 3, amount_cents: 90000, status: 'transfer' })])
@@ -188,23 +199,23 @@ describe('transaction filters, export and sums', () => {
   it('cancels CSV without invoking export', async () => {
     vi.mocked(files.saveCsv).mockResolvedValue(null)
     render(<Transactions />); await screen.findByText('Mzda')
-    fireEvent.click(screen.getByRole('button', { name: 'Exportovať filtrované CSV' }))
+    fireEvent.click(menuItem('Exportovať filtrované CSV'))
     expect(await screen.findByText('Export zrušený.')).toBeVisible()
     expect(api.exportCsv).not.toHaveBeenCalled()
   })
   it('shows CSV failure and permits retry', async () => {
     vi.mocked(api.exportCsv).mockRejectedValueOnce(new Error('Zápis zlyhal'))
     render(<Transactions />); await screen.findByText('Mzda')
-    fireEvent.click(screen.getByRole('button', { name: 'Exportovať filtrované CSV' }))
+    fireEvent.click(menuItem('Exportovať filtrované CSV'))
     expect(await screen.findByRole('alert')).toHaveTextContent('Zápis zlyhal')
-    expect(screen.getByRole('button', { name: 'Exportovať filtrované CSV' })).toBeEnabled()
+    expect(screen.getByRole('menuitem', { name: 'Exportovať filtrované CSV' })).toBeEnabled()
   })
   it('blocks empty and reversed custom periods but accepts a same-day range', async () => {
     render(<Transactions />); await screen.findByText('Mzda')
     vi.mocked(api.listTransactions).mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Vlastné' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Zadajte platný')
-    expect(screen.getByRole('button', { name: 'Exportovať filtrované CSV' })).toBeDisabled()
+    expect(screen.getByRole('menuitem', { name: 'Exportovať filtrované CSV' })).toBeDisabled()
     fireEvent.change(screen.getByLabelText('Od dátumu'), { target: { value: '2026-09-05' } })
     fireEvent.change(screen.getByLabelText('Do dátumu'), { target: { value: '2026-09-04' } })
     expect(api.listTransactions).not.toHaveBeenCalled()
@@ -229,7 +240,7 @@ describe('other audited screen boundaries', () => {
     vi.mocked(api.saveCategory).mockRejectedValue(new Error('Kategória už existuje'))
     render(<Categories />)
     await screen.findByLabelText('Názov kategórie 8')
-    fireEvent.click(screen.getByRole('button', { name: '+ kategória' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nová kategória' }))
     const dialog = screen.getByRole('dialog', { name: 'Pridať kategóriu' })
     fireEvent.change(within(dialog).getByLabelText('Názov'), { target: { value: 'jedlo' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Uložiť' }))
@@ -260,14 +271,15 @@ describe('other audited screen boundaries', () => {
     vi.mocked(api.getCheckUpdates).mockReturnValue(boot.promise)
     vi.mocked(api.setCheckUpdates).mockResolvedValue(undefined)
     vi.mocked(api.checkUpdateNow).mockResolvedValue(null)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await screen.findByText('Test účet')
-    const checkbox = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    const checkbox = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     fireEvent.click(checkbox)
     await waitFor(() => expect(checkbox).toBeChecked())
     await act(async () => boot.resolve(false))
     expect(checkbox).toBeChecked()
-    expect(api.checkUpdateNow).toHaveBeenCalledTimes(1)
+    // Michal 2026-10-12: turning checking on is not a check path (start, About open, button).
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
   })
 })
 
@@ -277,6 +289,7 @@ it('returns from a checksum statement drill-down to ordinary transactions throug
   vi.mocked(api.badChecksums).mockResolvedValue([{ statement_id: 42, number: 3, account_label: 'Test', off_by_cents: 100 }])
   vi.mocked(api.summary).mockResolvedValue({ income_cents: 0, expense_cents: 0, transfer_cents: 0, fee_cents: 0, net_cents: 0, unassigned_count: 0, suggested_count: 0, by_category: [], by_month: [], by_month_category: [], top_merchants: [] })
   render(<App />)
+  fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Prehľad' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Zobraziť transakcie' }))
   await waitFor(() => expect(api.listTransactions).toHaveBeenLastCalledWith(expect.objectContaining({ statement_id: 42, from: null, to: null })))
   fireEvent.click(within(screen.getByRole('navigation')).getByRole('button', { name: 'Transakcie' }))
@@ -327,7 +340,7 @@ it('reloads account and category sources through Obnoviť after initial metadata
   render(<Transactions />)
   expect(await screen.findByRole('alert')).toHaveTextContent('Kategórie sa nedajú načítať')
   expect(screen.queryByRole('region', { name: 'Súčty zobrazených transakcií' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Obnoviť' }))
+  fireEvent.click(menuItem('Obnoviť'))
   expect(await screen.findByRole('region', { name: 'Súčty zobrazených transakcií' })).toBeVisible()
   expect(within(screen.getByRole('combobox', { name: 'Účet' })).getByRole('option', { name: 'Osobný - Test účet' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('combobox', { name: 'Filter kategórie' }))

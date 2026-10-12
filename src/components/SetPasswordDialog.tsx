@@ -70,8 +70,8 @@ export function SetPasswordDialog({ account, onClose, onSaved }: {
     <Field label="Zopakovať heslo">
       <PasswordInput value={confirm} onChange={setConfirm} maxLength={PASSWORD_MAX_CHARS} />
     </Field>
-    {tooLong ? <p role="alert" className="k-text-danger">Limit je 512 znakov.</p> : null}
-    {error ? <p role="alert" className="k-text-danger">{error}</p> : null}
+    {tooLong ? <p role="alert" className="ab-text-danger">Limit je 512 znakov.</p> : null}
+    {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
     {saved ? <p role="status">Heslo je uložené v Správcovi poverení.</p> : null}
   </Dialog>
 }

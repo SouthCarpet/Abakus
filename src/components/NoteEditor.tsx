@@ -74,8 +74,8 @@ export function NoteEditor({ txId, initialNote, onSaved }: {
   }
 
   return (
-    <div className="k-field">
-      <label className="k-field-label" htmlFor={`note-${txId}`}>Poznámka</label>
+    <div className="ab-field">
+      <label className="ab-field-label" htmlFor={`note-${txId}`}>Poznámka</label>
       <textarea
         id={`note-${txId}`}
         aria-label={`Poznámka k transakcii ${txId}`}
@@ -84,11 +84,11 @@ export function NoteEditor({ txId, initialNote, onSaved }: {
         disabled={status === 'saving'}
         onChange={(e) => { setDraft(e.target.value); setStatus('idle') }}
       />
-      <div className="k-row">
+      <div className="ab-row">
         <Button variant="secondary" disabled={status === 'saving' || overLimit} onClick={() => void save()}>
           Uložiť poznámku
         </Button>
-        <span className="k-field-label">{codePoints} / {NOTE_MAX_CODE_POINTS} znakov</span>
+        <span className="ab-field-label">{codePoints} / {NOTE_MAX_CODE_POINTS} znakov</span>
       </div>
       {overLimit ? <p role="alert">Poznámka je príliš dlhá, skráťte ju.</p> : null}
       {status === 'saving' ? <p role="status">Ukladá sa...</p> : null}

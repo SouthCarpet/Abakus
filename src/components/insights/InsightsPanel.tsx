@@ -121,7 +121,7 @@ export function InsightsPanel({
   )
 
   return (
-    <div className="k-section">
+    <div className="ab-section">
       {accountsError ? <p role="alert">{accountsError}</p> : null}
       {historyError ? <p role="alert">{historyError}</p> : null}
       {history ? <CoverageCard coverages={coverages} allTime={window === null} /> : null}

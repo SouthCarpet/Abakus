@@ -6,5 +6,6 @@ describe('tokens only', () => {
   it('has no literal colours or durations outside tokens.css', () => {
     const bad = walk('src').flatMap((p) => { const s = readFileSync(p, 'utf8'); const hits = s.match(/#[0-9a-fA-F]{3,6}\b|\brgba?\(|\boklch\(|\b\d+ms\b/g) ?? []; return hits.map((h) => `${p}: ${h}`) })
     expect(bad).toEqual([])
-  })
+    // The walk reads every source file; under the full parallel suite it can pass 5 s.
+  }, 30000)
 })

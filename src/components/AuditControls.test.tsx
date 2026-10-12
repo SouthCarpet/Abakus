@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ThemePicker } from './ThemePicker'
+import { ThemeMode, ThemeSwitch } from './ThemeControls'
+import { resetThemeState } from '../kaliber/theme'
 import { PeriodPicker, usePeriod } from './PeriodPicker'
 import { Dialog } from './Dialog'
 import { useState } from 'react'
@@ -12,35 +13,67 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear() })
 
-// Oracle: contracts.md Theme, three validated persistent modes and safe storage fallback.
+// Oracle: Kaliber R20 (one state `kaliber-theme`, absent = System), contracts.md Theme
+// (persistent modes, safe storage fallback), the theme pair (switch and segmented control).
+const mode = (name: string) => screen.getByRole('radio', { name })
+const themeSwitch = () => screen.getByRole('switch', { name: 'Tmavý vzhľad' })
 describe('theme controls', () => {
+  beforeEach(() => resetThemeState())
   it('keeps explicit dark through OS changes and restart, then follows system when selected', () => {
-    const view = render(<ThemePicker />)
-    fireEvent.change(screen.getByRole('combobox', { name: 'Vzhľad' }), { target: { value: 'dark' } })
+    const view = render(<ThemeMode />)
+    fireEvent.click(mode('Tmavý'))
     expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem('kaliber-theme')).toBe('dark')
     act(() => osChange({ matches: false } as MediaQueryListEvent))
     expect(document.documentElement.dataset.theme).toBe('dark')
-    view.unmount(); render(<ThemePicker />)
-    expect(screen.getByRole('combobox', { name: 'Vzhľad' })).toHaveValue('dark')
-    fireEvent.change(screen.getByRole('combobox', { name: 'Vzhľad' }), { target: { value: 'system' } })
+    view.unmount(); resetThemeState(); render(<ThemeMode />)
+    expect(mode('Tmavý')).toBeChecked()
+    fireEvent.click(mode('Podľa systému'))
+    expect(localStorage.getItem('kaliber-theme')).toBeNull()
     expect(document.documentElement.dataset.theme).toBe('light')
     act(() => osChange({ matches: true } as MediaQueryListEvent))
     expect(document.documentElement.dataset.theme).toBe('dark')
-    fireEvent.change(screen.getByRole('combobox', { name: 'Vzhľad' }), { target: { value: 'light' } })
+    fireEvent.click(mode('Svetlý'))
     act(() => osChange({ matches: true } as MediaQueryListEvent))
     expect(document.documentElement.dataset.theme).toBe('light')
   })
-  it.each(['garbage', '{', 'null'])('falls back to system for corrupt preference %s', (stored) => {
+  it('shares one state between the sun and moon switch and the Settings control', () => {
+    render(<><ThemeSwitch /><ThemeMode /></>)
+    expect(themeSwitch()).not.toBeChecked()
+    expect(mode('Podľa systému')).toBeChecked()
+    fireEvent.click(themeSwitch())
+    expect(mode('Tmavý')).toBeChecked()
+    expect(themeSwitch()).toBeChecked()
+    expect(localStorage.getItem('kaliber-theme')).toBe('dark')
+    fireEvent.click(mode('Svetlý'))
+    expect(themeSwitch()).not.toBeChecked()
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+  it.each(['light', 'dark'])('migrates the old abakus.theme value %s without losing it', (stored) => {
     localStorage.setItem('abakus.theme', stored)
-    render(<ThemePicker />)
-    expect(screen.getByRole('combobox', { name: 'Vzhľad' })).toHaveValue('system')
+    render(<ThemeMode />)
+    expect(mode(stored === 'dark' ? 'Tmavý' : 'Svetlý')).toBeChecked()
+    expect(localStorage.getItem('kaliber-theme')).toBe(stored)
+    expect(localStorage.getItem('abakus.theme')).toBeNull()
+  })
+  it('keeps a present shared key over the old key', () => {
+    localStorage.setItem('abakus.theme', 'dark')
+    localStorage.setItem('kaliber-theme', 'light')
+    render(<ThemeMode />)
+    expect(mode('Svetlý')).toBeChecked()
+    expect(localStorage.getItem('abakus.theme')).toBeNull()
+  })
+  it.each(['garbage', '{', 'null', 'system'])('falls back to system for corrupt preference %s', (stored) => {
+    localStorage.setItem('kaliber-theme', stored)
+    render(<ThemeMode />)
+    expect(mode('Podľa systému')).toBeChecked()
   })
   it('keeps controls usable when reading and writing storage fail', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('denied') })
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full') })
-    render(<ThemePicker />)
-    expect(screen.getByRole('combobox', { name: 'Vzhľad' })).toHaveValue('system')
-    fireEvent.change(screen.getByRole('combobox', { name: 'Vzhľad' }), { target: { value: 'dark' } })
+    render(<ThemeMode />)
+    expect(mode('Podľa systému')).toBeChecked()
+    fireEvent.click(mode('Tmavý'))
     expect(document.documentElement.dataset.theme).toBe('dark')
   })
 })

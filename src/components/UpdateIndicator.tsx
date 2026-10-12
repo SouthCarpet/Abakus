@@ -1,15 +1,14 @@
 import { useLatestRelease } from '../lib/updateStatus'
-import { Button } from './Button'
 
-// Point 5: the global counterpart to Settings' quiet update line. It never
-// checks the network itself. It only shows whatever Settings already found
-// (or nothing, if the preference is off or no check ever ran).
-export function UpdateIndicator({ onOpenSettings }: { onOpenSettings: () => void }) {
+// Kaliber R20: a found update is a quiet info line in the header tools that leads to About,
+// never a warning colour. It never checks the network itself; it only shows what a check
+// (at start, on About open or on the button) already found.
+export function UpdateIndicator({ onOpenAbout }: { onOpenAbout: () => void }) {
   const release = useLatestRelease()
   if (!release) return null
   return (
-    <Button variant="ghost" className="k-update-indicator" onClick={onOpenSettings}>
+    <button type="button" className="k-update-line" onClick={onOpenAbout}>
       Nová verzia {release.tag}
-    </Button>
+    </button>
   )
 }

@@ -6,7 +6,9 @@ import { Card } from '../components/Card'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
-import { Toast } from '../components/Toast'
+import { PageHead } from '../components/PageHead'
+import { ArchiveGlyph, TrashGlyph } from '../kaliber/icons'
+import { toast } from '../kaliber/toast'
 import { useAction } from '../lib/useAction'
 import { groupCategories } from '../lib/categories'
 import { categoryApi, type CategoryDeletePreview, type CategoryUpdatePreview, type RuleDeletePreview } from '../lib/category-api'
@@ -38,14 +40,14 @@ export function RulesTable({
   onDelete: (rule: RuleView) => void
 }) {
   return (
-    <table className="k-table k-rules-table">
+    <table className="k-table ab-rules-table">
       <thead>
         <tr>
           <th>Kľúč</th>
           <th>Miesto</th>
           <th>Kategória</th>
           <th>Druh</th>
-          <th className="k-num">Zásahy</th>
+          <th className="k-num k-cell-number">Zásahy</th>
           <th></th>
         </tr>
       </thead>
@@ -65,7 +67,7 @@ export function RulesTable({
             <td>
               <span className="k-card-badge">{RULE_KIND_LABELS[rule.kind]}</span>
             </td>
-            <td className="k-num">{rule.hit_count}</td>
+            <td className="k-num k-cell-number">{rule.hit_count}</td>
             <td>
               {rule.kind !== 'seed' ? (
                 <Button variant="danger" onClick={() => onDelete(rule)}>
@@ -105,7 +107,7 @@ function CategoryRow({
   }
 
   return (
-    <div className="k-row" style={indent ? { marginLeft: 'var(--space-6)' } : undefined}>
+    <div className="ab-row" style={indent ? { marginLeft: 'var(--space-6)' } : undefined}>
       <input
         className="k-input k-well"
         aria-label={`Názov kategórie ${category.id}`}
@@ -127,18 +129,19 @@ function CategoryRow({
         // stays plain "Archivovať" (unchanged for existing archive tests),
         // the native title carries the hover explanation.
         <Button variant="ghost" className="k-icon-btn" aria-label="Archivovať" title={ARCHIVE_TITLE} onClick={() => onArchive(category)}>
-          🗄
+          <ArchiveGlyph />
         </Button>
       ) : null}
       {!category.system ? (
+        // Kaliber R12: the danger colour shows only in the confirm step, not on the row.
         <Button
-          variant="danger"
+          variant="ghost"
           className="k-icon-btn"
           aria-label={`Zmazať kategóriu ${category.name}`}
           title="Zmaže kategóriu natrvalo."
           onClick={() => onDeleteRequest(category)}
         >
-          🗑
+          <TrashGlyph />
         </Button>
       ) : null}
     </div>
@@ -162,14 +165,14 @@ function CategoryTree({
 }) {
   const groups = groupCategories(categories)
   return (
-    <div className="k-section">
+    <div className="ab-section">
       {groups.map(({ parent, subs }) => (
-        <div key={parent.id} className="k-section">
+        <div key={parent.id} className="ab-section">
           <CategoryRow category={parent} indent={false} onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} />
           {subs.map((sub) => (
             <CategoryRow key={sub.id} category={sub} indent onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} />
           ))}
-          <div className="k-row" style={{ marginLeft: 'var(--space-6)' }}>
+          <div className="ab-row" style={{ marginLeft: 'var(--space-6)' }}>
             <Button variant="ghost" onClick={() => onAddSub(parent)}>
               + podkategória
             </Button>
@@ -291,7 +294,7 @@ function CategoryEditDialog({
     >
       {error ? <p role="alert">{error}</p> : null}
       {preview ? (
-        <div className="k-section">
+        <div className="ab-section">
           <p>Zmena druhu ovplyvní {preview.affected_categories} kategórií a {preview.transaction_count} transakcií (z toho {preview.confirmed_count} potvrdených).</p>
           <p>Kategórie a súvisiace transakcie zostanú priradené, mení sa iba význam výdavok/príjem.</p>
         </div>
@@ -400,7 +403,7 @@ function CategoryDeleteDialog({
       {previewError ? <p role="alert">{previewError}</p> : null}
       {!preview && !previewError ? <p role="status">Načítava sa náhľad zmazania...</p> : null}
       {preview ? (
-        <div className="k-section">
+        <div className="ab-section">
           <p>{`Zmaže kategóriu ${category.name} a jej podkategórie.`}</p>
           <p>{`${preview.transaction_count} transakcií sa presunie do nezaradených (z toho ${preview.confirmed_count} potvrdených).`}</p>
           {preview.rule_count > 0 ? <p>{`Zmaže sa aj ${preview.rule_count} pravidiel.`}</p> : null}
@@ -496,7 +499,6 @@ export function Categories() {
   const [archiveTarget, setArchiveTarget] = useState<Category | null>(null)
   const [editTarget, setEditTarget] = useState<Category | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
-  const [deleteMessage, setDeleteMessage] = useState<string | null>(null)
   const [ruleDeleteTarget, setRuleDeleteTarget] = useState<RuleView | null>(null)
 
   async function refresh() {
@@ -557,7 +559,7 @@ export function Categories() {
   // Point 4: the outcome is the exact preview the backend just applied, so
   // the shown count is never a stale client guess.
   async function categoryDeleted(outcome: CategoryDeletePreview) {
-    setDeleteMessage(`Zmazané: ${outcome.transaction_count} transakcií presunutých do nezaradených.`)
+    toast(`Zmazané: ${outcome.transaction_count} transakcií presunutých do nezaradených.`)
     await refresh()
   }
 
@@ -571,21 +573,17 @@ export function Categories() {
   }
 
   return (
-    <div className="k-section">
+    <div className="ab-screen">
+      <PageHead
+        title="Kategórie"
+        primary={<Button variant="primary" disabled={action.busy} onClick={() => setAddOpen(true)}>Nová kategória</Button>}
+      />
       {action.error ? <p role="alert">{action.error}</p> : null}
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
-      {deleteMessage ? <Toast message={deleteMessage} /> : null}
-      <fieldset disabled={action.busy} className="k-section">
-        <div className="k-row" style={{ alignItems: 'stretch' }}>
+      <fieldset disabled={action.busy} className="ab-section">
+        <div className="ab-row" style={{ alignItems: 'stretch' }}>
           <div style={{ flex: 1, minWidth: 320 }}>
-            <Card
-              title="Kategórie"
-              footer={
-                <Button variant="primary" onClick={() => setAddOpen(true)}>
-                  + kategória
-                </Button>
-              }
-            >
+            <Card title="Kategórie">
               <CategoryTree
                 categories={categories}
                 onRename={rename}
@@ -596,12 +594,12 @@ export function Categories() {
               />
             </Card>
           </div>
-          <div className="k-rules-card-col" style={{ flex: 1, minWidth: 560 }}>
+          <div className="ab-rules-card-col" style={{ flex: 1, minWidth: 560 }}>
             <Card title="Pravidlá">
-              <p className="k-field-label">
+              <p className="ab-field-label">
                 Pravidlá vzniknú po priradení kategórie alebo potvrdení návrhu pri rozpoznateľnom obchodníkovi. Samotné vytvorenie kategórie pravidlo nevytvorí.
               </p>
-              <div className="k-table-scroll" role="region" aria-label="Pravidlá" tabIndex={0}>
+              <div className="ab-table-scroll" role="region" aria-label="Pravidlá" tabIndex={0}>
                 <RulesTable rules={rules} categories={categories} onRedirect={redirectRule} onDelete={setRuleDeleteTarget} />
               </div>
             </Card>

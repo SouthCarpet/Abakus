@@ -18,16 +18,17 @@ afterEach(() => { cleanup(); setLatestRelease(null) })
 
 describe('UpdateIndicator', () => {
   it('shows nothing when no release is known yet', () => {
-    render(<UpdateIndicator onOpenSettings={vi.fn()} />)
+    render(<UpdateIndicator onOpenAbout={vi.fn()} />)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('names the found version and navigates to Settings on click', () => {
+  it('names the found version and leads to About on click, as a quiet line', () => {
     setLatestRelease(release)
-    const onOpenSettings = vi.fn()
-    render(<UpdateIndicator onOpenSettings={onOpenSettings} />)
+    const onOpenAbout = vi.fn()
+    render(<UpdateIndicator onOpenAbout={onOpenAbout} />)
     const button = screen.getByRole('button', { name: /0\.2\.0/ })
     fireEvent.click(button)
-    expect(onOpenSettings).toHaveBeenCalledTimes(1)
+    expect(onOpenAbout).toHaveBeenCalledTimes(1)
+    expect(button).toHaveClass('k-update-line')
   })
 })

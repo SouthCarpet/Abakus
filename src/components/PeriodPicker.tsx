@@ -36,8 +36,8 @@ export function usePeriod(): [PeriodValue, (value: PeriodValue) => void] {
 
 export function PeriodPicker({ value, onChange }: { value: PeriodValue; onChange: (value: PeriodValue) => void }) {
   return (
-    <div className="k-row">
-      <div className="k-row" role="group" aria-label="Obdobie">
+    <div className="ab-row">
+      <div className="ab-row" role="group" aria-label="Obdobie">
         {KINDS.map((kind) => (
           <Button
             key={kind}

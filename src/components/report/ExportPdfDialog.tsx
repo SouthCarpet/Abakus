@@ -165,7 +165,7 @@ function ExportDialogContent(props: ExportDialogContentProps) {
   const { accounts, accountsError, accountsLoading, busy, draft, exportError, exporting, invalidPeriod, outcome, preview, previewError, previewLoading, updateDraft } = props
   return <div className="report-export-dialog">
     <p>Vyberte obdobie, účty a rozsah dokumentu. Filtre tabuľky sa nepoužijú.</p>
-    <fieldset className="k-section" disabled={busy}>
+    <fieldset className="ab-section" disabled={busy}>
       <Field label="Obdobie">
         <select className="k-select k-well" value={draft.period} onChange={(event) => updateDraft({ period: event.target.value as PeriodChoice })}>
           <option value="month">Mesiac</option>
@@ -287,7 +287,7 @@ export function ExportPdfDialog({ open, onClose }: { open: boolean; onClose: () 
 
   const invalidPeriod = !request && !accountsLoading && !accountsError
   const canExport = Boolean(preview) && !busy && !previewLoading && !exportPending.current
-  return <Dialog open={open} title="Exportovať PDF" onClose={close} actions={<ExportActions busy={busy} canExport={canExport} close={close} exportReport={exportReport} />}>
+  return <Dialog wide open={open} title="Exportovať PDF" onClose={close} actions={<ExportActions busy={busy} canExport={canExport} close={close} exportReport={exportReport} />}>
     <ExportDialogContent
       accounts={accounts}
       accountsError={accountsError}

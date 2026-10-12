@@ -36,7 +36,7 @@ export function PasswordInput({
   }
 
   return (
-    <div className="k-password-row">
+    <div className="ab-password-row">
       <input
         id={inputId}
         type={shown ? 'text' : 'password'}

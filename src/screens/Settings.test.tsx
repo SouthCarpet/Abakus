@@ -75,9 +75,9 @@ vi.mock('../api', async (importOriginal) => {
 describe('Settings: opt-in update check', () => {
   it('stays off and never calls checkUpdateNow when the flag is off, and never feeds the global indicator', async () => {
     mockApi()
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(api.getCheckUpdates).toHaveBeenCalled())
-    expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).not.toBeChecked()
+    expect(screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })).not.toBeChecked()
     expect(api.checkUpdateNow).not.toHaveBeenCalled()
     expect(screen.queryByText(/Dostupná aktualizácia/)).not.toBeInTheDocument()
     expect(getLatestRelease()).toBeNull()
@@ -85,19 +85,76 @@ describe('Settings: opt-in update check', () => {
 
   it('checks on mount and shows the quiet release line when the flag is already on', async () => {
     mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(screen.getByText('Dostupná aktualizácia 0.2.0')).toBeInTheDocument())
     expect(screen.getByText(release.url)).toBeInTheDocument()
   })
 
-  it('turning the checkbox on persists the setting, runs the check immediately and feeds the global indicator', async () => {
+  it('turning checking on persists it without a request; the button then checks once', async () => {
     mockApi({ checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
-    render(<Settings />)
-    const box = await screen.findByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    render(<Settings aboutOpen />)
+    const box = await screen.findByRole('switch', { name: /Kontrolovať aktualizácie/ })
+    expect(screen.getByRole('button', { name: 'Skontrolovať aktualizácie' })).toBeDisabled()
     box.click()
     await waitFor(() => expect(api.setCheckUpdates).toHaveBeenCalledWith(true))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Skontrolovať aktualizácie' })).toBeEnabled())
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Skontrolovať aktualizácie' }))
     await waitFor(() => expect(screen.getByText('Dostupná aktualizácia 0.2.0')).toBeInTheDocument())
+    expect(api.checkUpdateNow).toHaveBeenCalledTimes(1)
     expect(getLatestRelease()).toEqual(release)
+  })
+})
+
+// Michal 2026-10-12 (Kaliber R20): with checking on, the check runs when About opens and on
+// the button, never because Settings opened; a connection error is not "the latest version".
+describe('Settings: About opens the check', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('does not check while About is closed, and checks once when it opens', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockResolvedValue(null) } as Partial<typeof api>)
+    const { container } = render(<Settings />)
+    await waitFor(() => expect(api.getCheckUpdates).toHaveBeenCalled())
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
+    const about = container.querySelector('details') as HTMLDetailsElement
+    about.open = true
+    fireEvent(about, new Event('toggle'))
+    await waitFor(() => expect(api.checkUpdateNow).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText(/máte najnovšiu verziu\.$/)).toBeInTheDocument()
+  })
+
+  it('makes no request on About open or the button while checking is off', async () => {
+    mockApi()
+    render(<Settings aboutOpen />)
+    await waitFor(() => expect(api.getCheckUpdates).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: 'Skontrolovať aktualizácie' }))
+    expect(api.checkUpdateNow).not.toHaveBeenCalled()
+    expect(screen.getByText('Kontrola ešte neprebehla.')).toBeInTheDocument()
+  })
+
+  it('shows a connection error apart from the latest version', async () => {
+    mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockRejectedValue('update check request failed: offline') } as Partial<typeof api>)
+    render(<Settings aboutOpen />)
+    expect(await screen.findByText(/bez spojenia so serverom GitHub\. Skúste to neskôr\.$/)).toBeInTheDocument()
+    expect(screen.queryByText(/máte najnovšiu verziu/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows the version, the build and the About links, and keeps About the last section', async () => {
+    mockApi()
+    const { container } = render(<Settings aboutOpen />)
+    await waitFor(() => expect(api.getCheckUpdates).toHaveBeenCalled())
+    expect(screen.getByText(__APP_VERSION__)).toBeInTheDocument()
+    const headings = [...container.querySelectorAll('.k-settings-section h3')].map((h) => h.textContent)
+    expect(headings).toEqual(['Vzhľad', 'Sieťová aktivita', 'O aplikácii'])
+    fireEvent.click(screen.getByRole('button', { name: 'Nahlásiť problém' }))
+    await waitFor(() => expect(api.openReleasePage).toHaveBeenCalledWith('https://github.com/SouthCarpet/Abakus/issues'))
+  })
+
+  it('names the data folder once', async () => {
+    mockApi()
+    render(<Settings aboutOpen />)
+    await waitFor(() => expect(screen.getAllByText(/Priečinok s dátami/)).toHaveLength(1))
   })
 })
 
@@ -117,8 +174,8 @@ describe('Settings: saved update preference lifecycle', () => {
   it('prevents a write before the saved true preference has loaded', async () => {
     const read = deferred<boolean>()
     mockApi({ getCheckUpdates: vi.fn().mockReturnValue(read.promise) })
-    render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     expect(box).toBeDisabled()
     await act(async () => read.resolve(true))
     expect(box).toBeChecked()
@@ -127,9 +184,9 @@ describe('Settings: saved update preference lifecycle', () => {
 
   it('keeps an unreadable preference disabled and reports the read error', async () => {
     mockApi({ getCheckUpdates: vi.fn().mockRejectedValue('Preference unreadable') })
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await screen.findByText('Preference unreadable')
-    expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeDisabled()
+    expect(screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })).toBeDisabled()
     expect(api.checkUpdateNow).not.toHaveBeenCalled()
   })
 
@@ -139,21 +196,21 @@ describe('Settings: saved update preference lifecycle', () => {
       getCheckUpdates: vi.fn(async () => saved),
       setCheckUpdates: vi.fn(async (next: boolean) => { saved = next }),
     })
-    const first = render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    const first = render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeEnabled())
     fireEvent.click(box)
     await waitFor(() => expect(box).toBeChecked())
     first.unmount()
-    render(<Settings />)
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeChecked())
+    render(<Settings aboutOpen />)
+    await waitFor(() => expect(screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })).toBeChecked())
     expect(saved).toBe(true)
   })
 
   it('retains the saved true value when saving false fails', async () => {
     mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), setCheckUpdates: vi.fn().mockRejectedValue('Save refused') })
-    render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeChecked())
     fireEvent.click(box)
     await screen.findByText('Save refused')
@@ -168,29 +225,29 @@ describe('Settings: saved update preference lifecycle', () => {
       getCheckUpdates: vi.fn(async () => saved),
       setCheckUpdates: vi.fn(async (next: boolean) => { await save.promise; saved = next }),
     })
-    const first = render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    const first = render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeEnabled())
     fireEvent.click(box)
     first.unmount()
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await act(async () => save.resolve())
     expect(saved).toBe(true)
-    expect(screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })).toBeChecked()
+    expect(screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })).toBeChecked()
     expect(api.checkUpdateNow).toHaveBeenCalledTimes(1)
   })
 
   it('reads the saved true value after a previous mount fails to save false', async () => {
     const save = deferred<void>()
     mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
-    const first = render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    const first = render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeChecked())
     fireEvent.click(box)
     first.unmount()
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await act(async () => save.reject('Write failed'))
-    const remountedBox = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    const remountedBox = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     expect(remountedBox).toBeChecked()
     expect(remountedBox).toBeEnabled()
     expect(screen.queryByText('Write failed')).not.toBeInTheDocument()
@@ -199,8 +256,8 @@ describe('Settings: saved update preference lifecycle', () => {
   it('serializes rapid clicks until the pending save completes', async () => {
     const save = deferred<void>()
     mockApi({ setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
-    render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeEnabled())
     fireEvent.click(box)
     fireEvent.click(box)
@@ -214,8 +271,8 @@ describe('Settings: saved update preference lifecycle', () => {
   it('ignores a stale check error after the user saves opt-out', async () => {
     const check = deferred<Release | null>()
     mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockReturnValue(check.promise) })
-    render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeChecked())
     fireEvent.click(box)
     await waitFor(() => expect(box).not.toBeChecked())
@@ -226,8 +283,8 @@ describe('Settings: saved update preference lifecycle', () => {
   it('ignores a stale release after the user saves opt-out', async () => {
     const check = deferred<Release | null>()
     mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockReturnValue(check.promise) })
-    render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeChecked())
     fireEvent.click(box)
     await waitFor(() => expect(box).not.toBeChecked())
@@ -238,8 +295,8 @@ describe('Settings: saved update preference lifecycle', () => {
   it('does not start a check when a save completes after Settings unmounts', async () => {
     const save = deferred<void>()
     mockApi({ setCheckUpdates: vi.fn().mockReturnValue(save.promise) })
-    const view = render(<Settings />)
-    const box = screen.getByRole('checkbox', { name: /Kontrolovať aktualizácie/ })
+    const view = render(<Settings aboutOpen />)
+    const box = screen.getByRole('switch', { name: /Kontrolovať aktualizácie/ })
     await waitFor(() => expect(box).toBeEnabled())
     fireEvent.click(box)
     view.unmount()
@@ -251,7 +308,7 @@ describe('Settings: saved update preference lifecycle', () => {
 describe('Settings: update button (0.1.4)', () => {
   it('shows only the quiet line and the link, no button, when the release has no installer asset', async () => {
     mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await screen.findByText('Dostupná aktualizácia 0.2.0')
     expect(screen.queryByRole('button', { name: /Aktualizovať na/ })).not.toBeInTheDocument()
   })
@@ -265,7 +322,7 @@ describe('Settings: update button (0.1.4)', () => {
       downloadUpdate: vi.fn().mockReturnValue(download.promise),
       launchUpdate: vi.fn().mockReturnValue(launch.promise),
     } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Aktualizovať na 0.1.4' }))
     expect(api.downloadUpdate).toHaveBeenCalledWith('0.1.4')
@@ -284,7 +341,7 @@ describe('Settings: update button (0.1.4)', () => {
       checkUpdateNow: vi.fn().mockResolvedValue(releaseWithInstaller),
       downloadUpdate: vi.fn().mockRejectedValue('Stiahnutie zlyhalo: offline'),
     } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Aktualizovať na 0.1.4' }))
 
@@ -296,7 +353,7 @@ describe('Settings: update button (0.1.4)', () => {
 
   it('opens the release page through open_release_page when the link is clicked', async () => {
     mockApi({ getCheckUpdates: vi.fn().mockResolvedValue(true), checkUpdateNow: vi.fn().mockResolvedValue(release) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByText(release.url))
 
@@ -307,13 +364,13 @@ describe('Settings: update button (0.1.4)', () => {
 describe('Settings: network audit', () => {
   it('shows the empty state when net_log has no rows', async () => {
     mockApi()
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(screen.getByText('Žiadna sieťová aktivita')).toBeInTheDocument())
   })
 
   it('lists net_log rows and refreshes them after a manual scan', async () => {
     mockApi({ netLog: vi.fn().mockResolvedValue([netLogRow]) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(screen.getByText(netLogRow.url)).toBeInTheDocument())
 
     screen.getByRole('button', { name: 'Skenovať teraz' }).click()
@@ -325,14 +382,14 @@ describe('Settings: network audit', () => {
   // (lost on restart), but while the process runs, Nastavenia must show it.
   it('shows a failed audit write and hides the section once none remain', async () => {
     mockApi({ netAuditFailures: vi.fn().mockResolvedValue([auditFailure]) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(screen.getByText(auditFailure.error)).toBeInTheDocument())
     expect(screen.getByText('Neúspešné zápisy auditu')).toBeInTheDocument()
   })
 
   it('shows nothing extra when every audit write succeeded', async () => {
     mockApi()
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(screen.getByText('Žiadna sieťová aktivita')).toBeInTheDocument())
     expect(screen.queryByText('Neúspešné zápisy auditu')).not.toBeInTheDocument()
   })
@@ -353,7 +410,7 @@ function manyNetLogRows(count: number): NetLogRow[] {
 describe('Settings: network activity collapse (point 7)', () => {
   it('shows only the first 10 rows and offers to show the rest', async () => {
     mockApi({ netLog: vi.fn().mockResolvedValue(manyNetLogRows(12)) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(screen.getByText(/n=1$/)).toBeInTheDocument())
 
     expect(screen.getByText(/n=10$/)).toBeInTheDocument()
@@ -370,7 +427,7 @@ describe('Settings: network activity collapse (point 7)', () => {
 
   it('shows no toggle at all when 10 or fewer rows exist', async () => {
     mockApi({ netLog: vi.fn().mockResolvedValue(manyNetLogRows(10)) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     await waitFor(() => expect(screen.getByText(/n=10$/)).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: /Zobraziť všetky/ })).not.toBeInTheDocument()
   })
@@ -384,7 +441,7 @@ describe('Settings: edit account', () => {
   it('edits the label and keeps the IBAN read-only', async () => {
     const updateAccount = vi.fn().mockResolvedValue({ ...account, label: 'Nový názov' })
     mockApi({ listAccounts: vi.fn().mockResolvedValue([account]), updateAccount } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
     const ibanField = screen.getByLabelText('IBAN (nedá sa zmeniť)') as HTMLInputElement
@@ -400,7 +457,7 @@ describe('Settings: edit account', () => {
     const refusal = 'Počet výpisov: 3. Počet transakcií: 12. Zmena typu účtu zmení ich zaradenie v Prehľade aj v exporte. Ak chcete pokračovať, potvrďte zmenu.'
     const updateAccount = vi.fn().mockRejectedValueOnce(refusal).mockResolvedValueOnce({ ...account, kind: 'business' })
     mockApi({ listAccounts: vi.fn().mockResolvedValue([account]), updateAccount } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
     fireEvent.change(screen.getByLabelText('Typ účtu'), { target: { value: 'business' } })
@@ -423,7 +480,7 @@ describe('Settings: account password', () => {
   it('sets a password on an account that has none, shows the row and the status line updated', async () => {
     const setAccountPassword = vi.fn().mockResolvedValue(undefined)
     mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]), setAccountPassword } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
     await screen.findByRole('dialog', { name: 'Heslo k výpisom účtu Osobný' })
@@ -438,7 +495,7 @@ describe('Settings: account password', () => {
   it('changes a password on an account that already has one', async () => {
     const setAccountPassword = vi.fn().mockResolvedValue(undefined)
     mockApi({ listAccounts: vi.fn().mockResolvedValue([withPassword]), setAccountPassword } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Zmeniť heslo' }))
     fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: 'nove-heslo' } })
@@ -450,7 +507,7 @@ describe('Settings: account password', () => {
 
   it('keeps Uložiť disabled while the two fields do not match or are empty', async () => {
     mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]) } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
     expect(screen.getByRole('button', { name: 'Uložiť' })).toBeDisabled()
@@ -468,7 +525,7 @@ describe('Settings: account password', () => {
   it('shows the alert on a failure, keeps the draft and the dialog open', async () => {
     const setAccountPassword = vi.fn().mockRejectedValue('Uloženie hesla zlyhalo: keyring locked')
     mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]), setAccountPassword } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
     fireEvent.change(screen.getByLabelText('Heslo'), { target: { value: 'tajneheslo' } })
@@ -487,7 +544,7 @@ describe('Settings: account password', () => {
   it('accepts exactly 512 characters and rejects 513 with the Slovak hint, Uložiť disabled', async () => {
     const setAccountPassword = vi.fn().mockResolvedValue(undefined)
     mockApi({ listAccounts: vi.fn().mockResolvedValue([withoutPassword]), setAccountPassword } as Partial<typeof api>)
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     fireEvent.click(await screen.findByRole('button', { name: 'Nastaviť heslo' }))
 
     const atLimit = 'a'.repeat(512)
@@ -521,7 +578,7 @@ describe('Settings: restore refetches the account list', () => {
     vi.mocked(api.restorePreview).mockResolvedValue({ accounts: 1, statements: 2, transactions: 10, schema_version: 6 })
     vi.mocked(api.restoreDatabase).mockResolvedValue({ safety_copy_path: 'C:/safety.db' })
 
-    render(<Settings />)
+    render(<Settings aboutOpen />)
     expect(await screen.findByText('Účet A')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Vybrať zálohu' }))

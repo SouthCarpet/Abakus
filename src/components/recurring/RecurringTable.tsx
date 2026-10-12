@@ -32,14 +32,14 @@ export function RecurringTable({
 }) {
   if (rows.length === 0) return null
   return (
-    <div className="k-table-scroll">
+    <div className="ab-table-scroll">
       <table className="k-table">
-        <caption className="k-field-label">{caption}</caption>
+        <caption className="ab-field-label">{caption}</caption>
         <thead>
           <tr>
             <th>Názov</th>
             <th>Interval</th>
-            <th className="k-num">Suma</th>
+            <th className="k-num k-cell-number">Suma</th>
             <th>Posledná</th>
             <th>Ďalšia</th>
             <th>Stav</th>
@@ -91,23 +91,23 @@ function RecurringTableRow({
         <Button variant="ghost" aria-label={`Detail ${row.name}`} onClick={() => onDetail(row)}>
           {row.name}
         </Button>
-        <div className="k-field-label">{row.account_label}</div>
-        <div className="k-field-label">{categoryStatusLabel(row, null)}</div>
+        <div className="ab-field-label">{row.account_label}</div>
+        <div className="ab-field-label">{categoryStatusLabel(row, null)}</div>
         {price ? <div><span className="k-card-badge">{price}</span></div> : null}
         {row.foreign_eur_estimate ? (
-          <div className="k-field-label">Prepočet podľa poslednej platby; kurz sa môže zmeniť</div>
+          <div className="ab-field-label">Prepočet podľa poslednej platby; kurz sa môže zmeniť</div>
         ) : null}
       </td>
       <td>
         {row.cadence ? cadenceLabel(row.cadence) : 'neznámy'}
-        {monthly ? <div className="k-field-label">{monthly}</div> : null}
+        {monthly ? <div className="ab-field-label">{monthly}</div> : null}
       </td>
-      <td className="k-num k-money">{actualChargeLabel(row)}</td>
+      <td className="k-num k-cell-number ab-money">{actualChargeLabel(row)}</td>
       <td>{row.last_paid ? formatDate(row.last_paid) : 'chýba'}</td>
       <td>{row.next_due ? formatDate(row.next_due) : 'chýba'}</td>
       <td>
         <span className="k-card-badge">{stateLabel(row)}</span>
-        {ended ? <div className="k-field-label">{ended}</div> : null}
+        {ended ? <div className="ab-field-label">{ended}</div> : null}
       </td>
       <td>
         <RowActions
@@ -140,7 +140,7 @@ function RowActions({
 }) {
   if (row.decision === 'estimate') {
     return (
-      <div className="k-row k-recurring-actions">
+      <div className="ab-row ab-recurring-actions">
         <Button variant="primary" disabled={busy} aria-label={`Potvrdiť ${row.name}`} onClick={() => onConfirm(row)}>
           Potvrdiť
         </Button>
@@ -155,7 +155,7 @@ function RowActions({
   }
   if (row.decision === 'ignored') {
     return (
-      <div className="k-row k-recurring-actions">
+      <div className="ab-row ab-recurring-actions">
         <Button variant="secondary" disabled={busy} aria-label={`Upraviť ${row.name}`} onClick={() => onEdit(row)}>
           Upraviť
         </Button>
@@ -166,7 +166,7 @@ function RowActions({
     )
   }
   return (
-    <div className="k-row k-recurring-actions">
+    <div className="ab-row ab-recurring-actions">
       <Button variant="secondary" disabled={busy} aria-label={`Upraviť ${row.name}`} onClick={() => onEdit(row)}>
         Upraviť
       </Button>

@@ -5,6 +5,9 @@ import type { AccountKind, Checksum, ImportReport, StatementDeletePreview, State
 import { api, formatEur } from '../api'
 import { useAction } from '../lib/useAction'
 import { Button } from '../components/Button'
+import { PageHead } from '../components/PageHead'
+import { ariaKeys, withKey } from '../kaliber/bindings'
+import { startActivity } from '../kaliber/activity'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
@@ -33,7 +36,7 @@ function PeriodLine({ report }: { report: ImportReport }) {
 
 function ChecksumRow({ checksum }: { checksum: Checksum | null }) {
   const danger = checksum?.status === 'off_by'
-  return <span className={danger ? 'k-text-danger' : undefined}>{checksumLabel(checksum)}</span>
+  return <span className={danger ? 'ab-text-danger' : undefined}>{checksumLabel(checksum)}</span>
 }
 
 function WarningsList({ warnings }: { warnings: string[] }) {
@@ -50,7 +53,7 @@ function WarningsList({ warnings }: { warnings: string[] }) {
 // A17/F4: shows the backend's own failure text instead of the generic "Chyba" badge alone.
 function ImportErrorMessage({ report }: { report: ImportReport }) {
   if (!report.message) return null
-  return <p className="k-text-danger">{report.message}</p>
+  return <p className="ab-text-danger">{report.message}</p>
 }
 
 function LockedAction({
@@ -95,7 +98,7 @@ function LockedAction({
         <Field label="Heslo">
           <PasswordInput value={password} onChange={setPassword} />
         </Field>
-        <label className="k-checkbox">
+        <label className="ab-checkbox">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
           Zapamätať pre tento účet
         </label>
@@ -145,12 +148,12 @@ export function ImportResultCard({
         ) : undefined
       }
     >
-      <div className="k-row">
+      <div className="ab-row">
         <span>{report.accountLabel ?? report.ibanMasked ?? '-'}</span>
         {report.statementNumber !== null ? <span className="k-num">č. {report.statementNumber}</span> : null}
         <PeriodLine report={report} />
       </div>
-      <div className="k-row">
+      <div className="ab-row">
         <span>
           {report.inserted} nových, {report.duplicates} duplicít
         </span>
@@ -224,23 +227,23 @@ function StatementReviewChip({ statementId }: { statementId: number }) {
     return () => { active = false }
   }, [statementId])
 
-  if (error) return <span className="k-card-badge k-text-danger">Kontrola sa nenačítala</span>
+  if (error) return <span className="k-card-badge ab-text-danger">Kontrola sa nenačítala</span>
   if (!review) return <span className="k-card-badge">Načítava sa kontrola…</span>
 
   const items = reviewOpenItems(review)
   const danger = review.status === 'needs_attention'
   return (
-    <span className="k-review-chip">
+    <span className="ab-review-chip">
       <Button
         variant="ghost"
-        className={danger ? 'k-card-badge k-text-danger' : 'k-card-badge'}
+        className={danger ? 'k-card-badge ab-text-danger' : 'k-card-badge'}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         {REVIEW_STATUS_LABEL[review.status]}
       </Button>
       {open ? (
-        <span className="k-review-detail">
+        <span className="ab-review-detail">
           {items.length === 0 ? (
             <span>Žiadne otvorené položky.</span>
           ) : (
@@ -268,13 +271,13 @@ function StatementRow({
 }) {
   const danger = statement.checksum.status === 'off_by'
   return (
-    <div className="k-round-row">
+    <div className="ab-round-row">
       <span>{formatDate(statement.period_end)}</span>
       <span>{statement.account_label}</span>
       <span className="k-num">č. {statement.number}</span>
       <span className="k-num">{statement.transaction_count} transakcií</span>
       <span className="k-num">{formatEur(statement.total_cents)}</span>
-      <span className={danger ? 'k-card-badge k-text-danger' : 'k-card-badge'}>{checksumLabel(statement.checksum)}</span>
+      <span className={danger ? 'k-card-badge ab-text-danger' : 'k-card-badge'}>{checksumLabel(statement.checksum)}</span>
       <StatementReviewChip statementId={statement.statement_id} />
       <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
         Zobraziť transakcie
@@ -282,7 +285,7 @@ function StatementRow({
       {/* Secondary, not the loudest control on the row: composes the
           existing ghost variant with the existing danger text tone, so
           Zmazať stays findable without outweighing Zobraziť transakcie. */}
-      <Button variant="ghost" className="k-text-danger" onClick={() => onDelete(statement)}>
+      <Button variant="ghost" className="ab-text-danger" onClick={() => onDelete(statement)}>
         Zmazať
       </Button>
     </div>
@@ -291,7 +294,7 @@ function StatementRow({
 
 function StatementListHead() {
   return (
-    <div className="k-round-row-head">
+    <div className="ab-round-row-head">
       <span>Dátum</span>
       <span>Účet</span>
       <span>Číslo</span>
@@ -332,7 +335,7 @@ function StatementList({
       {sorted.length === 0 ? (
         <p>Zatiaľ žiadne importy.</p>
       ) : (
-        <div className="k-round-list">
+        <div className="ab-round-list">
           <StatementListHead />
           {visible.map((s) => (
             <StatementRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} />
@@ -345,7 +348,7 @@ function StatementList({
             {showOlder ? 'Zbaliť' : `Staršie výpisy (${older.length})`}
           </Button>
           {showOlder ? (
-            <div className="k-round-list">
+            <div className="ab-round-list">
               {older.map((s) => (
                 <StatementRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} />
               ))}
@@ -369,7 +372,30 @@ function DeleteStatementBody({ preview }: { preview: StatementDeletePreview | nu
   )
 }
 
-export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?: (statementId?: number) => void }) {
+// `pickRequest` (Ctrl+O from anywhere, App): a positive value opens the file chooser once;
+// `onPickRequestHandled` lets App reset it, so a later visit does not open it again.
+// Ctrl+O: a positive request opens the file chooser once, then App resets it.
+function usePickRequest(pickRequest: number | undefined, onHandled: (() => void) | undefined, pick: () => void) {
+  useEffect(() => {
+    if (!pickRequest || pickRequest <= 0) return
+    if (onHandled) onHandled()
+    pick()
+  }, [pickRequest])
+}
+
+function PickButton({ busy, onPick }: { busy: boolean; onPick: () => void }) {
+  return (
+    <Button variant="primary" disabled={busy} title={withKey('Vybrať PDF', 'import')} aria-keyshortcuts={ariaKeys('import')} onClick={onPick}>
+      Vybrať PDF
+    </Button>
+  )
+}
+
+export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHandled }: {
+  onNavigateToTransactions?: (statementId?: number) => void
+  pickRequest?: number
+  onPickRequestHandled?: () => void
+}) {
   const action = useAction()
   const deletion = useAction()
   const previewRequest = useRef(0)
@@ -422,8 +448,17 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
   const runImport = useCallback(
     async (paths: string[]) => {
       if (paths.length === 0) return
-      const results = await api.importStatements(paths)
-      mergeReports(results)
+      // Kaliber P1 end form: the header line runs while the import runs, the footer keeps a
+      // dated receipt. The backend reports no progress, so the line stays indeterminate.
+      const done = startActivity('Prebieha import výpisov')
+      let receipt: string | undefined
+      try {
+        const results = await api.importStatements(paths)
+        mergeReports(results)
+        receipt = `Import dokončený, súbory: ${paths.length}.`
+      } finally {
+        done(receipt)
+      }
     },
     [mergeReports],
   )
@@ -444,6 +479,8 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
       }).catch((e) => action.setError(String(e)))
     return () => { disposed = true; unlisten?.() }
   }, [runImport])
+
+  usePickRequest(pickRequest, onPickRequestHandled, () => void action.run(pickFiles))
 
   async function pickFiles() {
     const selection = await open({ multiple: true, filters: [{ name: 'PDF', extensions: ['pdf'] }] })
@@ -499,15 +536,16 @@ export function Import({ onNavigateToTransactions }: { onNavigateToTransactions?
   }
 
   return (
-    <div className="k-section">
+    <div className="ab-screen">
+      <PageHead
+        title="Import"
+        primary={<PickButton busy={[action.busy, deletion.busy].some(Boolean)} onPick={() => void action.run(pickFiles)} />}
+      />
       {action.error ? <p role="alert">{action.error}</p> : null}
       {action.busy ? <p role="status">Prebieha import...</p> : null}
-      <fieldset disabled={action.busy || deletion.busy} className="k-section">
-        <div className="k-well k-dropzone">
-          <p>Presuňte výpisy sem alebo</p>
-          <Button variant="primary" onClick={() => void action.run(pickFiles)}>
-            Vybrať PDF
-          </Button>
+      <fieldset disabled={action.busy || deletion.busy} className="ab-section">
+        <div className="k-well ab-dropzone">
+          <p>Presuňte výpisy Tatra banky sem alebo použite Vybrať PDF.</p>
         </div>
         {reports.map((report) => (
           <ImportResultCard

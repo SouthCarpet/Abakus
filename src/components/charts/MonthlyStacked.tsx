@@ -47,11 +47,11 @@ export function MonthlyStacked({
           <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
           <XAxis dataKey="month" stroke="var(--color-text-muted)" fontSize={12} tickLine={false} />
           <YAxis stroke="var(--color-text-muted)" fontSize={12} tickLine={false} domain={[0, 'auto']} tickFormatter={(v: number) => formatEur(v)} />
-          <Tooltip content={ChartTooltip} cursor={{ className: 'k-chart-cursor' }} />
+          <Tooltip content={ChartTooltip} cursor={{ className: 'ab-chart-cursor' }} />
           <Legend />
           {categories.map((cat, i) =>
             cat.category_id === OSTATNE_ID ? (
-              <Bar key={cat.category_id} dataKey={String(cat.category_id)} name={cat.name} stackId="a" fill="var(--color-border)" className="k-chart-ostatne" />
+              <Bar key={cat.category_id} dataKey={String(cat.category_id)} name={cat.name} stackId="a" fill="var(--color-border)" className="ab-chart-ostatne" />
             ) : (
               <Bar
                 key={cat.category_id}
@@ -59,7 +59,7 @@ export function MonthlyStacked({
                 name={cat.name}
                 stackId="a"
                 fill={CHART_COLORS[i]}
-                className="k-chart-slice"
+                className="ab-chart-slice"
                 onClick={() => onCategoryClick(cat.category_id)}
               />
             ),
