@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { categoryApi } from '../lib/category-api'
@@ -17,7 +17,7 @@ describe('RulesTable', () => {
     ] as const
     render(<RulesTable rules={[...rules]} categories={[]} onRedirect={vi.fn()} onDelete={vi.fn()} />)
     expect(screen.getByText('presné')).toBeInTheDocument(); expect(screen.getByText('slovník')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Zmazať' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /^Zmazať pravidlo / })).toHaveLength(1)
   })
 
   it('carries the overflow-safe key cell class so a long merchant string wraps instead of widening the card', () => {
@@ -27,6 +27,18 @@ describe('RulesTable', () => {
     const { container } = render(<RulesTable rules={[...rules]} categories={[]} onRedirect={vi.fn()} onDelete={vi.fn()} />)
     const table = container.querySelector('table')
     expect(table).toHaveClass('k-table', 'ab-rules-table')
+  })
+
+  // Oracle: Kaliber R12, danger colour only in the confirm step.
+  it('draws the row delete as a quiet ghost icon with the 44 px hit class', () => {
+    const rules = [
+      { id: 1, kind: 'exact', key: 'aldi sued', place: 'neuss', category_id: 2, category_name: 'potraviny', parent_name: 'Jedlo', hit_count: 3 },
+    ] as const
+    const { container } = render(<RulesTable rules={[...rules]} categories={[]} onRedirect={vi.fn()} onDelete={vi.fn()} />)
+    const button = within(container).getByRole('button', { name: 'Zmazať pravidlo aldi sued' })
+    expect(button).toHaveClass('k-btn-ghost', 'k-icon-btn', 'ab-icon-hit')
+    expect(button).not.toHaveClass('k-btn-danger')
+    expect(button).toHaveTextContent('')
   })
 })
 
@@ -155,6 +167,21 @@ describe('Categories archive control (point 4)', () => {
     expect(archiveButton).toHaveAttribute('title', 'Archivuje kategóriu. História ostáva.')
     expect(archiveButton.textContent).not.toBe('Archivovať')
   })
+
+  // Oracle: Kaliber R12 and components.md "Hit target". The row keeps name and actions on one
+  // line (nowrap row, shrinkable name) and both icon actions carry the 44 px hit class.
+  it('keeps the name field and the icon actions on one row with the touch hit class', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    render(<Categories />)
+
+    const name = await screen.findByRole('textbox', { name: `Názov kategórie ${JEDLO.id}` })
+    expect(name).toHaveClass('ab-category-name')
+    expect(name.parentElement).toHaveClass('ab-category-row')
+    const row = name.parentElement as HTMLElement
+    for (const label of ['Archivovať', `Zmazať kategóriu ${JEDLO.name}`]) {
+      expect(within(row).getByRole('button', { name: label })).toHaveClass('ab-icon-hit')
+    }
+  })
 })
 
 // Point 4: a red trash control previews the delete before it happens, states
@@ -242,9 +269,9 @@ describe('Categories rule editing (point 14)', () => {
     vi.mocked(api.listRules).mockResolvedValue([rule])
     vi.mocked(categoryApi.previewRuleDelete).mockResolvedValue({ rule_id: 4, open_rule_references: 5, open_classification_changes: 2 })
     render(<Categories />)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať pravidlo aldi sued' })).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať pravidlo aldi sued' }))
 
     expect(await screen.findByText(/Otvorených riadkov s týmto pravidlom: 5/)).toBeInTheDocument()
     expect(screen.getByText(/2 riadkoch/)).toBeInTheDocument()

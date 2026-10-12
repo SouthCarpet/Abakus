@@ -316,6 +316,14 @@ it('retains parent drilldown 10 through asynchronous metadata and queries parent
   expect(filter).toHaveTextContent('Potraviny')
 })
 
+// Oracle: Kaliber R12 (a search field shows its whole prompt). The field takes the rest of the filter row.
+it('gives the search field the flexible search class so its placeholder is not clipped', () => {
+  render(<Transactions />)
+  const search = screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })
+  expect(search).toHaveClass('ab-filter-search')
+  expect(search).toHaveAttribute('placeholder', 'Hľadať obchodníka alebo poznámku...')
+})
+
 // Point 17: a merchant click in Overview lands here with the merchant name
 // already in the search box and already applied as the text filter, with no
 // debounce wait needed for the initial value.

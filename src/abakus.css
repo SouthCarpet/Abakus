@@ -45,8 +45,23 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-password-row input { flex: 1 1 auto; min-width: 0; }
 .ab-password-row button { flex: none; }
 
+/* ---- touch widths: 44 px hit area (components.md "Hit target": --k-hit) --------------
+   kaliber.css gives --k-hit 24px; a phone window raises it to the touch size, so every
+   Kaliber control that already reads --k-hit follows, and these two Abakus classes join them. */
+@media (max-width: 599px) { :root { --k-hit: var(--control-h-touch); } }
+.ab-btn { height: max(var(--control-h), var(--k-hit)); }
+.ab-icon-hit { width: max(var(--control-h), var(--k-hit)); height: max(var(--control-h), var(--k-hit)); }
+/* A category row keeps its name field and its actions on one line, also at 390 px. */
+.ab-category-row { flex-wrap: nowrap; gap: var(--space-2); }
+.ab-category-name { flex: 1 1 0; min-width: 0; }
+/* The register search shows its whole placeholder: it takes the rest of the filter row, and
+   a row too narrow for 22rem gives it the full line. */
+.ab-filter-search { flex: 1 1 22rem; min-width: min(100%, 22rem); }
+
 /* ---- tables -------------------------------------------------------------------- */
 .ab-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; padding: var(--space-1); }
+/* A header stays on one line; a narrow window scrolls the region and never breaks a header word. */
+.ab-table-scroll th { white-space: nowrap; }
 .ab-money { white-space: nowrap; min-width: calc(var(--space-8) * 4); }
 .ab-accounts-table td:first-child { overflow-wrap: anywhere; }
 .ab-accounts-table td:last-child { min-width: calc(var(--space-8) * 5); }
@@ -65,6 +80,8 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-register tbody tr[aria-selected="true"] td { background: var(--color-surface-selected); }
 
 /* ---- charts --------------------------------------------------------------------- */
+.ab-chart-well { padding: var(--space-3); }
+.ab-chart-legend { margin: var(--space-2) 0 0; padding: 0; list-style: none; justify-content: center; }
 .ab-chart-ostatne { fill: var(--color-border); fill-opacity: var(--color-chart-band-alpha); }
 .ab-chart-slice { cursor: pointer; transition: opacity var(--motion-fast) var(--ease-standard); }
 .ab-chart-slice:hover { opacity: 0.85; }

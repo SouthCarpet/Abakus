@@ -183,7 +183,7 @@ function FilterBar({
         ref={searchRef}
         type="search"
         data-k-search=""
-        className="k-input"
+        className="k-input ab-filter-search"
         aria-label="Hľadať obchodníka alebo poznámku"
         aria-keyshortcuts="Control+F"
         title={withKey('Hľadať', 'find')}

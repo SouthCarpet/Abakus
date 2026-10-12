@@ -9,6 +9,7 @@ import { PageHead } from '../components/PageHead'
 import { ariaKeys, withKey } from '../kaliber/bindings'
 import { startActivity } from '../kaliber/activity'
 import { useDeleteKey } from '../kaliber/deleteKey'
+import { TrashGlyph } from '../kaliber/icons'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
@@ -285,11 +286,16 @@ function StatementRow({
       <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
         Zobraziť transakcie
       </Button>
-      {/* Secondary, not the loudest control on the row: composes the
-          existing ghost variant with the existing danger text tone, so
-          Zmazať stays findable without outweighing Zobraziť transakcie. */}
-      <Button variant="ghost" className="ab-text-danger" onClick={() => onDelete(statement)}>
-        Zmazať
+      {/* Kaliber R12: the danger colour shows only in the confirm step, so the row
+          delete is the quiet ghost icon of the category rows. */}
+      <Button
+        variant="ghost"
+        className="k-icon-btn ab-icon-hit"
+        aria-label={`Zmazať výpis č. ${statement.number}`}
+        title="Zmaže výpis natrvalo."
+        onClick={() => onDelete(statement)}
+      >
+        <TrashGlyph />
       </Button>
     </div>
   )

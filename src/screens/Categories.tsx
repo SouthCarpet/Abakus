@@ -71,8 +71,14 @@ export function RulesTable({
             <td className="k-num k-cell-number">{rule.hit_count}</td>
             <td>
               {rule.kind !== 'seed' ? (
-                <Button variant="danger" onClick={() => onDelete(rule)}>
-                  Zmazať
+                <Button
+                  variant="ghost"
+                  className="k-icon-btn ab-icon-hit"
+                  aria-label={`Zmazať pravidlo ${rule.key}`}
+                  title="Zmaže pravidlo."
+                  onClick={() => onDelete(rule)}
+                >
+                  <TrashGlyph />
                 </Button>
               ) : null}
             </td>
@@ -110,9 +116,9 @@ function CategoryRow({
   }
 
   return (
-    <div className="ab-row" style={indent ? { marginLeft: 'var(--space-6)' } : undefined} {...rowProps(category.system ? undefined : () => onDeleteRequest(category))}>
+    <div className="ab-row ab-category-row" style={indent ? { marginLeft: 'var(--space-6)' } : undefined} {...rowProps(category.system ? undefined : () => onDeleteRequest(category))}>
       <input
-        className="k-input k-well"
+        className="k-input k-well ab-category-name"
         aria-label={`Názov kategórie ${category.id}`}
         value={name}
         disabled={category.system}
@@ -131,7 +137,7 @@ function CategoryRow({
         // Point 4: icon-only so the row stays compact; the accessible name
         // stays plain "Archivovať" (unchanged for existing archive tests),
         // the native title carries the hover explanation.
-        <Button variant="ghost" className="k-icon-btn" aria-label="Archivovať" title={ARCHIVE_TITLE} onClick={() => onArchive(category)}>
+        <Button variant="ghost" className="k-icon-btn ab-icon-hit" aria-label="Archivovať" title={ARCHIVE_TITLE} onClick={() => onArchive(category)}>
           <ArchiveGlyph />
         </Button>
       ) : null}
@@ -139,7 +145,7 @@ function CategoryRow({
         // Kaliber R12: the danger colour shows only in the confirm step, not on the row.
         <Button
           variant="ghost"
-          className="k-icon-btn"
+          className="k-icon-btn ab-icon-hit"
           aria-label={`Zmazať kategóriu ${category.name}`}
           title="Zmaže kategóriu natrvalo."
           onClick={() => onDeleteRequest(category)}

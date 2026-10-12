@@ -224,7 +224,7 @@ describe('Statement list: delete a statement', () => {
     render(<Import />)
     await waitFor(() => expect(screen.getByText('č. 6')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať výpis č. 6' }))
     await waitFor(() => expect(api.statementDeletePreview).toHaveBeenCalledWith(5))
     await screen.findByText(/Odstráni sa 8 transakcií, z nich 2 potvrdených. Pravidlá, ktoré nepoužíva iný výpis: 1/)
 
@@ -241,7 +241,7 @@ describe('Statement list: delete a statement', () => {
     render(<Import />)
     await waitFor(() => expect(screen.getByText('č. 6')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať výpis č. 6' }))
     await screen.findByText(/Odstráni sa 8 transakcií/)
     // Oracle: README, "Del": the confirm opens with the focus on Zrušiť, like the account and category confirms.
     expect(screen.getByRole('button', { name: 'Zrušiť' })).toHaveFocus()
@@ -265,17 +265,17 @@ describe('Statement list: column headers', () => {
   })
 })
 
-// A17: Zmazať used to outweigh Zobraziť transakcie on every row (filled
-// danger next to a plain text control). It stays findable through the
-// danger text tone, but no longer the loudest thing on the row.
-describe('Statement list: row-level Zmazať weight', () => {
-  it('is a ghost button with the danger text tone, not the filled danger button', async () => {
+// Oracle: Kaliber R12, danger colour only in the confirm step. The row delete is the quiet ghost
+// icon of the category rows, with an accessible name; the danger button is the confirm.
+describe('Statement list: row-level delete weight', () => {
+  it('is a quiet ghost icon with the 44 px hit class, never danger-coloured', async () => {
     vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
     render(<Import />)
-    const button = await screen.findByRole('button', { name: 'Zmazať' })
-    expect(button).toHaveClass('k-btn-ghost')
-    expect(button).toHaveClass('ab-text-danger')
+    const button = await screen.findByRole('button', { name: 'Zmazať výpis č. 6' })
+    expect(button).toHaveClass('k-btn-ghost', 'k-icon-btn', 'ab-icon-hit')
     expect(button).not.toHaveClass('k-btn-danger')
+    expect(button).not.toHaveClass('ab-text-danger')
+    expect(button).toHaveTextContent('')
   })
 })
 
@@ -296,7 +296,7 @@ describe('Import audit failure boundaries', () => {
     vi.mocked(api.statementHistory).mockResolvedValue([historyRow({ statement_id: 91, number: 3, account_label: 'Test', period_end: '2026-09-01' })])
     vi.mocked(api.statementDeletePreview).mockRejectedValueOnce(new Error('Náhľad výpisu zlyhal'))
     render(<Import />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Zmazať' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Zmazať výpis č. 3' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Náhľad výpisu zlyhal')
     expect(screen.getByRole('button', { name: 'Natrvalo zmazať' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
@@ -308,7 +308,7 @@ describe('Import audit failure boundaries', () => {
     vi.mocked(api.statementDeletePreview).mockResolvedValue({ statement_id: 91, number: 3, account_label: 'Test', period_start: '2026-08-01', period_end: '2026-09-01', transaction_count: 2, confirmed_count: 1, rules_deleted: 0 })
     vi.mocked(api.deleteStatement).mockRejectedValueOnce(new Error('Odstránenie výpisu zlyhalo'))
     render(<Import />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Zmazať' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Zmazať výpis č. 3' }))
     const remove = screen.getByRole('button', { name: 'Natrvalo zmazať' })
     await waitFor(() => expect(remove).toBeEnabled())
     fireEvent.click(remove)
