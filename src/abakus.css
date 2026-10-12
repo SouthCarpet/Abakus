@@ -83,6 +83,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-chart-well { padding: var(--space-3); }
 .ab-chart-legend { margin: var(--space-2) 0 0; padding: 0; list-style: none; justify-content: center; }
 .ab-chart-ostatne { fill: var(--color-border); fill-opacity: var(--color-chart-band-alpha); }
+.ab-chart-slice, .ab-chart-ostatne { vector-effect: non-scaling-stroke; }
 .ab-chart-slice { cursor: pointer; transition: opacity var(--motion-fast) var(--ease-standard); }
 .ab-chart-slice:hover { opacity: 0.85; }
 .ab-chart-cursor { fill: var(--color-chart-grid); fill-opacity: var(--color-chart-band-alpha); }
