@@ -1,0 +1,45 @@
+Osobný účet     SK44 1100 0000 0000 1234 5678          Mena  EUR                          BIC (SWIFT)   TATRSKBX
+IBAN SK44 1100 0000 0000 1234 5678
+Číslo klienta:  1234567
+Majiteľ účtu:   JANA VZOROVÁ
+Tatra banka, a.s., Hodžovo nám. 3
+811 06 Bratislava
+Dialog  0800 00 1100              ID:   00                                    Výpis číslo:        7
+Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 31.07.2026
+Dátum sprac.  Popis                                     Dátum zúčt.                              Suma
+--------------------------------------------------------------------------------------------------
+              Posledný výpis  30.06.2026                                                       500.00
+02.07.2026    EUR AP nákup POS                                                                 12.40-
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    Neuss                 PENNY
+              Dátum:  01.07.26  Čas:  18:02:11        Suma:         12.40- EUR
+--------------------------------------------------------------------------------------------------
+09.07.2026    EUR AP nákup POS                                                                 23.10-
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    Neuss                 PENNY
+              Dátum:  08.07.26  Čas:  17:45:30        Suma:         23.10- EUR
+--------------------------------------------------------------------------------------------------
+16.07.2026    EUR AP nákup POS                                                                  8.75-
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    Neuss                 PENNY
+              Dátum:  15.07.26  Čas:  19:12:05        Suma:          8.75- EUR
+--------------------------------------------------------------------------------------------------
+18.07.2026    EUR AP nákup POS                                                                 15.00-
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    Berlin                PENNY
+              Dátum:  17.07.26  Čas:  11:20:44        Suma:         15.00- EUR
+--------------------------------------------------------------------------------------------------
+23.07.2026    EUR AP nákup POS                                                                  6.20-
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    Neuss                 PENNY MARKT
+              Dátum:  22.07.26  Čas:  08:31:59        Suma:          6.20- EUR
+--------------------------------------------------------------------------------------------------
+25.07.2026    EUR AP nákup POS                                                                  9.80-
+              Číslo karty:      440000******1111      Držiteľ: JANA VZOROVÁ
+              Miesto platby:    Neuss                 REWE
+              Dátum:  24.07.26  Čas:  16:05:12        Suma:          9.80- EUR
+--------------------------------------------------------------------------------------------------
+              Zostatok na účte ku dňu vystavenia výpisu:                                       424.75
+--------------------------------------------------------------------------------------------------
+Mena    EUR                                          Výpis číslo:        7        Strana:        1Osobný účet     SK44 1100 0000 0000 1234 5678     Majiteľ Jana Vzorová                  Dátum 31.07.2026
+Týmto potvrdzujem, že váš vklad je chránený v zmysle zákona o ochrane vkladov.

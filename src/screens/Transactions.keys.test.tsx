@@ -167,3 +167,21 @@ describe('register keys', () => {
     expect(row4()).not.toHaveClass('is-inked')
   })
 })
+
+// Plan 091 p3 follow-up (ledger seq 5433): the preview of "confirm similar" on the synthetic
+// Penny Neuss rows (fixtures/synthetic/penny-neuss-2026-07.txt; the store side is
+// crates/store/tests/penny_neuss.rs). Oracle: docs/plan-091-bulk-confirmation.md, same
+// merchant and same place.
+describe('Penny Neuss preview', () => {
+  it('offers the two other PENNY Neuss payments, not Berlin, PENNY MARKT or REWE', async () => {
+    const penny = (id: number, place: string, merchant = 'PENNY', status: TxRow['status'] = 'unassigned') =>
+      tx(id, { merchant_raw: merchant, place, status, category_id: status === 'suggested' ? 1 : null })
+    vi.mocked(api.listTransactions).mockResolvedValue([
+      penny(11, 'Neuss', 'PENNY', 'suggested'), penny(12, 'Neuss'), penny(13, 'Neuss'),
+      penny(14, 'Berlin'), penny(15, 'Neuss', 'PENNY MARKT'), penny(16, 'Neuss', 'REWE'),
+    ])
+    render(<Transactions />)
+    const row = (await screen.findAllByText('PENNY'))[0].closest('tr') as HTMLElement
+    expect(within(row).getByRole('checkbox', { name: 'Potvrdiť aj podobné (2)' })).toBeInTheDocument()
+  })
+})
