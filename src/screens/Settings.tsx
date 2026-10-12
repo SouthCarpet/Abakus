@@ -7,6 +7,7 @@ import { DeleteAccountDialog } from '../components/DeleteAccountDialog'
 import { SetPasswordDialog } from '../components/SetPasswordDialog'
 import type { Account, AccountKind, AuditFailure, NetLogRow, Release } from '../api'
 import { PageHead } from '../components/PageHead'
+import { useDeleteKey } from '../kaliber/deleteKey'
 import { ThemeMode } from '../components/ThemeControls'
 import { checkNow, describeLastCheck, invalidateChecks, useLastCheck } from '../lib/updateCheck'
 import { api } from '../api'
@@ -257,15 +258,17 @@ function AccountRow({
   onSetPassword,
   onEdit,
   onDelete,
+  rowProps,
 }: {
   account: Account
   onForgetPassword: (id: number) => void
   onSetPassword: (account: Account) => void
   onEdit: (account: Account) => void
   onDelete: (account: Account) => void
+  rowProps: (open?: () => void) => Record<string, unknown>
 }) {
   return (
-    <tr>
+    <tr {...rowProps(() => onDelete(account))}>
       <td>{account.label}</td>
       <td>{account.kind === 'personal' ? 'Osobný' : 'Firemný'}</td>
       <td>{maskIban(account.iban)}</td>
@@ -312,6 +315,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
   const [checkUpdates, setCheckUpdates] = useState(false)
   const [updatePreferenceLoaded, setUpdatePreferenceLoaded] = useState(false)
   const release = useLatestRelease()
+  const accountKeys = useDeleteKey<HTMLTableSectionElement>(accounts.length)
   const [aboutOpen, setAboutOpen] = useState(Boolean(initialAboutOpen))
   const [checking, setChecking] = useState(false)
   const [netLog, setNetLog] = useState<NetLogRow[]>([])
@@ -498,9 +502,9 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
                     <th></th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody ref={accountKeys.containerRef}>
                   {accounts.map((account) => (
-                    <AccountRow key={account.id} account={account} onForgetPassword={(id) => void action.run(() => forgetPassword(id))} onSetPassword={openPassword} onEdit={openEdit} onDelete={setDeleteTarget} />
+                    <AccountRow key={account.id} account={account} onForgetPassword={(id) => void action.run(() => forgetPassword(id))} onSetPassword={openPassword} onEdit={openEdit} onDelete={setDeleteTarget} rowProps={accountKeys.rowProps} />
                   ))}
                 </tbody>
               </table>
@@ -551,7 +555,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
           </details>
         </section>
       </fieldset>
-      {deleteTarget ? <DeleteAccountDialog account={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={refresh} /> : null}
+      {deleteTarget ? <DeleteAccountDialog account={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={() => { accountKeys.deleted(); return refresh() }} /> : null}
       <Dialog
         open={addOpen}
         title="Pridať účet"

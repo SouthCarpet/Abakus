@@ -34,6 +34,8 @@ vi.mock('../api', async (importOriginal) => {
 const ROWS = [tx(1), tx(2), tx(3, { status: 'transfer' }), tx(4, { status: 'suggested', category_id: 1 })]
 
 beforeEach(() => {
+  vi.clearAllMocks()
+  for (const fn of [api.bulkAssign, api.undoLastAssignment, api.confirm]) vi.mocked(fn).mockReset()
   localStorage.setItem('abakus.period', '{"kind":"all"}')
   vi.mocked(api.listAccounts).mockResolvedValue([])
   vi.mocked(api.listCategories).mockResolvedValue([{ id: 1, parent_id: null, name: 'Jedlo', kind: 'expense', sort: 0, system: false, archived: false }])
@@ -120,6 +122,35 @@ describe('register keys', () => {
     fireEvent.keyDown(document.body, { key: 'z', code: 'KeyY', ctrlKey: true })
     await waitFor(() => expect(api.undoLastAssignment).toHaveBeenCalledWith('u-1'))
     expect(await screen.findByText('Vrátených transakcií: 1.')).toBeInTheDocument()
+  })
+
+  it('redoes the undone bulk assignment with Ctrl+Y and Ctrl+Shift+Z, and only once per undo', async () => {
+    vi.mocked(api.bulkAssign).mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: 'u-1' })
+      .mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: 'u-2' })
+      .mockResolvedValueOnce({ updated: 1, rules_created: 0, skipped_transfers: 0, undo_id: 'u-3' })
+    vi.mocked(api.undoLastAssignment).mockResolvedValue({ restored_rows: 1 } as Awaited<ReturnType<typeof api.undoLastAssignment>>)
+    await ready()
+    fireEvent.click(box(1))
+    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    fireEvent.click(within(bulkBar).getByRole('combobox'))
+    fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
+    fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
+    await screen.findByText('Priradenie dokončené.')
+    expect(api.bulkAssign).toHaveBeenLastCalledWith([1], 1, false)
+    fireEvent.keyDown(document.body, { key: 'z', code: 'KeyY', ctrlKey: true })
+    await waitFor(() => expect(api.undoLastAssignment).toHaveBeenCalledWith('u-1'))
+    await screen.findByText('Vrátených transakcií: 1.')
+    fireEvent.keyDown(document.body, { key: 'y', code: 'KeyZ', ctrlKey: true })
+    await waitFor(() => expect(api.bulkAssign).toHaveBeenCalledTimes(2))
+    expect(api.bulkAssign).toHaveBeenLastCalledWith([1], 1, false)
+    fireEvent.keyDown(document.body, { key: 'y', code: 'KeyZ', ctrlKey: true })
+    await act(async () => {})
+    expect(api.bulkAssign).toHaveBeenCalledTimes(2)
+    fireEvent.keyDown(document.body, { key: 'z', code: 'KeyY', ctrlKey: true })
+    await waitFor(() => expect(api.undoLastAssignment).toHaveBeenLastCalledWith('u-2'))
+    await waitFor(() => expect(screen.getAllByText('Vrátených transakcií: 1.').length).toBeGreaterThan(0))
+    fireEvent.keyDown(document.body, { key: 'Z', code: 'KeyY', ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(api.bulkAssign).toHaveBeenCalledTimes(3))
   })
 
   it('inks a row whose state a write changed, for ink_hold, and never at page load', async () => {

@@ -18,6 +18,8 @@ export const BINDINGS: Binding[] = [
   { id: 'import', spec: 'primary+o', action: 'Import a výber PDF', where: 'Všade' },
   { id: 'find', spec: 'primary+f', action: 'Pole Hľadať', where: 'Transakcie' },
   { id: 'undo', spec: 'primary+z', action: 'Vrátiť posledné hromadné priradenie', where: 'Transakcie' },
+  { id: 'redo', spec: 'primary+y', action: 'Znova vykonať vrátené hromadné priradenie (aj Ctrl+Shift+Z)', where: 'Transakcie' },
+  { id: 'delete', spec: 'Delete', action: 'Zmazať zameraný riadok: otvorí potvrdenie s počtom, bez neho nič nezmaže', where: 'Účty, výpisy, kategórie' },
   { id: 'select-all', spec: 'primary+a', action: 'Vybrať všetky viditeľné riadky, druhýkrát zrušiť výber', where: 'Tabuľka Transakcie' },
   { id: 'accept', spec: 'Enter', action: 'Prijať odhad na zameranom riadku', where: 'Tabuľka Transakcie' },
   { id: 'toggle', spec: 'space', action: 'Prepnúť výber zameraného riadku', where: 'Tabuľka Transakcie' },

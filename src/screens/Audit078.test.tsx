@@ -108,6 +108,15 @@ describe('account deletion from its Settings row', () => {
     expect(api.deleteAccount).not.toHaveBeenCalled()
     expect(screen.getByText('Test účet')).toBeVisible()
   })
+  // Kaliber keyboard map: Del on the row opens the same named confirm, the focus on Cancel.
+  it('opens the named confirm with Del on the account row, focus on Zrušiť', async () => {
+    render(<Settings aboutOpen />)
+    const row = (await screen.findByText('Test účet')).closest('tr') as HTMLElement
+    fireEvent.keyDown(row, { key: 'Delete' })
+    const dialog = screen.getByRole('dialog', { name: 'Zmazať účet Test účet?' })
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Zrušiť' }))
+    expect(api.deleteAccount).not.toHaveBeenCalled()
+  })
   it('requires the exact name and prevents a second delete while pending, then refreshes counts', async () => {
     const pending = deferred<Awaited<ReturnType<typeof api.deleteAccount>>>()
     vi.mocked(api.deleteAccount).mockReturnValue(pending.promise)

@@ -36,18 +36,18 @@ tieň, `src/kaliber.css` je vlastný port so starými triedami (`.k-rail`,
 | Ctrl+A | Vybrať všetky viditeľné riadky (bez prevodov); druhé Ctrl+A výber zruší | Tabuľka Transakcie |
 | Esc | Jedna vrstva na stlačenie: toast, menu alebo zoznam kategórií, text v hľadaní, výber, dialóg alebo panel Pomocník | Celá appka |
 | Ctrl+Z | Vrátiť posledné hromadné priradenie | Transakcie, keď je Späť dostupné |
+| Ctrl+Y, Ctrl+Shift+Z | Znova vykonať hromadné priradenie, ktoré Ctrl+Z vrátilo; iný zápis túto možnosť zruší | Transakcie |
+| Del | Otvorí existujúci pomenovaný dialóg mazania s počtom, zameranie na Zrušiť; po zmazaní zameranie na ďalší riadok (alebo predchádzajúci pri poslednom). Nikdy nemaže bez dialógu. Del v textovom poli upravuje text. | Účty (Nastavenia), výpisy (Import), kategórie |
 | Ctrl+F | Zamerať pole Hľadať | Transakcie |
 | Ctrl+O | Otvoriť Import a výber PDF | Celá appka |
 | F1 | Panel Pomocník | Celá appka |
 | Ctrl+čiarka | Nastavenia | Celá appka |
 | F5, Ctrl+R | Zablokovať obnovenie stránky (neuložený text v dialógoch) | Celá appka |
 
+Rozhodnutie kontrolóra 2026-10-12: Del sa viaže na zoznamy s mazaním v režime `confirm` (katalóg: "standard where a delete exists") a redo k Ctrl+Z.
+
 Nepriradené a prečo:
 
-- **Del**: všetky mazania v Abakuse (účet, výpis, kategória) sú nevratné a
-  majú pomenovaný dialóg s počtom. Výskum výslovne radí Del na ne neviazať.
-  Register nemá vratné mazanie.
-- **Ctrl+Y a Ctrl+Shift+Z**: Abakus nemá znovu vykonať.
 - **Ctrl+K**: Abakus nemá paletu príkazov; každý príkaz je na obrazovke alebo
   v menu Ďalšie. Katalóg ju neukladá.
 - **Ctrl+P, Ctrl+S**: Abakus nič netlačí ani neukladá dokument. Export PDF je

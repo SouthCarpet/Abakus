@@ -8,6 +8,7 @@ import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { PageHead } from '../components/PageHead'
 import { ArchiveGlyph, TrashGlyph } from '../kaliber/icons'
+import { useDeleteKey } from '../kaliber/deleteKey'
 import { toast } from '../kaliber/toast'
 import { useAction } from '../lib/useAction'
 import { groupCategories } from '../lib/categories'
@@ -89,6 +90,7 @@ function CategoryRow({
   onArchive,
   onEdit,
   onDeleteRequest,
+  rowProps,
 }: {
   category: Category
   indent: boolean
@@ -96,6 +98,7 @@ function CategoryRow({
   onArchive: (category: Category) => void
   onEdit: (category: Category) => void
   onDeleteRequest: (category: Category) => void
+  rowProps: (open?: () => void) => Record<string, unknown>
 }) {
   const [name, setName] = useState(category.name)
   useEffect(() => setName(category.name), [category.name])
@@ -107,7 +110,7 @@ function CategoryRow({
   }
 
   return (
-    <div className="ab-row" style={indent ? { marginLeft: 'var(--space-6)' } : undefined}>
+    <div className="ab-row" style={indent ? { marginLeft: 'var(--space-6)' } : undefined} {...rowProps(category.system ? undefined : () => onDeleteRequest(category))}>
       <input
         className="k-input k-well"
         aria-label={`Názov kategórie ${category.id}`}
@@ -155,6 +158,7 @@ function CategoryTree({
   onArchive,
   onEdit,
   onDeleteRequest,
+  rowProps,
 }: {
   categories: Category[]
   onRename: (id: number, name: string) => void
@@ -162,15 +166,16 @@ function CategoryTree({
   onArchive: (category: Category) => void
   onEdit: (category: Category) => void
   onDeleteRequest: (category: Category) => void
+  rowProps: (open?: () => void) => Record<string, unknown>
 }) {
   const groups = groupCategories(categories)
   return (
     <div className="ab-section">
       {groups.map(({ parent, subs }) => (
         <div key={parent.id} className="ab-section">
-          <CategoryRow category={parent} indent={false} onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} />
+          <CategoryRow category={parent} indent={false} onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} rowProps={rowProps} />
           {subs.map((sub) => (
-            <CategoryRow key={sub.id} category={sub} indent onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} />
+            <CategoryRow key={sub.id} category={sub} indent onRename={onRename} onArchive={onArchive} onEdit={onEdit} onDeleteRequest={onDeleteRequest} rowProps={rowProps} />
           ))}
           <div className="ab-row" style={{ marginLeft: 'var(--space-6)' }}>
             <Button variant="ghost" onClick={() => onAddSub(parent)}>
@@ -390,7 +395,7 @@ function CategoryDeleteDialog({
       onClose={() => { if (!busy) onClose() }}
       actions={
         <>
-          <Button variant="secondary" disabled={busy} onClick={onClose}>
+          <Button variant="secondary" data-k-autofocus="" disabled={busy} onClick={onClose}>
             Zrušiť
           </Button>
           <Button variant="danger" disabled={busy || !preview} onClick={() => void confirmDelete()}>
@@ -499,6 +504,7 @@ export function Categories() {
   const [archiveTarget, setArchiveTarget] = useState<Category | null>(null)
   const [editTarget, setEditTarget] = useState<Category | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
+  const categoryKeys = useDeleteKey<HTMLDivElement>(categories.length)
   const [ruleDeleteTarget, setRuleDeleteTarget] = useState<RuleView | null>(null)
 
   async function refresh() {
@@ -559,6 +565,7 @@ export function Categories() {
   // Point 4: the outcome is the exact preview the backend just applied, so
   // the shown count is never a stale client guess.
   async function categoryDeleted(outcome: CategoryDeletePreview) {
+    categoryKeys.deleted()
     toast(`Zmazané: ${outcome.transaction_count} transakcií presunutých do nezaradených.`)
     await refresh()
   }
@@ -584,6 +591,7 @@ export function Categories() {
         <div className="ab-row" style={{ alignItems: 'stretch' }}>
           <div style={{ flex: 1, minWidth: 320 }}>
             <Card title="Kategórie">
+              <div ref={categoryKeys.containerRef}>
               <CategoryTree
                 categories={categories}
                 onRename={rename}
@@ -591,7 +599,9 @@ export function Categories() {
                 onArchive={setArchiveTarget}
                 onEdit={setEditTarget}
                 onDeleteRequest={setDeleteTarget}
+                rowProps={categoryKeys.rowProps}
               />
+              </div>
             </Card>
           </div>
           <div className="ab-rules-card-col" style={{ flex: 1, minWidth: 560 }}>

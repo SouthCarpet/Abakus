@@ -285,6 +285,12 @@ function SeedRuleRedirect({ row, categories, onChanged, onCreate }: { row: TxRow
   )
 }
 
+interface BulkAssignment {
+  ids: number[]
+  catId: number
+  applyToMatching: boolean
+}
+
 function rowClass(focused: boolean, selected: boolean, inked: boolean): string {
   return ['k-ink', focused && 'is-active', selected && 'is-selected', inked && 'is-inked'].filter(Boolean).join(' ')
 }
@@ -454,6 +460,8 @@ export function Transactions({
   // id for confirm). Valid only for the most recent bulk assignment: any
   // other mutation clears it, and a new bulk assignment replaces it.
   const [lastUndo, setLastUndo] = useState<{ id: string } | null>(null)
+  const lastBulk = useRef<BulkAssignment | null>(null)
+  const redoBulk = useRef<BulkAssignment | null>(null)
   const action = useAction()
   const exportAction = useAction()
   const periodValid = validPeriod(period)
@@ -633,6 +641,13 @@ export function Transactions({
     const id = lastUndo?.id
     if (id && !action.busy) void action.run(() => undoAssignment(id))
   }
+  const latestRedo = useRef<() => void>(() => {})
+  latestRedo.current = () => {
+    const bulk = redoBulk.current
+    if (!bulk || action.busy) return
+    redoBulk.current = null
+    void action.run(() => assignBulk(bulk))
+  }
   useEffect(() => {
     function onKeyDown(event: globalThis.KeyboardEvent) {
       if (document.querySelector('[aria-modal="true"]')) return
@@ -642,9 +657,15 @@ export function Transactions({
         searchRef.current?.select()
         return
       }
-      if (matchKey(event, 'primary+z') && !isFormField(event.target)) {
+      if (isFormField(event.target)) return
+      if (matchKey(event, 'primary+z')) {
         event.preventDefault()
         latestUndo.current()
+        return
+      }
+      if (matchKey(event, 'primary+y') || matchKey(event, 'primary+shift+z')) {
+        event.preventDefault()
+        latestRedo.current()
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -684,6 +705,7 @@ export function Transactions({
 
   function forgetUndo() {
     setLastUndo(null)
+    redoBulk.current = null
     dropToastsWithAction()
   }
 
@@ -705,7 +727,15 @@ export function Transactions({
   // replaces whichever one is showing.
   async function bulkAssign(catId: number | null, applyToMatching: boolean) {
     if (catId === null) return
-    const outcome = await api.bulkAssign([...selected], catId, applyToMatching)
+    await assignBulk({ ids: [...selected], catId, applyToMatching })
+  }
+
+  // The one undoable command. Redo (Ctrl+Y, Ctrl+Shift+Z) runs the same assignment again
+  // after an undo; any other write drops the redo (forgetUndo).
+  async function assignBulk(bulk: BulkAssignment) {
+    const outcome = await api.bulkAssign(bulk.ids, bulk.catId, bulk.applyToMatching)
+    lastBulk.current = bulk
+    redoBulk.current = null
     setSelected(new Set())
     setBulkCategoryId(null)
     dropToastsWithAction()
@@ -731,8 +761,11 @@ export function Transactions({
     const outcome = await api.undoLastAssignment(id)
     forgetUndo()
     toast(outcome ? `Vrátených transakcií: ${outcome.restored_rows}.` : 'Vrátenie sa nepodarilo, akcia už nie je aktuálna.')
-    if (outcome) reloadAfterWrite()
+    if (!outcome) return
+    redoBulk.current = lastBulk.current
+    reloadAfterWrite()
   }
+
 
   // Section 9 U05: creation and assignment stay two distinct, explicit
   // actions. The category is already persisted once this fires; a bulk

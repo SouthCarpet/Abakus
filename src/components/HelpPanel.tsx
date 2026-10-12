@@ -3,6 +3,7 @@ import { useEscapeLayer } from '../kaliber/escape'
 import { BINDINGS } from '../kaliber/bindings'
 import { keyLabel } from '../kaliber/keys'
 import { CloseGlyph } from '../kaliber/icons'
+import { trapTab } from '../kaliber/focusTrap'
 
 export type HelpScreen = 'transactions' | 'overview' | 'import' | 'categories' | 'settings'
 
@@ -77,7 +78,9 @@ export function HelpPanel({ open, screen, onClose }: { open: boolean; screen: He
     const previous = document.activeElement as HTMLElement | null
     const frame = requestAnimationFrame(() => setShown(true))
     searchRef.current?.focus()
-    return () => { cancelAnimationFrame(frame); previous?.focus() }
+    const onKeyDown = (event: KeyboardEvent) => trapTab(event, panelRef.current)
+    document.addEventListener('keydown', onKeyDown)
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('keydown', onKeyDown); previous?.focus() }
   }, [open])
 
   if (!open) return null

@@ -8,6 +8,7 @@ import { Button } from '../components/Button'
 import { PageHead } from '../components/PageHead'
 import { ariaKeys, withKey } from '../kaliber/bindings'
 import { startActivity } from '../kaliber/activity'
+import { useDeleteKey } from '../kaliber/deleteKey'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
@@ -264,14 +265,16 @@ function StatementRow({
   statement,
   onNavigate,
   onDelete,
+  rowProps,
 }: {
   statement: StatementHistoryRow
   onNavigate: (statementId: number) => void
   onDelete: (statement: StatementHistoryRow) => void
+  rowProps: (open?: () => void) => Record<string, unknown>
 }) {
   const danger = statement.checksum.status === 'off_by'
   return (
-    <div className="ab-round-row">
+    <div className="ab-round-row" {...rowProps(() => onDelete(statement))}>
       <span>{formatDate(statement.period_end)}</span>
       <span>{statement.account_label}</span>
       <span className="k-num">č. {statement.number}</span>
@@ -320,25 +323,31 @@ function StatementList({
   statements,
   onNavigate,
   onDelete,
+  deletedRef,
 }: {
   statements: StatementHistoryRow[]
   onNavigate: (statementId: number) => void
   onDelete: (statement: StatementHistoryRow) => void
+  // Set by the list: the screen calls it when a confirmed delete succeeded (focus to the next row).
+  deletedRef: { current: () => void }
 }) {
   const [showOlder, setShowOlder] = useState(false)
   const sorted = sortNewestFirst(statements)
+  const keys = useDeleteKey<HTMLDivElement>(statements.length)
+  deletedRef.current = keys.deleted
   const visible = sorted.slice(0, VISIBLE_STATEMENTS)
   const older = sorted.slice(VISIBLE_STATEMENTS)
 
   return (
     <Card title="Všetky výpisy">
+      <div ref={keys.containerRef}>
       {sorted.length === 0 ? (
         <p>Zatiaľ žiadne importy.</p>
       ) : (
         <div className="ab-round-list">
           <StatementListHead />
           {visible.map((s) => (
-            <StatementRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} />
+            <StatementRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} rowProps={keys.rowProps} />
           ))}
         </div>
       )}
@@ -350,12 +359,13 @@ function StatementList({
           {showOlder ? (
             <div className="ab-round-list">
               {older.map((s) => (
-                <StatementRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} />
+                <StatementRow key={s.statement_id} statement={s} onNavigate={onNavigate} onDelete={onDelete} rowProps={keys.rowProps} />
               ))}
             </div>
           ) : null}
         </>
       ) : null}
+      </div>
     </Card>
   )
 }
@@ -399,6 +409,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
   const action = useAction()
   const deletion = useAction()
   const previewRequest = useRef(0)
+  const statementDeleted = useRef<() => void>(() => {})
   const statementsRequest = useRef(0)
   const [previewError, setPreviewError] = useState('')
   const [reports, setReports] = useState<ImportReport[]>([])
@@ -523,6 +534,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
     if (!deleteTarget || !deletePreview) return
     const id = deleteTarget.statement_id
     await api.deleteStatement(id)
+    statementDeleted.current()
     setDeleteTarget(null)
     setDeletePreview(null)
     setReports((prev) => prev.filter((r) => r.statementId !== id))
@@ -556,7 +568,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
             onContinue={onNavigateToTransactions}
           />
         ))}
-        <StatementList statements={statements} onNavigate={(id) => onNavigateToTransactions?.(id)} onDelete={(s) => void requestDelete(s)} />
+        <StatementList statements={statements} onNavigate={(id) => onNavigateToTransactions?.(id)} onDelete={(s) => void requestDelete(s)} deletedRef={statementDeleted} />
       </fieldset>
       <SetupAccountDialog
         key={unknownQueue[0]?.path ?? 'none'}
@@ -570,7 +582,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
         onClose={closeDelete}
         actions={
           <>
-            <Button variant="secondary" disabled={deletion.busy} onClick={closeDelete}>
+            <Button variant="secondary" data-k-autofocus="" disabled={deletion.busy} onClick={closeDelete}>
               Späť
             </Button>
             <Button variant="danger" disabled={!deletePreview || deletion.busy} onClick={() => void deletion.run(confirmDelete)}>
