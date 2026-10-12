@@ -48,8 +48,8 @@ export const HELP_TOPICS: Topic[] = [
   {
     id: 'settings', screen: 'settings', title: 'Nastavenia, záloha a aktualizácie', lines: [
       'Záloha je nešifrovaný súbor SQLite. Obnova nahradí celú databázu naraz.',
-      'Kontrola aktualizácií je predvolene vypnutá. Keď ju zapnete, Abakus sa pozrie na GitHub pri spustení, pri otvorení sekcie O aplikácii a na tlačidlo Skontrolovať aktualizácie. Každé volanie je v zozname Sieťová aktivita.',
-      'Vzhľad: Svetlý, Tmavý alebo Podľa systému. Prepínač so slnkom a mesiacom v hlavičke mení ten istý stav.',
+      'Kontrola aktualizácií je predvolene vypnutá. Keď ju zapnete, Abakus sa pozrie na GitHub pri spustení (ticho), pri otvorení sekcie O aplikácii a na tlačidlo Skontrolovať aktualizácie. Samotné zapnutie prepínača nič neposiela. Pri vypnutej kontrole sa nič neposiela a tlačidlo je neaktívne. Každé volanie je v zozname Sieťová aktivita.',
+      'Vzhľad: Svetlý, Tmavý alebo Podľa systému. Prepínač so slnkom a mesiacom v hlavičke mení ten istý stav. Voľba sa ukladá pod kľúčom kaliber-theme. Voľba zo staršej verzie (kľúč abakus.theme) sa pri prvom spustení prenesie.',
     ],
   },
 ]

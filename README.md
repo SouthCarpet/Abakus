@@ -25,7 +25,7 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 **0.2.0.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
-Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a ikonové tlačidlo na zmazanie. Červené tlačidlo je až v potvrdzovacom dialógu. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
+Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a ikonové tlačidlo na zmazanie; rovnako je zmazanie pravidla a výpisu v riadku tiché ikonové tlačidlo s názvom. Červené tlačidlo je až v potvrdzovacom dialógu. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
 Pribudol aj tichý riadok **Nová verzia** v hlavičke appky, viditeľný na každej obrazovke; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) nájde novšie vydanie, a vedie do sekcie **O aplikácii**. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
 
@@ -79,6 +79,7 @@ Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Záloh
 - **Nástroje hlavičky:** prepínač so slnkom a mesiacom (rýchla zmena vzhľadu) a tichý riadok **Nová verzia**, keď kontrola nájde novšie vydanie.
 - **Pätička:** stav práce (napríklad počas importu, potom „Import dokončený, súbory: N. 14:05“) a odkaz **Pomocník**. Pomocník (aj F1) otvorí panel vpravo s hľadaním, témami podľa obrazovky a zoznamom klávesov.
 - **Hlásenia** výsledku akcie sú vpravo dole. Hlásenie po hromadnom priradení má tlačidlo **Späť**.
+- **Úzke okno a dotyk:** pod 600 px majú tlačidlá a ikony riadkov zásah 44 px (token `--k-hit`), riadok kategórie ostane na jednej línii a široké tabuľky sa posúvajú vo vlastnej oblasti bez zalamovania hlavičiek. Pole **Hľadať** v Transakciách zaberie zvyšok riadku filtrov, takže ukáže celý text.
 - **Pohyb:** riadok, ktorému zápis zmení kategóriu alebo stav, sa na 1,6 s podfarbí. Pri viac ako 6 zmenách za sekundu sa nepodfarbí nič a pätička vymenuje zmenené riadky. Počas importu beží v hlavičke tenká čiara. Vzhľad sa po kliknutí prelína, zmena systému sa prejaví hneď. Systémové obmedzenie pohybu vypne všetky prechody.
 
 Klávesy (zoznam je aj v Pomocníkovi):
@@ -290,7 +291,9 @@ Abakus zoskupuje viditeľné nezaradené transakcie podľa obchodníka a miesta;
 Bankové poplatky majú druh `fee`. Filter **Druh** v Transakciách ho ponúka ako
 **Poplatok**. Súhrn a mesačné riadky vracajú `fee_cents`, podpísanú časť už
 započítaných výdavkov. V **Prehľade** má súhrnná tabuľka riadok **Poplatky** a graf **Príjmy
-a výdavky** vlastný stĺpec Poplatky vedľa Príjmu a Výdavkov; nejde o druhý
+a výdavky** vlastný stĺpec Poplatky vedľa Príjmu a Výdavkov (tri rady sa líšia
+odtieňom aj vzorom obrysu a legenda ukazuje rovnakú čiaru; popisy osi sú
+skrátené, napríklad `1,5 tis. €`); nejde o druhý
 súčet, len o zvýraznenie časti, ktorá je už vo Výdavkoch. Migrácia schémy na
 verziu 5 mení iba druh rozpoznaných starších poplatkov. Kontrakt: [bankové
 poplatky](docs/plan-091-fees.md).

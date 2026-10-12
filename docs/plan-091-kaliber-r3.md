@@ -112,3 +112,31 @@ podobných platieb, hromadné potvrdenie a negatívny prípad obchodníka
 
 Brány pred každým commitom: vitest, tsc, eslint, `slop_lint.py src`;
 cargo test a clippy pri zmene Rustu.
+
+## Oprava po overení, kolo 1 (úloha 091-a1-fix1): pridaný povrch
+
+Pridané len v `src/` (žiadna zmena `kaliber.css` ani `tokens.css`, tie ostávajú
+bajtovou kópiou). Každý riadok je jeden nový názov.
+
+- `.ab-btn` (trieda na každom `Button`): výška `max(var(--control-h), var(--k-hit))`.
+- `:root { --k-hit }` v `@media (max-width: 599px)`: zásah 44 px pod 600 px.
+- `.ab-icon-hit`: ikonové tlačidlo riadku, šírka a výška ako `.ab-btn`.
+- `.ab-category-row`, `.ab-category-name`: riadok kategórie na jednej línii,
+  pole názvu sa zmenšuje.
+- `.ab-filter-search`: pole Hľadať v Transakciách zaberie zvyšok riadku filtrov
+  (základ 22 rem).
+- `.ab-table-scroll th { white-space: nowrap }`: hlavička sa nezalomí.
+- `.ab-chart-well`, `.ab-chart-legend`: vnútorný okraj grafu a legenda pod ním.
+- `ChartLegend` a typ `SeriesStep` (`src/components/charts/ChartLegend.tsx`):
+  legenda s čiarou v odtieni a vzore radu (`--k-legend-color`, `--k-legend-dash`).
+- `INCOME_EXPENSE_SERIES` (`IncomeExpense.tsx`): rady Príjem, Výdavky, Poplatky
+  s krokmi rampy 1, 3, 5. Krok určuje odtieň výplne aj vzor obrysu
+  (`--chart-dash-N`).
+- `formatAxisEur` (`src/lib/charts.ts`): skrátený text osi (`600 €`,
+  `1,5 tis. €`, `2 mil. €`) s pevnými medzerami; os má šírku 72 px.
+- Názvy ovládačov: `Zmazať pravidlo <kľúč>`, `Zmazať výpis č. <číslo>`.
+- Veta prázdneho grafu: „Za vybrané obdobie nie sú údaje podľa kategórií
+  a mesiacov.“
+- Pomocník, téma Nastavenia: tri cesty kontroly, pravidlo „vypnutá nič
+  neposiela“, kľúč `kaliber-theme` a prenos z `abakus.theme`.
+- Potvrdenie zmazania výpisu: tlačidlo **Zrušiť** (bolo **Späť**) s fokusom.

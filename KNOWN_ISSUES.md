@@ -153,6 +153,18 @@
   pri 390 px (svetlý aj tmavý vzhľad, syntetické dáta namiesto backendu) nenašla vodorovné
   posúvanie celej stránky. Tabuľky Transakcie a Účty a zoznam výpisov
   v Importe sa posúvajú vo svojej oblasti, takže stĺpce Kategória, Stav
-  a akcie sú vpravo mimo prvého pohľadu. Popisy osi v grafe Príjmy
-  a výdavky sa pri 390 px zalamujú a kľúč pravidla v Kategóriách sa
-  zalomí uprostred slova.
+  a akcie sú vpravo mimo prvého pohľadu. Hlavičky týchto tabuliek sa
+  nezalamujú, oblasť sa posúva. Popisy hodnotovej osi v grafoch majú
+  skrátený text (napríklad `1,5 tis. €`) a nezalamujú sa pri žiadnej šírke.
+  Kľúč pravidla v Kategóriách sa pri 390 px zalomí uprostred slova.
+- **Pod 600 px majú ovládacie prvky zásah 44 px.** Tlačidlá a ikony
+  riadkov (archivovať, zmazať) sú vtedy vysoké 44 px, na širšom okne 32 px.
+  Zmazanie pravidla, výpisu a kategórie je v riadku tichá ikona s názvom
+  (napríklad „Zmazať pravidlo penny“). Červené tlačidlo je až v potvrdení.
+- **Kontrola aktualizácií má tri cesty a vypínač.** Zapnutá kontrola sa
+  pozrie na GitHub pri spustení (ticho), pri otvorení **O aplikácii** a na
+  tlačidlo **Skontrolovať aktualizácie**. Samotné zapnutie prepínača nič
+  neposiela. Pri vypnutej kontrole neodíde nič a tlačidlo je neaktívne.
+- **Vzhľad má jeden kľúč `kaliber-theme`.** Voľba z verzie 0.1.x
+  (`abakus.theme`) sa pri prvom spustení prenesie do nového kľúča a starý
+  sa zmaže. Pri nedostupnom úložisku platí systémový režim.
