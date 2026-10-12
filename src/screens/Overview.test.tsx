@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BadChecksum, Summary } from '../api'
 import { api } from '../api'
@@ -316,7 +316,9 @@ describe('Overview shows fee totals (point 13)', () => {
     vi.mocked(api.summary).mockResolvedValue({ ...nonEmptySummary, fee_cents: -1234 })
     render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
 
-    expect(await screen.findByText('Poplatky')).toBeInTheDocument()
-    expect(screen.getByText('-12,34 €')).toBeInTheDocument()
+    // The chart legend also names Poplatky, so the KPI is read inside the period summary.
+    const summary = await screen.findByLabelText('Súhrn obdobia')
+    expect(within(summary).getByText('Poplatky')).toBeInTheDocument()
+    expect(within(summary).getByText('-12,34 €')).toBeInTheDocument()
   })
 })

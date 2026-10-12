@@ -36,3 +36,21 @@ export function topCategories(rows: CategoryTotal[], limit: number): CategoryTot
   }
   return top
 }
+
+const NBSP = ' '
+
+function compactNumber(value: number): string {
+  return String(Math.round(value * 10) / 10).replace('.', ',')
+}
+
+/**
+ * Value-axis tick text in euros from cents: `600 €`, `1,5 tis. €`, `2 mil. €`. Every space is a
+ * no-break space, because the chart library breaks an axis label at a normal space.
+ */
+export function formatAxisEur(cents: number): string {
+  const euros = cents / 100
+  const abs = Math.abs(euros)
+  if (abs >= 1_000_000) return `${compactNumber(euros / 1_000_000)}${NBSP}mil.${NBSP}€`
+  if (abs >= 1_000) return `${compactNumber(euros / 1_000)}${NBSP}tis.${NBSP}€`
+  return `${compactNumber(euros)}${NBSP}€`
+}

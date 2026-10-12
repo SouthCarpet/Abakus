@@ -1,7 +1,6 @@
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { Summary } from '../../api'
-import { formatEur } from '../../api'
-import { OSTATNE_ID, topCategories } from '../../lib/charts'
+import { OSTATNE_ID, formatAxisEur, topCategories } from '../../lib/charts'
 import { ChartTooltip } from './ChartTooltip'
 
 // Series 1..6 map to the six fixed chart-N tokens in order, never cycling
@@ -37,16 +36,17 @@ export function MonthlyStacked({
   rows: Summary['by_month_category']
   onCategoryClick: (categoryId: number) => void
 }) {
+  if (rows.length === 0) return <p>Za vybrané obdobie nie sú údaje podľa kategórií a mesiacov.</p>
   const categories = topCategories(rows, 6)
   const topIds = new Set(categories.filter((c) => c.category_id !== OSTATNE_ID).map((c) => c.category_id))
   const data = pivotByMonth(rows, topIds)
   return (
-    <div className="k-well" style={{ padding: 'var(--space-3)' }}>
+    <div className="k-well ab-chart-well">
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data}>
           <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
           <XAxis dataKey="month" stroke="var(--color-text-muted)" fontSize={12} tickLine={false} />
-          <YAxis stroke="var(--color-text-muted)" fontSize={12} tickLine={false} domain={[0, 'auto']} tickFormatter={(v: number) => formatEur(v)} />
+          <YAxis width={72} stroke="var(--color-text-muted)" fontSize={12} tickLine={false} domain={[0, 'auto']} tickFormatter={formatAxisEur} />
           <Tooltip content={ChartTooltip} cursor={{ className: 'ab-chart-cursor' }} />
           <Legend />
           {categories.map((cat, i) =>

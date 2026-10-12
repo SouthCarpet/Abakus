@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OSTATNE_ID, sliceCategoryId, topCategories } from './charts'
+import { OSTATNE_ID, formatAxisEur, sliceCategoryId, topCategories } from './charts'
 
 const rows = [
   { category_id: 1, name: 'Jedlo', cents: 800 },
@@ -74,5 +74,26 @@ describe('sliceCategoryId', () => {
 
   it('maps the folded Ostatné slice to null, so it never drills down', () => {
     expect(sliceCategoryId(OSTATNE_ID)).toBeNull()
+  })
+})
+
+// Oracle: dataviz.md "Axes" (a labelled value axis with its unit) and the r3 visual audit, finding
+// V3: a tick never wraps. Tick text is compact and every space in it is a no-break space, because
+// the chart library breaks a label at a normal space.
+describe('formatAxisEur', () => {
+  it.each([
+    [0, '0 €'],
+    [60000, '600 €'],
+    [150000, '1,5 tis. €'],
+    [200000, '2 tis. €'],
+    [25000000, '250 tis. €'],
+    [150000000, '1,5 mil. €'],
+    [-60000, '-600 €'],
+  ])('writes %i cents as %s', (cents, text) => {
+    expect(formatAxisEur(cents)).toBe(text)
+  })
+
+  it('never contains a breaking space', () => {
+    for (const cents of [0, 5000, 123400, 98765400, 4500000000]) expect(formatAxisEur(cents)).not.toMatch(/ /)
   })
 })
