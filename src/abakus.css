@@ -57,6 +57,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-filter-field { flex: 1 1 11rem; min-width: 0; }
 .ab-filter-field .k-select-wrap { display: grid; min-width: 0; }
 .ab-filter-field .k-input { width: 100%; }
+.ab-filter-field .k-select { min-width: 0; width: 100%; }
 /* The register search shows its whole placeholder: it takes the rest of the filter row. */
 .ab-filter-search { flex: 2 1 16rem; }
 .ab-filter-clear { margin-left: auto; min-height: var(--k-hit); font: inherit; font-size: var(--text-sm); background: transparent; border: 0; padding: 0 var(--space-2); cursor: pointer; }
@@ -88,11 +89,15 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
   .ab-narrow-only { display: block !important; }
   .ab-head { align-items: flex-start; }
   .ab-filter-clear { margin-left: 0; }
-  .ab-cat { min-width: 9rem; }
+  .ab-cat { min-width: 8rem; }
+  /* Two filter fields per line; the search takes the full line. */
+  .ab-filter-field { flex: 1 1 8rem; }
+  .ab-filter-search { flex: 1 1 100%; }
+  .ab-filters { gap: var(--space-3); }
 }
 
 /* ---- tables -------------------------------------------------------------------- */
-.ab-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; padding: var(--space-1); }
+.ab-table-scroll { position: relative; min-width: 0; max-width: 100%; overflow-x: auto; padding: var(--space-1); }
 /* A header stays on one line; a narrow window scrolls the region and never breaks a header word. */
 .ab-table-scroll th { white-space: nowrap; }
 .ab-money { white-space: nowrap; min-width: calc(var(--space-8) * 4); }
