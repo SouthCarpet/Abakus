@@ -5,6 +5,7 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 ## 0.2.0 (2026-09-14)
 
 - Nový vzhľad podľa jazyka dizajnu Kaliber, revízia 4: písmo Fira Sans, plochý register s linkami, súhrnná tabuľka namiesto dlaždíc v Prehľade a päť záložiek v hlavičke. Appka sa otvorí na **Transakciách**.
+- Transakcie ukazujú v popise obdobie a účet, register začína vyššie (len krátka nápoveda ku klávesom, podrobnosti a postup Zaradiť podľa obchodníka sú v **Pomocníkovi**), políčka v riadkoch majú na telefóne plochu 44 × 44 px a výber kategórie má šípku rozbalenia. Potvrdenia mazania skloňujú správne (1 pravidlo, 2 pravidlá, 5 pravidiel; Odstránia sa 2 transakcie). Grafy majú jeden rámik.
 - Každá obrazovka má v hlavičke názov, jednu hlavnú akciu a menu **Ďalšie**. **Exportovať PDF** je v hlavičke Prehľadu a v menu Ďalšie v Transakciách, nie v lište nad každou obrazovkou.
 - Vzhľad má prepínač so slnkom a mesiacom v hlavičke a voľbu **Svetlý**, **Tmavý**, **Podľa systému** v **Nastavenia > Vzhľad**. Doterajšia voľba sa prenesie.
 - Nastavenia majú sekcie **Vzhľad**, **Sieťová aktivita** a poslednú **O aplikácii** (verzia, zostavenie, poznámky k vydaniu, nahlásenie problému, licencie, kontrola aktualizácií). Text „Priečinok s dátami“ je na obrazovke raz.
