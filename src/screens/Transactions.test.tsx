@@ -216,7 +216,7 @@ describe('Transactions bulk assign toast', () => {
     await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
 
     fireEvent.click(screen.getAllByRole('checkbox')[0])
-    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    const bulkBar = screen.getByText('Vybrané: 1').closest('div') as HTMLElement
     fireEvent.click(within(bulkBar).getByRole('combobox'))
     fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
@@ -240,7 +240,7 @@ describe('Transactions bulk confirm', () => {
     await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
 
     fireEvent.click(screen.getAllByRole('checkbox')[0])
-    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    const bulkBar = screen.getByText('Vybrané: 1').closest('div') as HTMLElement
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Potvrdiť vybrané' }))
 
     await waitFor(() => expect(vi.mocked(api.confirm)).toHaveBeenCalledWith([5], false))
@@ -263,7 +263,7 @@ describe('Transactions undo after bulk assignment', () => {
     await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
 
     fireEvent.click(screen.getAllByRole('checkbox')[0])
-    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    const bulkBar = screen.getByText('Vybrané: 1').closest('div') as HTMLElement
     fireEvent.click(within(bulkBar).getByRole('combobox'))
     fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
@@ -283,7 +283,7 @@ describe('Transactions undo after bulk assignment', () => {
     await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
 
     fireEvent.click(screen.getAllByRole('checkbox')[0])
-    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    const bulkBar = screen.getByText('Vybrané: 1').closest('div') as HTMLElement
     fireEvent.click(within(bulkBar).getByRole('combobox'))
     fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
@@ -302,7 +302,7 @@ it('retains parent drilldown 10 through asynchronous metadata and queries parent
   let resolveCategories!: (value: typeof categories) => void
   vi.mocked(api.listCategories).mockReturnValueOnce(new Promise((resolve) => { resolveCategories = resolve }))
   render(<Transactions initialCategoryId={10} initialAccountKind="personal" />)
-  const filter = screen.getByRole('combobox', { name: 'Filter kategórie' })
+  const filter = screen.getByRole('combobox', { name: 'Kategória' })
   expect(filter).toHaveTextContent('Kategória ID 10 (názov nie je dostupný)')
   await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ category_id: 10, account_kind: 'personal' })))
 
@@ -320,8 +320,9 @@ it('retains parent drilldown 10 through asynchronous metadata and queries parent
 it('gives the search field the flexible search class so its placeholder is not clipped', () => {
   render(<Transactions />)
   const search = screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })
-  expect(search).toHaveClass('ab-filter-search')
-  expect(search).toHaveAttribute('placeholder', 'Hľadať obchodníka alebo poznámku...')
+  // The field sits in a wrapper with a visible label "Hľadať"; the wrapper takes the rest of the row.
+  expect(search.closest('.ab-filter-search')).not.toBeNull()
+  expect(search).toHaveAttribute('placeholder', 'Obchodník alebo poznámka')
 })
 
 // Point 17: a merchant click in Overview lands here with the merchant name
@@ -435,14 +436,14 @@ describe('Transactions integration: a note save settling after the filter change
     render(<Transactions />)
     await screen.findByText('Obchod')
     fireEvent.click(screen.getByRole('checkbox', { name: /Vybrať transakciu 5/ }))
-    expect(screen.getByText('1 vybraných')).toBeInTheDocument()
+    expect(screen.getByText('Vybrané: 1')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Detail transakcie 5' }))
     fireEvent.change(screen.getByLabelText('Poznámka k transakcii 5'), { target: { value: 'uz nesedi filtru' } })
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť poznámku' }))
     await waitFor(() => expect(screen.queryByText('Obchod')).not.toBeInTheDocument())
 
-    expect(screen.queryByText('1 vybraných')).not.toBeInTheDocument()
+    expect(screen.queryByText('Vybrané: 1')).not.toBeInTheDocument()
   })
 })
 
@@ -505,10 +506,11 @@ describe('Transactions unassigned merchant groups (point 2)', () => {
     vi.mocked(api.listTransactions).mockResolvedValueOnce(TWITCH_ROWS)
     render(<Transactions />)
 
-    const groupButton = await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Zaradiť podľa obchodníka' }))
+    const groupButton = await screen.findByRole('button', { name: 'Twitch: 15 platieb' })
     fireEvent.click(groupButton)
 
-    expect(await screen.findByText('15 vybraných')).toBeInTheDocument()
+    expect(await screen.findByText('Vybrané: 15')).toBeInTheDocument()
   })
 
   it('hides the group strip once there are no unassigned rows left', async () => {
@@ -597,7 +599,7 @@ describe('Transactions common search (point 9)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Všetko' }))
     fireEvent.change(screen.getByRole('combobox', { name: 'Účet' }), { target: { value: '1' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Druh' }), { target: { value: 'fee' } })
-    fireEvent.click(screen.getByRole('combobox', { name: 'Filter kategórie' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Kategória' }))
     fireEvent.click(screen.getByRole('option', { name: 'Jedlo' }))
     fireEvent.change(screen.getByRole('combobox', { name: 'Stav' }), { target: { value: 'unassigned' } })
     fireEvent.change(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'Penny Neuss' } })
@@ -621,15 +623,16 @@ describe('Transactions common search (point 9)', () => {
     const twitchRows = Array.from({ length: 15 }, (_, i) => makeTxRow({ id: 300 + i, merchant_raw: 'Twitch' }))
     vi.mocked(api.listTransactions).mockResolvedValue(twitchRows)
     render(<Transactions />)
-    await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
+    fireEvent.click(await screen.findByRole('button', { name: 'Zaradiť podľa obchodníka' }))
+    await screen.findByRole('button', { name: 'Twitch: 15 platieb' })
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' }), { target: { value: 'twi' } })
     await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ text: 'twi' })))
 
-    const groupButton = await screen.findByRole('button', { name: 'Twitch, 15 platieb, nepriradené' })
+    const groupButton = await screen.findByRole('button', { name: 'Twitch: 15 platieb' })
     fireEvent.click(groupButton)
 
-    expect(await screen.findByText('15 vybraných')).toBeInTheDocument()
+    expect(await screen.findByText('Vybrané: 15')).toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('twi')
   })
 
@@ -698,7 +701,7 @@ describe('Transactions: dbGeneration bump resets transient state and refetches',
     await waitFor(() => expect(screen.getByText('Obchod')).toBeInTheDocument())
 
     fireEvent.click(screen.getAllByRole('checkbox')[0])
-    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    const bulkBar = screen.getByText('Vybrané: 1').closest('div') as HTMLElement
     fireEvent.click(within(bulkBar).getByRole('combobox'))
     fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
@@ -713,7 +716,7 @@ describe('Transactions: dbGeneration bump resets transient state and refetches',
     fireEvent.click(screen.getAllByRole('checkbox')[0])
     // The generation bump below must clear a selection made AFTER that
     // assignment too, not just whatever the assignment itself already cleared.
-    expect(screen.getByText('1 vybraných')).toBeInTheDocument()
+    expect(screen.getByText('Vybrané: 1')).toBeInTheDocument()
     const listAccountsCallsBefore = vi.mocked(api.listAccounts).mock.calls.length
     const listTransactionsCallsBefore = vi.mocked(api.listTransactions).mock.calls.length
 
@@ -722,7 +725,7 @@ describe('Transactions: dbGeneration bump resets transient state and refetches',
     await waitFor(() => expect(vi.mocked(api.listAccounts).mock.calls.length).toBeGreaterThan(listAccountsCallsBefore))
     await waitFor(() => expect(vi.mocked(api.listTransactions).mock.calls.length).toBeGreaterThan(listTransactionsCallsBefore))
     expect(screen.queryByRole('button', { name: 'Späť' })).not.toBeInTheDocument()
-    expect(screen.queryByText('1 vybraných')).not.toBeInTheDocument()
+    expect(screen.queryByText('Vybrané: 1')).not.toBeInTheDocument()
   })
 
   it('does not refetch on the very first render, only a real generation change after mount', async () => {

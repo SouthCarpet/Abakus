@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { Account, AccountKind, Category, RuleView, Status, TxFilter, TxKind, TxRow } from '../api'
 import { api, formatEur } from '../api'
 import { Button } from '../components/Button'
 import { CategoryDialog } from '../components/CategoryDialog'
 import { CategoryPicker } from '../components/CategoryPicker'
-import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
+import { PeriodPicker, usePeriod, type PeriodValue } from '../components/PeriodPicker'
 import { OperationStatus } from '../components/OperationStatus'
 import { MoreMenu } from '../components/MoreMenu'
-import { PageHead } from '../components/PageHead'
+import { StateLabel, StateMark } from '../components/StateLabel'
 import { ExportPdfDialog } from '../components/report/ExportPdfDialog'
 import { footerNote } from '../kaliber/activity'
 import { binding, withKey } from '../kaliber/bindings'
@@ -21,12 +21,15 @@ import { RecurringTransactionAction } from '../components/recurring'
 import { statusLabel } from '../lib/categories'
 import { categoryApi } from '../lib/category-api'
 import { formatDate } from '../lib/format'
+import { countPhrase, pluralSk, tx } from '../lib/plural'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
 import { periodRange, validPeriod } from '../lib/period'
 import { groupUnassignedTransactions, type TransactionDisplayGroup } from '../lib/transaction-groups'
 
 const TEXT_DEBOUNCE_MS = 300
+// `--motion-base` is 120 ms: the class stays a little longer, then goes, so the next change draws again.
+const RULE_DRAW_MS = 400
 const STATUSES: Status[] = ['transfer', 'confirmed', 'suggested', 'unassigned']
 const ACCOUNT_MATCH_KINDS = new Set(['transfer_in', 'transfer_out', 'standing_order'])
 
@@ -72,15 +75,36 @@ function countMatchingUnconfirmed(rows: TxRow[], row: TxRow): number {
 // click straight into the existing bulk selection below.
 function groupLabel(group: TransactionDisplayGroup): string {
   const merchant = group.merchant.trim() ? group.merchant : 'Bez obchodníka'
-  const parts = group.place ? [merchant, group.place] : [merchant]
-  return `${parts.join(', ')}, ${group.count} platieb, nepriradené`
+  const name = group.place ? `${merchant}, ${group.place}` : merchant
+  return `${name}: ${countPhrase(group.count, tx.platba)}`
 }
 
-function UnassignedGroupsBar({ rows, onSelectGroup }: { rows: TxRow[]; onSelectGroup: (ids: number[]) => void }) {
-  const groups = useMemo(() => groupUnassignedTransactions(rows), [rows])
+const NOTE_GROUPS = 3
+
+// The one ink row near the top: it exists only while a real task waits (unassigned payments),
+// carries the count and its split by merchant, and one action that opens the group list.
+function WaitingRow({ groups, count, open, onToggle }: { groups: TransactionDisplayGroup[]; count: number; open: boolean; onToggle: () => void }) {
+  if (count === 0) return null
+  const shown = groups.slice(0, NOTE_GROUPS).map((g) => `${groupLabel(g)}.`).join(' ')
+  const more = groups.length > NOTE_GROUPS ? ` Ďalšie skupiny: ${groups.length - NOTE_GROUPS}.` : ''
+  const verb = pluralSk(count, ['čaká', 'čakajú', 'čaká'])
+  return (
+    <div className="k-ink-row" role="status" aria-label="Čakajú na zaradenie">
+      <div>
+        <div className="k-ink-row-text">{countPhrase(count, tx.platba)} {verb} na zaradenie</div>
+        <div className="k-ink-row-note">{shown}{more}</div>
+      </div>
+      <button type="button" className="k-ink-action" aria-expanded={open} aria-controls="ab-unassigned-groups" onClick={onToggle}>
+        Zaradiť podľa obchodníka
+      </button>
+    </div>
+  )
+}
+
+function UnassignedGroupsBar({ groups, onSelectGroup }: { groups: TransactionDisplayGroup[]; onSelectGroup: (ids: number[]) => void }) {
   if (groups.length === 0) return null
   return (
-    <div className="ab-row k-well" role="region" aria-label="Skupiny nezaradených platieb">
+    <div id="ab-unassigned-groups" className="ab-row k-well" role="region" aria-label="Skupiny nezaradených platieb">
       {groups.map((group) => (
         <Button key={group.ids[0]} variant="ghost" onClick={() => onSelectGroup(group.ids)}>
           {groupLabel(group)}
@@ -138,59 +162,68 @@ function FilterBar({
   searchRef?: RefObject<HTMLInputElement | null>
 }) {
   return (
-    <div className="ab-row">
-      <select
-        className="k-select k-well"
-        aria-label="Účet"
-        value={accountId ?? ''}
-        onChange={(e) => onAccount(e.target.value ? Number(e.target.value) : null)}
-      >
-        <option value="">Všetko</option>
+    <div className="ab-filter-row">
+      <SelectField id="f-acc" label="Účet" value={accountId ?? ''} onChange={(v) => onAccount(v ? Number(v) : null)}>
+        <option value="">Všetky účty</option>
         {accounts.map((a) => (
           <option key={a.id} value={a.id}>
             {a.kind === 'personal' ? 'Osobný' : 'Firemný'} - {a.label}
           </option>
         ))}
-      </select>
-      <select
-        className="k-select k-well"
-        aria-label="Stav"
-        value={status ?? ''}
-        onChange={(e) => onStatus((e.target.value || null) as Status | null)}
-      >
+      </SelectField>
+      <SelectField id="f-st" label="Stav" value={status ?? ''} onChange={(v) => onStatus((v || null) as Status | null)}>
         <option value="">Všetky stavy</option>
         {STATUSES.map((s) => (
           <option key={s} value={s}>
             {statusLabel(s)}
           </option>
         ))}
-      </select>
-      <CategoryPicker mode="filter" label="Filter kategórie" emptyLabel="Všetky kategórie" value={categoryId} onChange={onCategory} categories={categories} />
-      <select
-        className="k-select k-well"
-        aria-label="Druh"
-        value={kind ?? ''}
-        onChange={(e) => onKind((e.target.value || null) as TxKind | null)}
-      >
+      </SelectField>
+      <div className="k-select-field ab-filter-field">
+        <span className="ab-field-name">Kategória</span>
+        <CategoryPicker mode="filter" label="Kategória" emptyLabel="Všetky kategórie" value={categoryId} onChange={onCategory} categories={categories} />
+      </div>
+      <SelectField id="f-kind" label="Druh" value={kind ?? ''} onChange={(v) => onKind((v || null) as TxKind | null)}>
         <option value="">Všetky druhy</option>
         {TX_KINDS.map((k) => (
           <option key={k} value={k}>
             {TX_KIND_LABELS[k]}
           </option>
         ))}
-      </select>
-      <input
-        ref={searchRef}
-        type="search"
-        data-k-search=""
-        className="k-input ab-filter-search"
-        aria-label="Hľadať obchodníka alebo poznámku"
-        aria-keyshortcuts="Control+F"
-        title={withKey('Hľadať', 'find')}
-        placeholder="Hľadať obchodníka alebo poznámku..."
-        value={text}
-        onChange={(e) => onText(e.target.value)}
-      />
+      </SelectField>
+      <div className="k-input-field ab-filter-field ab-filter-search">
+        <label htmlFor="f-q">Hľadať</label>
+        <input
+          id="f-q"
+          ref={searchRef}
+          type="search"
+          data-k-search=""
+          className="k-input"
+          aria-label="Hľadať obchodníka alebo poznámku"
+          aria-keyshortcuts="Control+F"
+          title={withKey('Hľadať', 'find')}
+          placeholder="Obchodník alebo poznámka"
+          value={text}
+          onChange={(e) => onText(e.target.value)}
+        />
+      </div>
+    </div>
+  )
+}
+
+// A select with a permanent label above it (Kaliber: a select never lives on its placeholder).
+function SelectField({ id, label, value, onChange, children }: { id: string; label: string; value: string | number; onChange: (value: string) => void; children: ReactNode }) {
+  return (
+    <div className="k-select-field ab-filter-field">
+      <label htmlFor={id}>{label}</label>
+      <span className="k-select-wrap">
+        <select id={id} className="k-select k-well" value={value} onChange={(e) => onChange(e.target.value)}>
+          {children}
+        </select>
+        <svg className="k-select-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </span>
     </div>
   )
 }
@@ -216,7 +249,7 @@ function BulkBar({
   if (count === 0) return null
   return (
     <div className="ab-row k-well">
-      <span>{count} vybraných</span>
+      <span>Vybrané: {count}</span>
       <CategoryPicker value={categoryId} onChange={onCategoryChange} categories={categories} onCreate={onCreate} />
       <label className="ab-checkbox">
         <input type="checkbox" checked={applyToMatching} onChange={(e) => setApplyToMatching(e.target.checked)} />
@@ -300,6 +333,7 @@ export function TransactionRow({
   categories,
   selected,
   matchingCount = 0,
+  accountLabel,
   focused = false,
   inked = false,
   onSelect,
@@ -314,6 +348,8 @@ export function TransactionRow({
   // Point 1: how many other unconfirmed rows share this row's merchant/place
   // (or account, for transfer-like kinds). 0 hides the apply-to-matching option.
   matchingCount?: number
+  // The account's own name (Bezny ucet), when the screen knows it; the kind word otherwise.
+  accountLabel?: string
   // Point 12: true for the row currently holding the keyboard roving highlight.
   focused?: boolean
   // Kaliber F2: the row's category or state changed by the last write (entry ink).
@@ -340,16 +376,14 @@ export function TransactionRow({
             onClick={(e) => onSelect(row.id, e.currentTarget.checked, e.shiftKey)}
           />
         </td>
-        <td>{formatDate(row.tx_date)}</td>
-        <td>
-          <span className="k-card-badge">{row.account_kind === 'personal' ? 'O' : 'F'}</span>
+        <td className="ab-hide-narrow k-num">{formatDate(row.tx_date)}</td>
+        <td className="ab-hide-narrow ab-muted">{accountLabel ?? (row.account_kind === 'personal' ? 'Osobný' : 'Firemný')}</td>
+        <td className="ab-merch">
+          <b>{row.merchant_raw}</b>
+          {row.place ? <small>{row.place}</small> : null}
+          <small className="ab-narrow-only">{formatDate(row.tx_date)}</small>
         </td>
-        <td>
-          <div>{row.merchant_raw}</div>
-          {row.place ? <div className="ab-field-label">{row.place}</div> : null}
-        </td>
-        <td className="k-num k-cell-number ab-money">{formatEur(row.amount_cents)}</td>
-        <td>
+        <td className="ab-cat">
           <CategoryPicker
             label={`Kategória transakcie ${row.id}`}
             value={row.category_id}
@@ -360,7 +394,9 @@ export function TransactionRow({
           />
         </td>
         <td>
-          <span className="k-card-badge">{statusLabel(row.status)}</span>
+          <StateLabel status={row.status} />
+        </td>
+        <td className="ab-act">
           {row.status === 'suggested' ? (
             <>
               <Button variant="secondary" onClick={() => onConfirm(row.id, applyToMatching)}>
@@ -375,6 +411,7 @@ export function TransactionRow({
             </>
           ) : null}
         </td>
+        <td className="k-num k-cell-number ab-money">{formatEur(row.amount_cents)}</td>
         <td>
           <Button aria-label={`Detail transakcie ${row.id}`} aria-expanded={expanded} variant="ghost" onClick={() => setExpanded((v) => !v)}>
             {expanded ? '▾' : '▸'}
@@ -383,7 +420,7 @@ export function TransactionRow({
       </tr>
       {expanded ? (
         <tr>
-          <td colSpan={8}>
+          <td colSpan={9}>
             <pre className="k-well">{row.raw_block}</pre>
             <NoteEditor txId={row.id} initialNote={row.note} onSaved={onNoteSaved} />
             <RecurringTransactionAction row={row} categories={categories} onChanged={onNoteSaved} />
@@ -436,6 +473,9 @@ export function Transactions({
   const [anchorId, setAnchorId] = useState<number | null>(null)
   const [inked, setInked] = useState<ReadonlySet<number>>(new Set())
   const [pdfOpen, setPdfOpen] = useState(false)
+  const [groupsOpen, setGroupsOpen] = useState(false)
+  // R32: the total rule draws once after a confirmed change (a write that changed rows).
+  const [ruleDrawn, setRuleDrawn] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const tableRef = useRef<HTMLDivElement>(null)
   // F2 entry ink: the signatures of the last loaded rows, and whether the next load follows a
@@ -498,6 +538,7 @@ export function Transactions({
     inkNextLoad.current = false
     lastSignatures.current = next
     if (changed.length === 0) return
+    setRuleDrawn(true)
     if (!inkCap.current.admit(changed.length, Date.now())) {
       setInked(new Set())
       footerNote(capNote(changed.map((id) => data.find((r) => r.id === id)?.merchant_raw ?? String(id))))
@@ -505,6 +546,12 @@ export function Transactions({
     }
     setInked(new Set(changed))
   }
+
+  useEffect(() => {
+    if (!ruleDrawn) return
+    const timer = setTimeout(() => setRuleDrawn(false), RULE_DRAW_MS)
+    return () => clearTimeout(timer)
+  }, [ruleDrawn])
 
   useEffect(() => {
     if (inked.size === 0) return
@@ -781,117 +828,189 @@ export function Transactions({
     if (context) await action.run(() => assignOne(context.rowId, category.id))
   }
 
-  const unassignedCount = rows.filter((r) => r.status === 'unassigned').length
-  const suggestedCount = rows.filter((r) => r.status === 'suggested').length
-
+  const groups = useMemo(() => groupUnassignedTransactions(rows), [rows])
+  const counts = countStatuses(rows)
+  const accountLabels = useMemo(() => new Map(accounts.map((a) => [a.id, a.label])), [accounts])
   return (
     <div className="ab-screen">
-      <PageHead
-        title="Transakcie"
-        more={
-          <MoreMenu
-            items={[
-              { label: 'Obnoviť', onSelect: reload },
-              { label: 'Exportovať filtrované CSV', disabled: exportAction.busy || !effectivePeriodValid, onSelect: () => void exportAction.run(exportCsv) },
-              { label: 'Exportovať PDF', onSelect: () => setPdfOpen(true) },
-            ]}
+      <ScreenHead
+        drilldown={drilldown}
+        onNavigateToImport={onNavigateToImport}
+        menu={[
+          { label: 'Obnoviť', onSelect: reload },
+          { label: 'Exportovať filtrované CSV', disabled: exportAction.busy || !effectivePeriodValid, onSelect: () => void exportAction.run(exportCsv) },
+          { label: 'Exportovať PDF', onSelect: () => setPdfOpen(true) },
+        ]}
+      />
+      <WaitingRow groups={groups} count={counts.unassigned} open={groupsOpen} onToggle={() => setGroupsOpen((open) => !open)} />
+      <section className="k-sheet-surface ab-flush" aria-label="Zoznam transakcií">
+        <div className="ab-filters">
+          <PeriodRow statementDrilldown={!!drilldown.statementId} period={period} onPeriod={setPeriod} onClear={clearFilters} />
+          <FilterBar
+            accounts={accounts}
+            categories={categories}
+            accountId={accountId}
+            categoryId={categoryId}
+            status={status}
+            kind={kind}
+            text={text}
+            onAccount={setAccountId}
+            onCategory={setCategoryId}
+            onStatus={setStatus}
+            onKind={setKind}
+            onText={setText}
+            searchRef={searchRef}
           />
-        }
-      />
-      <div className="ab-row">
-        <span className="k-card-badge">Nezaradené: {unassignedCount}</span>
-        <span className="k-card-badge">Odhady: {suggestedCount}</span>
-      </div>
-      {drilldown.statementId ? <p>Vybraný výpis, všetky jeho dátumy.</p> : <PeriodPicker value={period} onChange={setPeriod} />}
-      {drilldown.accountKind ? <p>Druh účtu: {drilldown.accountKind === 'personal' ? 'Osobný' : 'Firemný'}</p> : null}
-      <FilterBar
-        accounts={accounts}
-        categories={categories}
-        accountId={accountId}
-        categoryId={categoryId}
-        status={status}
-        kind={kind}
-        text={text}
-        onAccount={setAccountId}
-        onCategory={setCategoryId}
-        onStatus={setStatus}
-        onKind={setKind}
-        onText={setText}
-        searchRef={searchRef}
-      />
-      <div className="ab-row">
-        <Button variant="secondary" onClick={clearFilters}>Vymazať všetky filtre</Button>
-      </div>
-      <OperationStatus error={metadataError} />
-      <LoadStatus loaded={loaded} error={loadError} valid={effectivePeriodValid} />
-      <OperationStatus error={action.error} busy={action.busy} />
-      <OperationStatus error={exportAction.error} busy={exportAction.busy} />
-      <FilteredTotals rows={rows} categories={categories} loaded={loaded} categoriesLoaded={metadataLoaded} />
-      {lastUndo ? (
-        <p className="ab-field-label">Posledné hromadné priradenie sa dá vrátiť: {keyLabel(binding('undo').spec)}.</p>
-      ) : null}
-      <p className="ab-field-label">
-        Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby. Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby rovnakého obchodníka.
-      </p>
-      <fieldset disabled={action.busy} className="ab-section">
-        <UnassignedGroupsBar rows={rows} onSelectGroup={(ids) => setSelected(new Set(ids))} />
-        <BulkBar
-          count={selected.size}
-          categories={categories}
-          categoryId={bulkCategoryId}
-          onCategoryChange={setBulkCategoryId}
-          onCreate={() => setCreateFor('bulk')}
-          onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
-          onConfirm={(applyToMatching) => void action.run(() => bulkConfirm(applyToMatching))}
-        />
-        <p className="ab-field-label" id="ab-register-keys">
-          Klávesy v tabuľke: šípky a Home, End, PgUp, PgDn presúvajú, medzerník vyberie riadok, Enter prijme odhad, Ctrl+A vyberie všetko, Esc zruší výber. Zoznam je v Pomocníkovi (F1).
-        </p>
-        <div ref={tableRef} className="ab-table-scroll" role="region" aria-label="Transakcie" aria-describedby="ab-register-keys" tabIndex={0} onKeyDown={onTableKeyDown}>
-        <table className="k-table ab-register">
-          <thead>
-            <tr>
-              <th></th>
-              <th>Dátum</th>
-              <th>Účet</th>
-              <th>Obchodník</th>
-              <th className="k-num k-cell-number ab-money">Suma</th>
-              <th>Kategória</th>
-              <th>Stav</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loaded && rows.length === 0 ? (
-              <tr>
-                <td colSpan={8}>
-                  <span>Za toto obdobie nič nie je. Skús iné obdobie hore.</span>{' '}
-                  {onNavigateToImport ? <Button variant="ghost" onClick={onNavigateToImport}>Importovať výpis</Button> : null}
-                </td>
-              </tr>
-            ) : null}
-            {rows.map((row) => (
-              <TransactionRow
-                key={row.id}
-                row={row}
-                categories={categories}
-                selected={selected.has(row.id)}
-                matchingCount={row.status === 'suggested' ? countMatchingUnconfirmed(rows, row) : 0}
-                focused={focusedRowId === row.id}
-                inked={inked.has(row.id)}
-                onSelect={toggleSelect}
-                onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
-                onConfirm={(id, applyToMatching) => void action.run(() => confirmOne(id, applyToMatching))}
-                onNoteSaved={refreshRows}
-                onCreateCategory={(rowId) => setCreateFor({ rowId })}
-              />
-            ))}
-          </tbody>
-        </table>
         </div>
-      </fieldset>
+        <OperationStatus error={metadataError} />
+        <LoadStatus loaded={loaded} error={loadError} valid={effectivePeriodValid} />
+        <OperationStatus error={action.error} busy={action.busy} />
+        <OperationStatus error={exportAction.error} busy={exportAction.busy} />
+        <StateCounts rows={rows} counts={counts} loaded={loaded} />
+        {lastUndo ? (
+          <p className="ab-field-label ab-pad">Posledné hromadné priradenie sa dá vrátiť: {keyLabel(binding('undo').spec)}.</p>
+        ) : null}
+        <fieldset disabled={action.busy} className="ab-section">
+          <div className="ab-section ab-pad">
+          {groupsOpen ? <UnassignedGroupsBar groups={groups} onSelectGroup={(ids) => setSelected(new Set(ids))} /> : null}
+          <BulkBar
+            count={selected.size}
+            categories={categories}
+            categoryId={bulkCategoryId}
+            onCategoryChange={setBulkCategoryId}
+            onCreate={() => setCreateFor('bulk')}
+            onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
+            onConfirm={(applyToMatching) => void action.run(() => bulkConfirm(applyToMatching))}
+          />
+          <p className="ab-field-label ab-measure" id="ab-register-keys">
+            Klávesy v tabuľke: šípky a Home, End, PgUp, PgDn presúvajú, medzerník vyberie riadok, Enter prijme odhad, Ctrl+A vyberie všetko, Esc zruší výber. Zoznam je v Pomocníkovi (F1).
+          </p>
+          <details className="ab-fold">
+            <summary>Ako sa vytvárajú pravidlá</summary>
+            <p className="ab-field-label ab-measure">
+              Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby. Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby rovnakého obchodníka.
+            </p>
+          </details>
+          </div>
+          <div ref={tableRef} className="ab-table-scroll" role="region" aria-label="Transakcie" aria-describedby="ab-register-keys" tabIndex={0} onKeyDown={onTableKeyDown}>
+            <table className="k-table ab-register">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th className="ab-hide-narrow">Dátum</th>
+                  <th className="ab-hide-narrow">Účet</th>
+                  <th>Obchodník</th>
+                  <th>Kategória</th>
+                  <th>Stav</th>
+                  <th><span className="k-sr-only">Akcia</span></th>
+                  <th className="k-num k-cell-number ab-money">Suma</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loaded && rows.length === 0 ? <EmptyRegisterRow onNavigateToImport={onNavigateToImport} /> : null}
+                {rows.map((row) => (
+                  <TransactionRow
+                    key={row.id}
+                    row={row}
+                    categories={categories}
+                    selected={selected.has(row.id)}
+                    matchingCount={row.status === 'suggested' ? countMatchingUnconfirmed(rows, row) : 0}
+                    accountLabel={accountLabels.get(row.account_id)}
+                    focused={focusedRowId === row.id}
+                    inked={inked.has(row.id)}
+                    onSelect={toggleSelect}
+                    onAssign={(id, catId) => void action.run(() => assignOne(id, catId))}
+                    onConfirm={(id, applyToMatching) => void action.run(() => confirmOne(id, applyToMatching))}
+                    onNoteSaved={refreshRows}
+                    onCreateCategory={(rowId) => setCreateFor({ rowId })}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </fieldset>
+        <FilteredTotals rows={rows} categories={categories} loaded={loaded} categoriesLoaded={metadataLoaded} drawn={ruleDrawn} />
+      </section>
       <ExportPdfDialog open={pdfOpen} onClose={() => setPdfOpen(false)} />
       <CategoryDialog open={createFor !== null} onClose={() => setCreateFor(null)} onCreated={(category) => void categoryCreated(category)} />
+    </div>
+  )
+}
+
+type MenuItem = { label: string; disabled?: boolean; onSelect: () => void }
+
+// Page head of the r4 gallery screen: the title, a short meta line for a drill-down, then the
+// import shortcut and the "Ďalšie" menu.
+function ScreenHead({ drilldown, onNavigateToImport, menu }: {
+  drilldown: { statementId?: number | null; accountKind?: AccountKind | null }
+  onNavigateToImport?: () => void
+  menu: MenuItem[]
+}) {
+  const meta = [
+    drilldown.statementId ? 'Vybraný výpis, všetky jeho dátumy.' : '',
+    drilldown.accountKind ? `Druh účtu: ${drilldown.accountKind === 'personal' ? 'Osobný' : 'Firemný'}.` : '',
+  ].filter(Boolean).join(' ')
+  return (
+    <div className="ab-head">
+      <div className="k-page-head">
+        <h2 className="k-page-title">Transakcie</h2>
+        {meta ? <p className="k-page-meta">{meta}</p> : null}
+      </div>
+      <div className="ab-head-actions">
+        {onNavigateToImport ? <Button variant="secondary" onClick={onNavigateToImport}>Import výpisu</Button> : null}
+        <MoreMenu items={menu} />
+      </div>
+    </div>
+  )
+}
+
+function PeriodRow({ statementDrilldown, period, onPeriod, onClear }: {
+  statementDrilldown: boolean
+  period: PeriodValue
+  onPeriod: (value: PeriodValue) => void
+  onClear: () => void
+}) {
+  return (
+    <div className="ab-filter-row">
+      {statementDrilldown ? null : <PeriodPicker value={period} onChange={onPeriod} />}
+      <button type="button" className="k-link ab-filter-clear" onClick={onClear}>Vymazať všetky filtre</button>
+    </div>
+  )
+}
+
+function EmptyRegisterRow({ onNavigateToImport }: { onNavigateToImport?: () => void }) {
+  return (
+    <tr>
+      <td colSpan={9}>
+        <span>Za toto obdobie nič nie je. Skús iné obdobie hore.</span>{' '}
+        {onNavigateToImport ? <Button variant="ghost" onClick={onNavigateToImport}>Importovať výpis</Button> : null}
+      </td>
+    </tr>
+  )
+}
+
+const STATE_ORDER: Status[] = ['unassigned', 'suggested', 'confirmed', 'transfer']
+
+function countStatuses(rows: TxRow[]): Record<Status, number> {
+  const counts: Record<Status, number> = { unassigned: 0, suggested: 0, confirmed: 0, transfer: 0 }
+  for (const row of rows) counts[row.status] += 1
+  return counts
+}
+
+// The caption line of the register: the total count, then the count of each state with its mark.
+function StateCounts({ rows, counts, loaded }: { rows: TxRow[]; counts: Record<Status, number>; loaded: boolean }) {
+  if (!loaded) return null
+  const forms = { unassigned: tx.nezaradene, suggested: tx.odhad, confirmed: tx.potvrdene, transfer: tx.prevod }
+  return (
+    <div className="ab-cap" role="status" aria-label="Počty podľa stavu">
+      <b>{countPhrase(rows.length, tx.platba)}</b>
+      {STATE_ORDER.filter((state) => state !== 'transfer' || counts.transfer > 0).map((state) => (
+        <span key={state} className="k-state-label">
+          <StateMark status={state} />
+          {countPhrase(counts[state], forms[state])}
+        </span>
+      ))}
     </div>
   )
 }
@@ -905,8 +1024,8 @@ function rowMoney(row: TxRow, kind: Category['kind'] | undefined) {
   return { income, expense: 0 }
 }
 
-function FilteredTotals({ rows, categories, loaded, categoriesLoaded }: {
-  rows: TxRow[]; categories: Category[]; loaded: boolean; categoriesLoaded: boolean
+function FilteredTotals({ rows, categories, loaded, categoriesLoaded, drawn }: {
+  rows: TxRow[]; categories: Category[]; loaded: boolean; categoriesLoaded: boolean; drawn: boolean
 }) {
   if (!loaded || !categoriesLoaded) return null
   const kinds = new Map(categories.map((category) => [category.id, category.kind]))
@@ -914,12 +1033,15 @@ function FilteredTotals({ rows, categories, loaded, categoriesLoaded }: {
   const income = money.reduce((sum, row) => sum + row.income, 0)
   const expense = money.reduce((sum, row) => sum + row.expense, 0)
   const transfers = rows.filter((row) => row.status === 'transfer').length
-  return <section aria-label="Súčty zobrazených transakcií" className="ab-row k-num">
-    <span>Zobrazené transakcie: {rows.length}</span>
-    <span>Príjem: {formatEur(income)}</span>
-    <span>Výdavky: {formatEur(expense)}</span>
-    <span>Čisté: {formatEur(income - expense)}</span>
-    <span>Prevody mimo súčtov: {transfers}</span>
+  // The hidden colon keeps the text of each line readable as "Príjem: 1 850,00 €" for a screen reader.
+  return <section aria-label="Súčty zobrazených transakcií" className="ab-pad">
+    <p className="ab-field-label ab-ledger-cap">Zobrazené transakcie: {rows.length}</p>
+    <div className="k-ledger ab-ledger-end">
+      <div className="k-ledger-row"><span>Príjem<span className="k-sr-only">:</span></span>{' '}<span className="k-ledger-amount">{formatEur(income)}</span></div>
+      <div className="k-ledger-row"><span>Výdavky<span className="k-sr-only">:</span></span>{' '}<span className="k-ledger-amount">{formatEur(expense)}</span></div>
+      <div className={`k-ledger-total k-ledger-total--lead${drawn ? ' is-changed' : ''}`}><span>Čisté<span className="k-sr-only">:</span></span>{' '}<span className="k-ledger-amount">{formatEur(income - expense)}</span></div>
+    </div>
+    {transfers > 0 ? <p className="ab-field-label ab-ledger-cap">Prevody mimo súčtov: {transfers}</p> : null}
   </section>
 }
 

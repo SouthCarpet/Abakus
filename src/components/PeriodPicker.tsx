@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useId, useState } from 'react'
 import { PERIOD_LABELS, validPeriod, type PeriodKind } from '../lib/period'
 import { Button } from './Button'
 
@@ -34,20 +34,27 @@ export function usePeriod(): [PeriodValue, (value: PeriodValue) => void] {
   return [period, setPeriod]
 }
 
+// The group has a visible name ("Obdobie"), so a button such as "Všetko" says what it filters.
+// The selected button takes the selected tone, not the accent fill: the register has one lead.
 export function PeriodPicker({ value, onChange }: { value: PeriodValue; onChange: (value: PeriodValue) => void }) {
+  const nameId = useId()
   return (
     <div className="ab-row">
-      <div className="ab-row" role="group" aria-label="Obdobie">
-        {KINDS.map((kind) => (
-          <Button
-            key={kind}
-            aria-pressed={value.kind === kind}
-            variant={value.kind === kind ? 'primary' : 'secondary'}
-            onClick={() => onChange(kind === 'custom' ? { kind, custom: value.custom ?? { from: '', to: '' } } : { kind })}
-          >
-            {PERIOD_LABELS[kind]}
-          </Button>
-        ))}
+      <div className="ab-period">
+        <span id={nameId} className="ab-field-name">Obdobie</span>
+        <div className="ab-row ab-period-buttons" role="group" aria-labelledby={nameId}>
+          {KINDS.map((kind) => (
+            <Button
+              key={kind}
+              aria-pressed={value.kind === kind}
+              variant="secondary"
+              className={value.kind === kind ? 'ab-pressed' : undefined}
+              onClick={() => onChange(kind === 'custom' ? { kind, custom: value.custom ?? { from: '', to: '' } } : { kind })}
+            >
+              {PERIOD_LABELS[kind]}
+            </Button>
+          ))}
+        </div>
       </div>
       {!validPeriod(value) ? <p role="alert">Zadajte platný začiatok a koniec obdobia. Začiatok nesmie byť po konci.</p> : null}
       {value.kind === 'custom' ? (

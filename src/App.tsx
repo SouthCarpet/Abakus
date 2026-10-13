@@ -115,6 +115,7 @@ export function App() {
                 key={tab.id}
                 type="button"
                 className={`k-tab${tab.id === screen ? ' is-active' : ''}`}
+                data-k-label={tab.label}
                 aria-current={tab.id === screen ? 'page' : undefined}
                 aria-keyshortcuts={tab.id === 'settings' ? ariaKeys('settings') : undefined}
                 title={tab.id === 'settings' ? withKey(tab.label, 'settings') : undefined}

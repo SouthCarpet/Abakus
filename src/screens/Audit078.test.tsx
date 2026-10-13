@@ -173,10 +173,10 @@ describe('transaction filters, export and sums', () => {
   it('clear removes all filters and selection including statement and account kind', async () => {
     render(<Transactions statementId={42} initialAccountKind="personal" initialCategoryId={8} initialStatus="unassigned" />)
     fireEvent.click(await screen.findByRole('checkbox', { name: /Vybrať transakciu/ }))
-    expect(screen.getByText('1 vybraných')).toBeVisible()
+    expect(screen.getByText('Vybrané: 1')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Vymazať všetky filtre' }))
     await waitFor(() => expect(api.listTransactions).toHaveBeenLastCalledWith({ from: null, to: null, account_id: null, account_kind: null, category_id: null, status: null, kind: null, text: null, statement_id: null }))
-    expect(screen.queryByText('1 vybraných')).not.toBeInTheDocument()
+    expect(screen.queryByText('Vybrané: 1')).not.toBeInTheDocument()
     expect(screen.getByRole('searchbox', { name: 'Hľadať obchodníka alebo poznámku' })).toHaveValue('')
   })
   it('counts three rows but excludes a 900 euro transfer from 123.45 income and 23.45 expense', async () => {
@@ -352,7 +352,7 @@ it('reloads account and category sources through Obnoviť after initial metadata
   fireEvent.click(menuItem('Obnoviť'))
   expect(await screen.findByRole('region', { name: 'Súčty zobrazených transakcií' })).toBeVisible()
   expect(within(screen.getByRole('combobox', { name: 'Účet' })).getByRole('option', { name: 'Osobný - Test účet' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('combobox', { name: 'Filter kategórie' }))
+  fireEvent.click(screen.getByRole('combobox', { name: 'Kategória' }))
   expect(screen.getByRole('option', { name: 'Jedlo' })).toBeInTheDocument()
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })

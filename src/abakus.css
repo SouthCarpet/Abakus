@@ -45,9 +45,51 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 /* A category row keeps its name field and its actions on one line, also at 390 px. */
 .ab-category-row { flex-wrap: nowrap; gap: var(--space-2); }
 .ab-category-name { flex: 1 1 0; min-width: 0; }
-/* The register search shows its whole placeholder: it takes the rest of the filter row, and
-   a row too narrow for 22rem gives it the full line. */
-.ab-filter-search { flex: 1 1 22rem; min-width: min(100%, 22rem); }
+/* ---- the register screen (Transakcie, r4 gallery screen abakus-transakcie) ------------ */
+.ab-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
+.ab-head > .k-page-head { margin-bottom: 0; }
+.ab-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ab-flush { padding: 0; overflow: hidden; }
+.ab-pad { padding: var(--space-4); }
+/* One filter block: the period, then the fields, each with its permanent name above it. */
+.ab-filters { display: grid; gap: var(--space-4); padding: var(--space-4); }
+.ab-filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
+.ab-filter-field { flex: 1 1 11rem; min-width: 0; }
+.ab-filter-field .k-select-wrap { display: grid; min-width: 0; }
+.ab-filter-field .k-input { width: 100%; }
+/* The register search shows its whole placeholder: it takes the rest of the filter row. */
+.ab-filter-search { flex: 2 1 16rem; }
+.ab-filter-clear { margin-left: auto; min-height: var(--k-hit); font: inherit; font-size: var(--text-sm); background: transparent; border: 0; padding: 0 var(--space-2); cursor: pointer; }
+.ab-field-name { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
+.ab-period { display: grid; gap: var(--space-1); min-width: 0; }
+.ab-period-buttons { gap: var(--space-2); }
+/* The selected period takes the selected tone and bold text, not the accent fill. */
+.ab-period-buttons .ab-pressed { background: var(--color-surface-selected); border-color: var(--color-border-strong); font-weight: 700; }
+.ab-cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
+.ab-cap b { font-weight: 700; }
+/* A help line keeps a reading measure, never the whole screen width. */
+.ab-measure { max-width: 68ch; }
+.ab-fold > summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); min-height: var(--k-hit); display: flex; align-items: center; }
+.ab-fold[open] > summary { color: var(--color-text); }
+.ab-muted { color: var(--color-text-muted); }
+.ab-merch b { display: block; font-weight: 600; }
+.ab-merch small { display: block; font-size: var(--text-xs); color: var(--color-text-muted); }
+.ab-cat { min-width: 11rem; }
+/* State and action live in separate cells; the action cell holds the button and its option. */
+.ab-act { white-space: nowrap; }
+.ab-act > * + * { margin-left: var(--space-3); }
+.ab-narrow-only { display: none !important; }
+/* R28: a transfer (outside the totals) is a square with a line through it. */
+.ab-mark--transfer::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--color-text); }
+.ab-ledger-end { max-width: 26rem; margin-left: auto; }
+.ab-ledger-cap { margin: 0 0 var(--space-2); }
+@media (max-width: 599px) {
+  .ab-hide-narrow { display: none; }
+  .ab-narrow-only { display: block !important; }
+  .ab-head { align-items: flex-start; }
+  .ab-filter-clear { margin-left: 0; }
+  .ab-cat { min-width: 9rem; }
+}
 
 /* ---- tables -------------------------------------------------------------------- */
 .ab-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; padding: var(--space-1); }

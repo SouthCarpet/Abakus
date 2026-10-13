@@ -47,7 +47,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear() })
 
 const region = () => screen.getByRole('region', { name: 'Transakcie' })
 const box = (id: number) => screen.getByRole('checkbox', { name: new RegExp(`^Vybrať transakciu ${id}:`) })
-const selectedCount = () => screen.queryByText(/vybraných$/)?.textContent ?? '0 vybraných'
+const selectedCount = () => screen.queryByText(/^Vybrané: [0-9]+$/)?.textContent ?? 'Vybrané: 0'
 
 async function ready() {
   render(<Transactions />)
@@ -60,10 +60,10 @@ describe('register keys', () => {
   it('selects all visible rows except the transfer with Ctrl+A, clears on the second press', async () => {
     await ready()
     fireEvent.keyDown(region(), { key: 'a', code: 'KeyA', ctrlKey: true })
-    expect(selectedCount()).toBe('3 vybraných')
+    expect(selectedCount()).toBe('Vybrané: 3')
     expect(box(3)).not.toBeChecked()
     fireEvent.keyDown(region(), { key: 'a', code: 'KeyA', ctrlKey: true })
-    expect(selectedCount()).toBe('0 vybraných')
+    expect(selectedCount()).toBe('Vybrané: 0')
   })
 
   it('toggles the focused row with Space and extends with Shift+ArrowDown', async () => {
@@ -81,7 +81,7 @@ describe('register keys', () => {
     await ready()
     fireEvent.click(box(1))
     fireEvent.click(box(2))
-    expect(selectedCount()).toBe('2 vybraných')
+    expect(selectedCount()).toBe('Vybrané: 2')
     fireEvent.keyDown(region(), { key: 'Escape' })
     expect(box(1)).not.toBeChecked()
     expect(screen.getByText('Obchod 1')).toBeInTheDocument()
@@ -112,7 +112,7 @@ describe('register keys', () => {
     vi.mocked(api.undoLastAssignment).mockResolvedValue({ restored_rows: 1 } as Awaited<ReturnType<typeof api.undoLastAssignment>>)
     await ready()
     fireEvent.click(box(1))
-    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    const bulkBar = screen.getByText('Vybrané: 1').closest('div') as HTMLElement
     fireEvent.click(within(bulkBar).getByRole('combobox'))
     fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
@@ -131,7 +131,7 @@ describe('register keys', () => {
     vi.mocked(api.undoLastAssignment).mockResolvedValue({ restored_rows: 1 } as Awaited<ReturnType<typeof api.undoLastAssignment>>)
     await ready()
     fireEvent.click(box(1))
-    const bulkBar = screen.getByText('1 vybraných').closest('div') as HTMLElement
+    const bulkBar = screen.getByText('Vybrané: 1').closest('div') as HTMLElement
     fireEvent.click(within(bulkBar).getByRole('combobox'))
     fireEvent.click(within(bulkBar).getByRole('option', { name: 'Jedlo' }))
     fireEvent.click(within(bulkBar).getByRole('button', { name: 'Priradiť' }))
