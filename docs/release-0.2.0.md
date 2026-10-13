@@ -17,7 +17,8 @@ Podrobnosti a poctivé limity sú v README (sekcie Transakcie, Kategórie, Preh�
 
 ## Kaliber revízia 3 (plán 091, lane a1)
 
-- Jazyk dizajnu Kaliber, revízia 3 (R12 až R22): `src/tokens.css` a `src/kaliber.css` sú bajtové kópie `design/web`, písmo Atkinson Hyperlegible Next, vlastné triedy appky s predponou `ab-` v `src/abakus.css`.
+- Kaliber r4 (Fira Sans): jadro (tokeny, `kaliber.css`, písmo) je prevzaté z r4; rozloženie obrazoviek sa mení v ďalších kolách.
+- Jazyk dizajnu Kaliber, revízia 3 (R12 až R22): `src/tokens.css` a `src/kaliber.css` sú bajtové kópie `design/web`, písmo Fira Sans, vlastné triedy appky s predponou `ab-` v `src/abakus.css`.
 - Päť záložiek v hlavičke, Transakcie ako prvá obrazovka, hlavička obrazovky s jednou hlavnou akciou a menu **Ďalšie**, Pomocník v pätičke a na F1, hlásenia vpravo dole so **Späť**.
 - Vzhľad v kľúči `kaliber-theme` (prenos z `abakus.theme`), prepínač slnko a mesiac v hlavičke a voľba v **Nastavenia > Vzhľad**.
 - **O aplikácii** ako posledná sekcia Nastavení. Kontrola aktualizácií len so súhlasom: pri spustení (ticho), pri otvorení O aplikácii a na tlačidlo. `check_update_now` vracia chybu spojenia ako chybu, nie ako „nič novšie“.

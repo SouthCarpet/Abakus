@@ -68,12 +68,12 @@ Abakus embeds `NotoSans-Regular.ttf` and `NotoSans-Bold.ttf`
 Open Font License 1.1. The full license is
 [`src-tauri/assets/report-fonts/OFL.txt`](src-tauri/assets/report-fonts/OFL.txt).
 
-## Atkinson Hyperlegible Next (user interface)
+## Fira Sans (user interface)
 
-The user interface uses `AtkinsonHyperlegibleNext-Variable.ttf`, the
-typeface of the Kaliber design language. It is licensed under the SIL
-Open Font License 1.1. The full license is
-[`src/assets/fonts/OFL-AtkinsonHyperlegibleNext.txt`](src/assets/fonts/OFL-AtkinsonHyperlegibleNext.txt).
+The user interface uses the static `FiraSans-*.ttf` files, the typeface of
+the Kaliber design language. They are licensed under the SIL Open Font
+License 1.1. The full license is
+[`assets/fonts/fira-sans/OFL.txt`](assets/fonts/fira-sans/OFL.txt).
 
 ## Lucide icons (user interface)
 

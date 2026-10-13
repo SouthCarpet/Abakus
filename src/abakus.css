@@ -6,15 +6,6 @@
    tokens-only vitest enforces it. Fixed geometry (1px hairlines) as in
    components.md. */
 
-/* The one @font-face of the app (adoption.md Step 2). OFL text beside the file. */
-@font-face {
-  font-family: "Atkinson Hyperlegible Next";
-  src: url("./assets/fonts/AtkinsonHyperlegibleNext-Variable.ttf") format("truetype");
-  font-weight: 200 800;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* ---- app window ------------------------------------------------------------ */
 html, body, #root { height: 100%; }
 .ab-app { min-height: 100%; }
