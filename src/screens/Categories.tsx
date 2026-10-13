@@ -7,6 +7,7 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { PageHead } from '../components/PageHead'
+import { countPhrase, pluralSk, tx } from '../lib/plural'
 import { ArchiveGlyph, TrashGlyph } from '../kaliber/icons'
 import { useDeleteKey } from '../kaliber/deleteKey'
 import { toast } from '../kaliber/toast'
@@ -306,7 +307,7 @@ function CategoryEditDialog({
       {error ? <p role="alert">{error}</p> : null}
       {preview ? (
         <div className="ab-section">
-          <p>Zmena druhu ovplyvní {preview.affected_categories} kategórií a {preview.transaction_count} transakcií (z toho {preview.confirmed_count} potvrdených).</p>
+          <p>Zmena druhu ovplyvní {countPhrase(preview.affected_categories, tx.kategoria)} a {countPhrase(preview.transaction_count, tx.transakcia)} (z toho {countPhrase(preview.confirmed_count, tx.potvrdene)}).</p>
           <p>Kategórie a súvisiace transakcie zostanú priradené, mení sa iba význam výdavok/príjem.</p>
         </div>
       ) : (
@@ -416,7 +417,7 @@ function CategoryDeleteDialog({
       {preview ? (
         <div className="ab-section">
           <p>{`Zmaže kategóriu ${category.name} a jej podkategórie.`}</p>
-          <p>{`${preview.transaction_count} transakcií sa presunie do nezaradených (z toho ${preview.confirmed_count} potvrdených).`}</p>
+          <p>{`${countPhrase(preview.transaction_count, tx.transakcia)} ${pluralSk(preview.transaction_count, ['sa presunie', 'sa presunú', 'sa presunie'])} do nezaradených (z toho ${countPhrase(preview.confirmed_count, tx.potvrdene)}).`}</p>
           {preview.rule_count > 0 ? <p>{`Zmaže sa aj ${preview.rule_count} pravidiel.`}</p> : null}
         </div>
       ) : null}
@@ -572,7 +573,7 @@ export function Categories() {
   // the shown count is never a stale client guess.
   async function categoryDeleted(outcome: CategoryDeletePreview) {
     categoryKeys.deleted()
-    toast(`Zmazané: ${outcome.transaction_count} transakcií presunutých do nezaradených.`)
+    toast(`Zmazané. ${countPhrase(outcome.transaction_count, tx.transakcia)} ${pluralSk(outcome.transaction_count, ['presunutá', 'presunuté', 'presunutých'])} do nezaradených.`)
     await refresh()
   }
 
@@ -589,6 +590,7 @@ export function Categories() {
     <div className="ab-screen">
       <PageHead
         title="Kategórie"
+        meta="Kategórie platieb a pravidlá, ktoré z nich vznikli."
         primary={<Button variant="primary" disabled={action.busy} onClick={() => setAddOpen(true)}>Nová kategória</Button>}
       />
       {action.error ? <p role="alert">{action.error}</p> : null}

@@ -13,10 +13,11 @@ export function countPhrase(n: number, forms: PluralForms): string {
   return `${n} ${pluralSk(n, forms)}`
 }
 
-/** The counted nouns of the register. Add a noun here, never a local ternary. */
+/** The counted nouns of the screens. Add a noun here, never a local ternary. */
 export const tx = {
   platba: ['platba', 'platby', 'platieb'],
   transakcia: ['transakcia', 'transakcie', 'transakcií'],
+  kategoria: ['kategória', 'kategórie', 'kategórií'],
   odhad: ['odhad', 'odhady', 'odhadov'],
   prevod: ['prevod', 'prevody', 'prevodov'],
   nezaradene: ['nezaradená', 'nezaradené', 'nezaradených'],

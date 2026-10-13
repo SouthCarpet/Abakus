@@ -130,7 +130,7 @@ describe('Overview unassigned drill-down carries the account kind filter', () =>
     fireEvent.click(await screen.findByRole('button', { name: 'Osobný' }))
     await waitFor(() => expect(vi.mocked(api.summary).mock.calls.at(-1)?.slice(2)).toEqual([null, 'personal']))
 
-    fireEvent.click(await screen.findByRole('button', { name: /Nezaradené/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Zaradiť platby' }))
 
     expect(onNavigateToTransactions).toHaveBeenCalledWith({ status: 'unassigned', accountKind: 'personal' })
   })
@@ -140,7 +140,7 @@ describe('Overview unassigned drill-down carries the account kind filter', () =>
     const onNavigateToTransactions = vi.fn()
     render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={onNavigateToTransactions} />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Nezaradené/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Zaradiť platby' }))
 
     expect(onNavigateToTransactions).toHaveBeenCalledWith({ status: 'unassigned' })
   })
@@ -320,5 +320,45 @@ describe('Overview shows fee totals (point 13)', () => {
     const summary = await screen.findByLabelText('Súhrn obdobia')
     expect(within(summary).getByText('Poplatky')).toBeInTheDocument()
     expect(within(summary).getByText('-12,34 €')).toBeInTheDocument()
+  })
+})
+
+// Kaliber r4 (R27, R34 d): the totals are a ledger with Čisté as the lead row, and the one
+// task on the screen is the ink row with the right Slovak plural.
+describe('Overview in Kaliber r4', () => {
+  it('shows the period as a ledger with the lead total and the memo lines outside it', async () => {
+    vi.mocked(api.summary).mockResolvedValue({ ...nonEmptySummary, income_cents: 185000, expense_cents: -60000, net_cents: 125000, fee_cents: -1234, transfer_cents: 5000 })
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+
+    const ledger = await screen.findByLabelText('Súhrn obdobia')
+    expect(ledger.querySelectorAll('.k-ledger-row')).toHaveLength(2)
+    expect(ledger.querySelector('.k-ledger-total--lead')).toHaveTextContent(/Čisté:\s*1 250,00/)
+    expect(within(ledger).getByText('Prevody mimo súčtov')).toBeInTheDocument()
+    expect(within(ledger).getByText('už vo výdavkoch')).toBeInTheDocument()
+  })
+
+  it('names the waiting payments with the plural form and carries the split of estimates', async () => {
+    vi.mocked(api.summary).mockResolvedValue({ ...nonEmptySummary, unassigned_count: 3, suggested_count: 1 })
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+
+    const row = await screen.findByRole('status', { name: 'Čakajú na zaradenie' })
+    expect(row).toHaveTextContent('3 platby čakajú na zaradenie')
+    expect(row).toHaveTextContent('Čaká 1 odhad na potvrdenie.')
+  })
+
+  it('shows no ink row while nothing waits', async () => {
+    vi.mocked(api.summary).mockResolvedValue({ ...nonEmptySummary, unassigned_count: 0, suggested_count: 2 })
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+
+    await screen.findByLabelText('Súhrn obdobia')
+    expect(screen.queryByRole('status', { name: 'Čakajú na zaradenie' })).not.toBeInTheDocument()
+  })
+
+  it('puts the metadata line under the page title', async () => {
+    vi.mocked(api.summary).mockResolvedValue(nonEmptySummary)
+    render(<Overview onNavigateToImport={() => {}} onNavigateToTransactions={() => {}} />)
+
+    expect(await screen.findByRole('heading', { name: 'Prehľad' })).toHaveClass('k-page-title')
+    expect(screen.getByText(/Súčty za vybrané obdobie/)).toHaveClass('k-page-meta')
   })
 })

@@ -124,8 +124,8 @@ describe('Categories edit flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
 
-    expect(await screen.findByText(/2 kategórií a 3 transakcií/)).toBeInTheDocument()
-    expect(screen.getByText(/2 potvrdených/)).toBeInTheDocument()
+    expect(await screen.findByText(/2 kategórie a 3 transakcie/)).toBeInTheDocument()
+    expect(screen.getByText(/2 potvrdené/)).toBeInTheDocument()
     expect(categoryApi.update).not.toHaveBeenCalled()
 
     vi.mocked(categoryApi.update).mockResolvedValue({ ...JEDLO, kind: 'income' })
@@ -140,7 +140,7 @@ describe('Categories edit flow', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Upraviť' })[0]).toBeInTheDocument())
     fireEvent.click(screen.getAllByRole('button', { name: 'Upraviť' })[0])
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
-    await screen.findByText(/1 kategórií a 1 transakcií/)
+    await screen.findByText(/1 kategória a 1 transakcia/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
 
@@ -213,14 +213,14 @@ describe('Categories delete control (point 4)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' }))
 
-    expect(await screen.findByText(/4 transakcií sa presunie do nezaradených/)).toBeInTheDocument()
-    expect(screen.getByText(/2 potvrdených/)).toBeInTheDocument()
+    expect(await screen.findByText(/4 transakcie sa presunú do nezaradených/)).toBeInTheDocument()
+    expect(screen.getByText(/2 potvrdené/)).toBeInTheDocument()
     expect(categoryApi.deleteCategory).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
 
     await waitFor(() => expect(categoryApi.deleteCategory).toHaveBeenCalledWith(preview))
-    expect(await screen.findByText(/Zmazané: 4 transakcií presunutých do nezaradených/)).toBeInTheDocument()
+    expect(await screen.findByText(/Zmazané. 4 transakcie presunuté do nezaradených/)).toBeInTheDocument()
   })
 
   it('cancelling the delete confirmation makes no write', async () => {
@@ -229,7 +229,7 @@ describe('Categories delete control (point 4)', () => {
     render(<Categories />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' }))
-    await screen.findByText(/4 transakcií sa presunie do nezaradených/)
+    await screen.findByText(/4 transakcie sa presunú do nezaradených/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
 

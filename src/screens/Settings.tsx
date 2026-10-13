@@ -476,7 +476,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
 
   return (
     <div className="ab-screen">
-      <PageHead title="Nastavenia" />
+      <PageHead title="Nastavenia" meta="Účty, údaje, záloha, vzhľad a aktualizácie. Verzia je v časti O aplikácii." />
       {action.error ? <p role="alert">{action.error}</p> : null}
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
       {exportMessage ? <p role="status">{exportMessage}</p> : null}

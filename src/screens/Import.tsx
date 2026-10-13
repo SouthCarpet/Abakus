@@ -6,6 +6,7 @@ import { api, formatEur } from '../api'
 import { useAction } from '../lib/useAction'
 import { Button } from '../components/Button'
 import { PageHead } from '../components/PageHead'
+import { countPhrase, tx } from '../lib/plural'
 import { ariaKeys, withKey } from '../kaliber/bindings'
 import { startActivity } from '../kaliber/activity'
 import { useDeleteKey } from '../kaliber/deleteKey'
@@ -279,7 +280,7 @@ function StatementRow({
       <span>{formatDate(statement.period_end)}</span>
       <span>{statement.account_label}</span>
       <span className="k-num">č. {statement.number}</span>
-      <span className="k-num">{statement.transaction_count} transakcií</span>
+      <span className="k-num">{countPhrase(statement.transaction_count, tx.transakcia)}</span>
       <span className="k-num">{formatEur(statement.total_cents)}</span>
       <span className={danger ? 'k-card-badge ab-text-danger' : 'k-card-badge'}>{checksumLabel(statement.checksum)}</span>
       <StatementReviewChip statementId={statement.statement_id} />
@@ -384,7 +385,7 @@ function DeleteStatementBody({ preview }: { preview: StatementDeletePreview | nu
   if (!preview) return <p>Načítava sa...</p>
   return (
     <p>
-      {`Natrvalo sa zmaže výpis č. ${preview.number} z účtu ${preview.account_label}. Odstráni sa ${preview.transaction_count} transakcií, z nich ${preview.confirmed_count} potvrdených. Pravidlá, ktoré nepoužíva iný výpis: ${preview.rules_deleted}. Ostatné výpisy zostanú zachované. Otvorené transakcie sa môžu znovu zaradiť podľa zostávajúcich pravidiel.`}
+      {`Natrvalo sa zmaže výpis č. ${preview.number} z účtu ${preview.account_label}. Odstráni sa ${countPhrase(preview.transaction_count, tx.transakcia)}, z nich ${countPhrase(preview.confirmed_count, tx.potvrdene)}. Pravidlá, ktoré nepoužíva iný výpis: ${preview.rules_deleted}. Ostatné výpisy zostanú zachované. Otvorené transakcie sa môžu znovu zaradiť podľa zostávajúcich pravidiel.`}
     </p>
   )
 }
@@ -558,6 +559,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
     <div className="ab-screen">
       <PageHead
         title="Import"
+        meta="Výpisy Tatra banky v PDF. Spracovanie beží len v tomto počítači."
         primary={<PickButton busy={[action.busy, deletion.busy].some(Boolean)} onPick={() => void action.run(pickFiles)} />}
       />
       {action.error ? <p role="alert">{action.error}</p> : null}

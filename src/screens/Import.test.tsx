@@ -226,7 +226,7 @@ describe('Statement list: delete a statement', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Zmazať výpis č. 6' }))
     await waitFor(() => expect(api.statementDeletePreview).toHaveBeenCalledWith(5))
-    await screen.findByText(/Odstráni sa 8 transakcií, z nich 2 potvrdených. Pravidlá, ktoré nepoužíva iný výpis: 1/)
+    await screen.findByText(/Odstráni sa 8 transakcií, z nich 2 potvrdené. Pravidlá, ktoré nepoužíva iný výpis: 1/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Natrvalo zmazať' }))
     await waitFor(() => expect(api.deleteStatement).toHaveBeenCalledWith(5))

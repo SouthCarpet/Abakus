@@ -9,11 +9,11 @@ import { MonthlyStacked } from '../components/charts/MonthlyStacked'
 import { InsightsPanel } from '../components/insights/InsightsPanel'
 import { StatementReminderBanner } from '../components/insights/StatementReminderBanner'
 import { YearComparisonCard } from '../components/insights/YearComparisonCard'
-import { Kpi } from '../components/Kpi'
 import { PageHead } from '../components/PageHead'
 import { ExportPdfAction } from '../components/report/ExportPdfAction'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { monthRange, periodRange, validPeriod } from '../lib/period'
+import { countPhrase, pluralSk, tx } from '../lib/plural'
 import { localTodayIso } from '../lib/recurring-labels'
 import { RecurringPanel } from '../components/recurring'
 
@@ -40,16 +40,40 @@ export function ChecksumBanner({ row, onNavigate }: { row: BadChecksum; onNaviga
   )
 }
 
-function UnassignedTile({ count, suggested, onClick }: { count: number; suggested: number; onClick: () => void }) {
+// The one ink row near the top (R34 d): it exists only while a real task waits, carries the
+// count and one action that opens the unassigned payments in Transakcie.
+function WaitingRow({ count, suggested, onClick }: { count: number; suggested: number; onClick: () => void }) {
+  if (count === 0) return null
+  const waits = pluralSk(count, ['čaká', 'čakajú', 'čaká'])
   return (
-    <div className="k-summary-row">
-      <dt>Nezaradené</dt>
-      <dd className="k-summary-value k-num">
-        <button type="button" className="k-key-link" aria-label={`Nezaradené: ${count} (odhady ${suggested})`} onClick={onClick}>
-          <span className="k-key">{count} (odhady {suggested})</span>
-        </button>
-      </dd>
+    <div className="k-ink-row" role="status" aria-label="Čakajú na zaradenie">
+      <div>
+        <div className="k-ink-row-text">{countPhrase(count, tx.platba)} {waits} na zaradenie</div>
+        {suggested > 0 ? (
+          <div className="k-ink-row-note">{pluralSk(suggested, ['Čaká', 'Čakajú', 'Čaká'])} {countPhrase(suggested, tx.odhad)} na potvrdenie.</div>
+        ) : null}
+      </div>
+      <button type="button" className="k-ink-action" onClick={onClick}>Zaradiť platby</button>
     </div>
+  )
+}
+
+// R27: the totals of the period are a ledger on the sheet. Čisté is the lead row with the
+// accent fill. Fees are already inside Výdavky and transfers stay outside, so both are
+// named under the ledger and never added to it.
+function PeriodLedger({ summary }: { summary: Summary }) {
+  return (
+    <section aria-label="Súhrn obdobia" className="ab-pad">
+      <div className="k-ledger ab-ledger-end">
+        <div className="k-ledger-row"><span>Príjem<span className="k-sr-only">:</span></span>{' '}<span className="k-ledger-amount">{formatEur(summary.income_cents)}</span></div>
+        <div className="k-ledger-row"><span>Výdavky<span className="k-sr-only">:</span></span>{' '}<span className="k-ledger-amount">{formatEur(summary.expense_cents)}</span></div>
+        <div className="k-ledger-total k-ledger-total--lead"><span>Čisté<span className="k-sr-only">:</span></span>{' '}<span className="k-ledger-amount">{formatEur(summary.net_cents)}</span></div>
+      </div>
+      <dl className="ab-ledger-memo">
+        <div><dt>Poplatky</dt>{' '}<dd className="k-num">{formatEur(summary.fee_cents)}</dd>{' '}<dd className="ab-muted">už vo výdavkoch</dd></div>
+        <div><dt>Prevody mimo súčtov</dt>{' '}<dd className="k-num">{formatEur(summary.transfer_cents)}</dd></div>
+      </dl>
+    </section>
   )
 }
 
@@ -84,12 +108,6 @@ function TopMerchantsTable({ rows, onMerchantClick }: { rows: Summary['top_merch
   )
 }
 
-function monthlySpan(rows: Summary['by_month'], pick: (m: Summary['by_month'][number]) => number): { min: number; max: number } | undefined {
-  if (rows.length === 0) return undefined
-  const values = rows.map(pick)
-  return { min: Math.min(0, ...values), max: Math.max(...values) }
-}
-
 // A17: "Importuj prvý výpis" is wrong advice once imports already exist; the
 // real cause is then the period filter, so the two cases get two sentences.
 function EmptyOverview({ onNavigateToImport, hasAnyImports }: { onNavigateToImport: () => void; hasAnyImports: boolean }) {
@@ -112,16 +130,10 @@ function EmptyOverview({ onNavigateToImport, hasAnyImports }: { onNavigateToImpo
 
 function SummaryBody({
   summary,
-  incomeSpan,
-  expenseSpan,
-  feeSpan,
   onNavigateToTransactions,
   onMonthClick,
 }: {
   summary: Summary
-  incomeSpan?: { min: number; max: number }
-  expenseSpan?: { min: number; max: number }
-  feeSpan?: { min: number; max: number }
   onNavigateToTransactions: (entry: { statementId?: number; status?: Status; categoryId?: number; merchantText?: string }) => void
   onMonthClick: (month: string) => void
 }) {
@@ -129,20 +141,12 @@ function SummaryBody({
   const onMerchantClick = (merchant: string) => onNavigateToTransactions({ merchantText: merchant })
   return (
     <>
-      <dl className="k-summary" aria-label="Súhrn obdobia">
-        <Kpi label="Príjem" cents={summary.income_cents} min={incomeSpan?.min} max={incomeSpan?.max} tone="success" />
-        <Kpi label="Výdavky" cents={summary.expense_cents} min={expenseSpan?.min} max={expenseSpan?.max} tone="danger" />
-        {/* Point 13: fee_cents is already a subset of expense_cents above, so
-            this tile surfaces it, it does not add a second expense total. */}
-        <Kpi label="Poplatky" cents={summary.fee_cents} min={feeSpan?.min} max={feeSpan?.max} tone="danger" />
-        <Kpi label="Čisté" cents={summary.net_cents} tone={summary.net_cents >= 0 ? 'success' : 'danger'} baselineOnly />
-        <Kpi label="Prevody vylúčené" cents={summary.transfer_cents} />
-        <UnassignedTile
-          count={summary.unassigned_count}
-          suggested={summary.suggested_count}
-          onClick={() => onNavigateToTransactions({ status: 'unassigned' })}
-        />
-      </dl>
+      <WaitingRow
+        count={summary.unassigned_count}
+        suggested={summary.suggested_count}
+        onClick={() => onNavigateToTransactions({ status: 'unassigned' })}
+      />
+      <PeriodLedger summary={summary} />
       <div className="ab-row" style={{ alignItems: 'stretch' }}>
         <div style={{ flex: 1, minWidth: 320 }}>
           <Card title="Podľa kategórií a mesiacov">
@@ -223,13 +227,9 @@ export function Overview({
     return () => { active = false }
   }, [period, kind])
 
-  const incomeSpan = summary ? monthlySpan(summary.by_month, (m) => m.income_cents) : undefined
-  const expenseSpan = summary ? monthlySpan(summary.by_month, (m) => m.expense_cents) : undefined
-  const feeSpan = summary ? monthlySpan(summary.by_month, (m) => m.fee_cents) : undefined
-
   return (
     <div className="ab-screen">
-      <PageHead title="Prehľad" primary={<ExportPdfAction variant="primary" />} />
+      <PageHead title="Prehľad" meta="Súčty za vybrané obdobie. Prevody medzi vlastnými účtami sú mimo súčtov." primary={<ExportPdfAction variant="primary" />} />
       <div className="ab-row">
         <PeriodPicker value={period} onChange={setPeriod} />
         <div className="ab-row" role="group" aria-label="Účet">
@@ -260,9 +260,6 @@ export function Overview({
         ) : (
           <SummaryBody
             summary={summary}
-            incomeSpan={incomeSpan}
-            expenseSpan={expenseSpan}
-            feeSpan={feeSpan}
             onNavigateToTransactions={navigateFiltered}
             onMonthClick={onMonthClick}
           />
