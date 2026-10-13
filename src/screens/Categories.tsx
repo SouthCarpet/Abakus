@@ -7,7 +7,7 @@ import { CategoryPicker } from '../components/CategoryPicker'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { PageHead } from '../components/PageHead'
-import { countPhrase, pluralSk, tx } from '../lib/plural'
+import { countPhrase, pluralSk, tx, vb } from '../lib/plural'
 import { ArchiveGlyph, TrashGlyph } from '../kaliber/icons'
 import { useDeleteKey } from '../kaliber/deleteKey'
 import { toast } from '../kaliber/toast'
@@ -417,8 +417,8 @@ function CategoryDeleteDialog({
       {preview ? (
         <div className="ab-section">
           <p>{`Zmaže kategóriu ${category.name} a jej podkategórie.`}</p>
-          <p>{`${countPhrase(preview.transaction_count, tx.transakcia)} ${pluralSk(preview.transaction_count, ['sa presunie', 'sa presunú', 'sa presunie'])} do nezaradených (z toho ${countPhrase(preview.confirmed_count, tx.potvrdene)}).`}</p>
-          {preview.rule_count > 0 ? <p>{`Zmaže sa aj ${preview.rule_count} pravidiel.`}</p> : null}
+          <p>{`${countPhrase(preview.transaction_count, tx.transakcia)} ${pluralSk(preview.transaction_count, vb.presunie)} do nezaradených (z toho ${countPhrase(preview.confirmed_count, tx.potvrdene)}).`}</p>
+          {preview.rule_count > 0 ? <p>{`${pluralSk(preview.rule_count, vb.zmaze)} aj ${countPhrase(preview.rule_count, tx.pravidlo)}.`}</p> : null}
         </div>
       ) : null}
     </Dialog>
@@ -573,7 +573,7 @@ export function Categories() {
   // the shown count is never a stale client guess.
   async function categoryDeleted(outcome: CategoryDeletePreview) {
     categoryKeys.deleted()
-    toast(`Zmazané. ${countPhrase(outcome.transaction_count, tx.transakcia)} ${pluralSk(outcome.transaction_count, ['presunutá', 'presunuté', 'presunutých'])} do nezaradených.`)
+    toast(`Zmazané. ${countPhrase(outcome.transaction_count, tx.transakcia)} ${pluralSk(outcome.transaction_count, vb.presunute)} do nezaradených.`)
     await refresh()
   }
 

@@ -13,7 +13,7 @@ import { PageHead } from '../components/PageHead'
 import { ExportPdfAction } from '../components/report/ExportPdfAction'
 import { PeriodPicker, usePeriod } from '../components/PeriodPicker'
 import { monthRange, periodRange, validPeriod } from '../lib/period'
-import { countPhrase, pluralSk, tx } from '../lib/plural'
+import { countPhrase, pluralSk, tx, vb } from '../lib/plural'
 import { localTodayIso } from '../lib/recurring-labels'
 import { RecurringPanel } from '../components/recurring'
 
@@ -44,13 +44,13 @@ export function ChecksumBanner({ row, onNavigate }: { row: BadChecksum; onNaviga
 // count and one action that opens the unassigned payments in Transakcie.
 function WaitingRow({ count, suggested, onClick }: { count: number; suggested: number; onClick: () => void }) {
   if (count === 0) return null
-  const waits = pluralSk(count, ['čaká', 'čakajú', 'čaká'])
+  const waits = pluralSk(count, vb.caka)
   return (
     <div className="k-ink-row" role="status" aria-label="Čakajú na zaradenie">
       <div>
         <div className="k-ink-row-text">{countPhrase(count, tx.platba)} {waits} na zaradenie</div>
         {suggested > 0 ? (
-          <div className="k-ink-row-note">{pluralSk(suggested, ['Čaká', 'Čakajú', 'Čaká'])} {countPhrase(suggested, tx.odhad)} na potvrdenie.</div>
+          <div className="k-ink-row-note">{pluralSk(suggested, vb.cakaVelke)} {countPhrase(suggested, tx.odhad)} na potvrdenie.</div>
         ) : null}
       </div>
       <button type="button" className="k-ink-action" onClick={onClick}>Zaradiť platby</button>

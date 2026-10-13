@@ -6,7 +6,7 @@ import { api, formatEur } from '../api'
 import { useAction } from '../lib/useAction'
 import { Button } from '../components/Button'
 import { PageHead } from '../components/PageHead'
-import { countPhrase, tx } from '../lib/plural'
+import { countPhrase, pluralSk, tx, vb } from '../lib/plural'
 import { ariaKeys, withKey } from '../kaliber/bindings'
 import { startActivity } from '../kaliber/activity'
 import { useDeleteKey } from '../kaliber/deleteKey'
@@ -385,7 +385,7 @@ function DeleteStatementBody({ preview }: { preview: StatementDeletePreview | nu
   if (!preview) return <p>Načítava sa...</p>
   return (
     <p>
-      {`Natrvalo sa zmaže výpis č. ${preview.number} z účtu ${preview.account_label}. Odstráni sa ${countPhrase(preview.transaction_count, tx.transakcia)}, z nich ${countPhrase(preview.confirmed_count, tx.potvrdene)}. Pravidlá, ktoré nepoužíva iný výpis: ${preview.rules_deleted}. Ostatné výpisy zostanú zachované. Otvorené transakcie sa môžu znovu zaradiť podľa zostávajúcich pravidiel.`}
+      {`Natrvalo sa zmaže výpis č. ${preview.number} z účtu ${preview.account_label}. ${pluralSk(preview.transaction_count, vb.odstrani)} ${countPhrase(preview.transaction_count, tx.transakcia)}, z nich ${countPhrase(preview.confirmed_count, tx.potvrdene)}. Pravidlá, ktoré nepoužíva iný výpis: ${preview.rules_deleted}. Ostatné výpisy zostanú zachované. Otvorené transakcie sa môžu znovu zaradiť podľa zostávajúcich pravidiel.`}
     </p>
   )
 }

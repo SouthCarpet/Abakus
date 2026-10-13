@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { countPhrase, pluralSk, tx } from './plural'
+import { describe, expect, it, vi } from 'vitest'
+import { countPhrase, pluralSk, tx, vb } from './plural'
 
 // Slovak: 1 takes the singular, 2 to 4 the "few" form, 0 and 5 or more the genitive plural.
 describe('pluralSk', () => {
@@ -44,5 +44,33 @@ describe('countPhrase and the counted nouns of the app', () => {
     expect(countPhrase(1, tx.potvrdene)).toBe('1 potvrdená')
     expect(countPhrase(4, tx.potvrdene)).toBe('4 potvrdené')
     expect(countPhrase(6, tx.potvrdene)).toBe('6 potvrdených')
+  })
+})
+
+// Audit 091-r4-a4 finding 3: the helper reads the CLDR rule of Slovak, and the verbs and the
+// rule noun of the two delete dialogs live beside the other counted nouns.
+describe('Slovak plural rule and the verbs of the dialogs', () => {
+  it('reads Intl.PluralRules for sk', () => {
+    const select = vi.spyOn(Intl.PluralRules.prototype, 'select')
+    pluralSk(3, tx.platba)
+    expect(select).toHaveBeenCalledWith(3)
+    select.mockRestore()
+  })
+  it.each([
+    [1, '1 pravidlo', 'Zmaže sa'],
+    [2, '2 pravidlá', 'Zmažú sa'],
+    [5, '5 pravidiel', 'Zmaže sa'],
+  ])('covers the rule noun and the delete verb for %i', (n, phrase, verb) => {
+    expect(countPhrase(n, tx.pravidlo)).toBe(phrase)
+    expect(pluralSk(n, vb.zmaze)).toBe(verb)
+  })
+  it.each([
+    [1, 'Odstráni sa', 'sa presunie', 'čaká'],
+    [2, 'Odstránia sa', 'sa presunú', 'čakajú'],
+    [5, 'Odstráni sa', 'sa presunie', 'čaká'],
+  ])('covers the other verbs for %i', (n, removed, moved, waits) => {
+    expect(pluralSk(n, vb.odstrani)).toBe(removed)
+    expect(pluralSk(n, vb.presunie)).toBe(moved)
+    expect(pluralSk(n, vb.caka)).toBe(waits)
   })
 })

@@ -223,6 +223,20 @@ describe('Categories delete control (point 4)', () => {
     expect(await screen.findByText(/Zmazané. 4 transakcie presunuté do nezaradených/)).toBeInTheDocument()
   })
 
+  // Audit 091-r4-a4 finding 3: the rule count and its verb take the Slovak form of 1, 2 and 5.
+  it.each([
+    [1, 'Zmaže sa aj 1 pravidlo.'],
+    [2, 'Zmažú sa aj 2 pravidlá.'],
+    [5, 'Zmaže sa aj 5 pravidiel.'],
+  ])('writes the rule count %i of the delete preview in the right form', async (ruleCount, sentence) => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    vi.mocked(categoryApi.previewDelete).mockResolvedValue({ ...preview, rule_count: ruleCount })
+    render(<Categories />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' }))
+    expect(await screen.findByText(sentence)).toBeInTheDocument()
+  })
+
   it('cancelling the delete confirmation makes no write', async () => {
     vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
     vi.mocked(categoryApi.previewDelete).mockResolvedValue(preview)

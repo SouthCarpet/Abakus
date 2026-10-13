@@ -234,6 +234,21 @@ describe('Statement list: delete a statement', () => {
     await waitFor(() => expect(screen.queryByText('č. 6')).not.toBeInTheDocument())
   })
 
+  // Audit 091-r4-a4 finding 3: the verb and the noun agree for 1, 2 and 5 transactions.
+  it.each([
+    [1, 'Odstráni sa 1 transakcia, z nich 1 potvrdená.'],
+    [2, 'Odstránia sa 2 transakcie, z nich 2 potvrdené.'],
+    [5, 'Odstráni sa 5 transakcií, z nich 5 potvrdených.'],
+  ])('writes the delete preview for %i transactions in the right form', async (count, sentence) => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([statement])
+    vi.mocked(api.statementDeletePreview).mockResolvedValueOnce({ ...preview, transaction_count: count, confirmed_count: count })
+    render(<Import />)
+    await waitFor(() => expect(screen.getByText('č. 6')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať výpis č. 6' }))
+    const body = await screen.findByText(/Natrvalo sa zmaže výpis/)
+    expect(body.textContent).toContain(sentence)
+  })
+
   it('cancelling the confirmation never calls deleteStatement', async () => {
     vi.mocked(api.statementHistory).mockResolvedValueOnce([statement])
     vi.mocked(api.statementDeletePreview).mockResolvedValueOnce(preview)

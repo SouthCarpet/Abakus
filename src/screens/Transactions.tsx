@@ -21,7 +21,7 @@ import { RecurringTransactionAction } from '../components/recurring'
 import { statusLabel } from '../lib/categories'
 import { categoryApi } from '../lib/category-api'
 import { formatDate } from '../lib/format'
-import { countPhrase, pluralSk, tx } from '../lib/plural'
+import { countPhrase, pluralSk, tx, vb } from '../lib/plural'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
 import { periodRange, validPeriod } from '../lib/period'
@@ -87,7 +87,7 @@ function WaitingRow({ groups, count, open, onToggle }: { groups: TransactionDisp
   if (count === 0) return null
   const shown = groups.slice(0, NOTE_GROUPS).map((g) => `${groupLabel(g)}.`).join(' ')
   const more = groups.length > NOTE_GROUPS ? ` Ďalšie skupiny: ${groups.length - NOTE_GROUPS}.` : ''
-  const verb = pluralSk(count, ['čaká', 'čakajú', 'čaká'])
+  const verb = pluralSk(count, vb.caka)
   return (
     <div className="k-ink-row" role="status" aria-label="Čakajú na zaradenie">
       <div>
