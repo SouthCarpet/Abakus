@@ -15,6 +15,13 @@ html, body, #root { height: 100%; }
 .ab-screen { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; max-width: 1392px; }
 .ab-footer-status { min-height: var(--k-hit); display: inline-flex; align-items: center; }
 
+/* R31: on a phone the five sections sit in the bottom navigation; the page reserves its 56 px. */
+.ab-app:has(.ab-bottom-nav) { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+.ab-bottom-nav { z-index: 10; }
+.ab-bottom-nav .k-bottom-nav-item { border: 0; background: transparent; font: inherit; font-size: var(--text-xs); cursor: pointer; min-width: 0; padding: 0 var(--space-1); }
+.ab-bottom-nav .k-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); }
+.ab-nav-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: square; }
+
 /* ---- layout helpers ---------------------------------------------------------- */
 .ab-section { display: flex; flex-direction: column; gap: var(--space-2); }
 fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
@@ -23,6 +30,9 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-text-danger { color: var(--color-danger); }
 .ab-text-success { color: var(--color-success); }
 .ab-card-body { display: flex; flex-direction: column; gap: var(--space-2); }
+/* A command button keeps its own width; it never stretches over the whole sheet. */
+.ab-card-body > .k-btn, .ab-section > .k-btn { align-self: flex-start; width: auto; padding: 0 var(--space-4); }
+.ab-theme-mode .k-segmented { max-width: 28rem; }
 
 /* ---- fields ------------------------------------------------------------------- */
 .ab-field { display: flex; flex-direction: column; gap: var(--space-1); }
@@ -106,7 +116,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 /* A header stays on one line; a narrow window scrolls the region and never breaks a header word. */
 .ab-table-scroll th { white-space: nowrap; }
 .ab-money { white-space: nowrap; min-width: calc(var(--space-8) * 4); }
-.ab-accounts-table td:first-child { overflow-wrap: anywhere; }
+.ab-accounts-table td:first-child { overflow-wrap: anywhere; min-width: calc(var(--space-8) * 3); }
 .ab-accounts-table td:last-child { min-width: calc(var(--space-8) * 5); }
 .ab-accounts-table button { white-space: nowrap; }
 .ab-rules-table td:first-child { overflow-wrap: anywhere; max-width: calc(var(--space-8) * 8); }

@@ -198,7 +198,6 @@ function NetLogSection({ rows, failures, onScanNow }: { rows: NetLogRow[]; failu
   const hasMore = rows.length > NET_LOG_COLLAPSE_AT
   return (
     <div className="ab-section">
-      <p className="k-card-title">Sieťová aktivita</p>
       {rows.length === 0 ? (
         <p>Žiadna sieťová aktivita</p>
       ) : (

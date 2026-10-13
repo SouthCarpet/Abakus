@@ -232,12 +232,21 @@ export function Overview({
       <PageHead title="Prehľad" meta="Súčty za vybrané obdobie. Prevody medzi vlastnými účtami sú mimo súčtov." primary={<ExportPdfAction variant="primary" />} />
       <div className="ab-row">
         <PeriodPicker value={period} onChange={setPeriod} />
-        <div className="ab-row" role="group" aria-label="Účet">
-          {ACCOUNT_KINDS.map((option) => (
-            <Button aria-pressed={accountKind === option.id} key={option.id} variant={accountKind === option.id ? 'primary' : 'secondary'} onClick={() => setAccountKind(option.id)}>
-              {option.label}
-            </Button>
-          ))}
+        <div className="ab-period">
+          <span id="ab-account-kind" className="ab-field-name">Účet</span>
+          <div className="ab-row ab-period-buttons" role="group" aria-labelledby="ab-account-kind">
+            {ACCOUNT_KINDS.map((option) => (
+              <Button
+                aria-pressed={accountKind === option.id}
+                key={option.id}
+                variant="secondary"
+                className={accountKind === option.id ? 'ab-pressed' : undefined}
+                onClick={() => setAccountKind(option.id)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 

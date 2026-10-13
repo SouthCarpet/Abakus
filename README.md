@@ -74,8 +74,8 @@ Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Záloh
 
 ## Rozhranie a klávesy
 
-- **Navigácia:** päť záložiek v hlavičke: **Transakcie** (otvorí sa ako prvá), **Prehľad**, **Import**, **Kategórie**, **Nastavenia** (posledné, aj Ctrl+čiarka).
-- **Hlavička obrazovky:** názov, jedna hlavná akcia a menu **Ďalšie**. Prehľad má hlavnú akciu **Exportovať PDF**, Import **Vybrať PDF**, Kategórie **Nová kategória**. Transakcie majú v menu **Ďalšie** položky **Obnoviť**, **Exportovať filtrované CSV** a **Exportovať PDF**.
+- **Navigácia:** päť záložiek v hlavičke: **Transakcie** (otvorí sa ako prvá), **Prehľad**, **Import**, **Kategórie**, **Nastavenia** (posledné, aj Ctrl+čiarka). V úzkom okne do 599 px sa záložky presunú do dolnej navigácie s ikonou a textom, aktuálna obrazovka má štvorcovú značku.
+- **Hlavička obrazovky:** veľký názov, pod ním jeden tlmený riadok popisu, vpravo jedna hlavná akcia a menu **Ďalšie**. Prehľad má hlavnú akciu **Exportovať PDF**, Import **Vybrať PDF**, Kategórie **Nová kategória**. Transakcie majú v menu **Ďalšie** položky **Obnoviť**, **Exportovať filtrované CSV** a **Exportovať PDF**.
 - **Nástroje hlavičky:** prepínač so slnkom a mesiacom (rýchla zmena vzhľadu) a tichý riadok **Nová verzia**, keď kontrola nájde novšie vydanie.
 - **Pätička:** stav práce (napríklad počas importu, potom „Import dokončený, súbory: N. 14:05“) a odkaz **Pomocník**. Pomocník (aj F1) otvorí panel vpravo s hľadaním, témami podľa obrazovky a zoznamom klávesov.
 - **Hlásenia** výsledku akcie sú vpravo dole. Hlásenie po hromadnom priradení má tlačidlo **Späť**.
@@ -290,7 +290,7 @@ Abakus zoskupuje viditeľné nezaradené transakcie podľa obchodníka a miesta;
 
 Bankové poplatky majú druh `fee`. Filter **Druh** v Transakciách ho ponúka ako
 **Poplatok**. Súhrn a mesačné riadky vracajú `fee_cents`, podpísanú časť už
-započítaných výdavkov. V **Prehľade** má súhrnná tabuľka riadok **Poplatky** a graf **Príjmy
+započítaných výdavkov. V **Prehľade** sú súčty obdobia kniha s riadkami **Príjem** a **Výdavky** a vedúcim riadkom **Čisté** s dvojitou čiarou. Pod ňou sú **Poplatky** (už vo výdavkoch) a **Prevody mimo súčtov**. Platby bez kategórie ukáže jeden tmavý riadok navrchu s tlačidlom **Zaradiť platby**. Graf **Príjmy
 a výdavky** vlastný stĺpec Poplatky vedľa Príjmu a Výdavkov (tri rady sa líšia
 odtieňom aj vzorom obrysu a legenda ukazuje rovnakú čiaru; popisy osi sú
 skrátené, napríklad `1,5 tis. €`); nejde o druhý

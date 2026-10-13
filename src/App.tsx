@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { BottomNav } from './components/BottomNav'
+import { usePhone } from './kaliber/usePhone'
 import type { AccountKind, Status } from './api'
 import { HelpPanel } from './components/HelpPanel'
 import { ThemeSwitch } from './components/ThemeControls'
@@ -15,7 +17,7 @@ import { Overview } from './screens/Overview'
 import { Settings } from './screens/Settings'
 import { Transactions } from './screens/Transactions'
 
-type Screen = 'transactions' | 'overview' | 'import' | 'categories' | 'settings'
+export type Screen = 'transactions' | 'overview' | 'import' | 'categories' | 'settings'
 
 interface TransactionsEntry {
   statementId?: number
@@ -29,7 +31,7 @@ interface TransactionsEntry {
 
 // Kaliber R12: 5 sections, so header tabs; Settings last. The register (Transakcie) is the
 // signature screen and opens first (identity lever R16, docs/plan-091-kaliber-r3.md).
-const TABS: { id: Screen; label: string }[] = [
+export const TABS: { id: Screen; label: string }[] = [
   { id: 'transactions', label: 'Transakcie' },
   { id: 'overview', label: 'Prehľad' },
   { id: 'import', label: 'Import' },
@@ -55,6 +57,46 @@ function useAppKeys(handlers: { help: () => void; settings: () => void; importFi
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
+}
+
+function AppHeader({ busy, screen, onSelect, onOpenAbout }: {
+  busy: boolean
+  screen: Screen
+  onSelect: (id: Screen) => void
+  onOpenAbout: () => void
+}) {
+  const phone = usePhone()
+  return (
+    <header className={`k-header ab-app-header${busy ? ' is-busy' : ''}`}>
+      <div className="k-shell">
+        <span className="k-header-name ab-brand">
+          <img src="/icon.svg" alt="" width={24} height={24} />
+          Abakus
+        </span>
+        {phone ? null : <nav className="k-tabs" aria-label="Sekcie">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`k-tab${tab.id === screen ? ' is-active' : ''}`}
+              data-k-label={tab.label}
+              aria-current={tab.id === screen ? 'page' : undefined}
+              aria-keyshortcuts={tab.id === 'settings' ? ariaKeys('settings') : undefined}
+              title={tab.id === 'settings' ? withKey(tab.label, 'settings') : undefined}
+              onClick={() => onSelect(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>}
+        <div className="k-header-tools">
+          <UpdateIndicator onOpenAbout={onOpenAbout} />
+          <ThemeSwitch />
+        </div>
+      </div>
+      <span className="k-activity" aria-hidden="true"><span className="k-activity-bar" /></span>
+    </header>
+  )
 }
 
 export function App() {
@@ -103,35 +145,12 @@ export function App() {
   const busy = activity.running.length > 0
   return (
     <div className="k-appshell ab-app">
-      <header className={`k-header ab-app-header${busy ? ' is-busy' : ''}`}>
-        <div className="k-shell">
-          <span className="k-header-name ab-brand">
-            <img src="/icon.svg" alt="" width={24} height={24} />
-            Abakus
-          </span>
-          <nav className="k-tabs" aria-label="Sekcie">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`k-tab${tab.id === screen ? ' is-active' : ''}`}
-                data-k-label={tab.label}
-                aria-current={tab.id === screen ? 'page' : undefined}
-                aria-keyshortcuts={tab.id === 'settings' ? ariaKeys('settings') : undefined}
-                title={tab.id === 'settings' ? withKey(tab.label, 'settings') : undefined}
-                onClick={() => selectScreen(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-          <div className="k-header-tools">
-            <UpdateIndicator onOpenAbout={openAbout} />
-            <ThemeSwitch />
-          </div>
-        </div>
-        <span className="k-activity" aria-hidden="true"><span className="k-activity-bar" /></span>
-      </header>
+      <AppHeader
+        busy={busy}
+        screen={screen}
+        onSelect={selectScreen}
+        onOpenAbout={openAbout}
+      />
       <div className="k-appshell-body">
         <main className="k-appshell-main" data-k-sheet="">
           {screen === 'transactions' ? (
@@ -166,6 +185,7 @@ export function App() {
           </div>
         </div>
       </footer>
+      <BottomNav tabs={TABS} current={screen} onSelect={selectScreen} />
       <HelpPanel open={helpOpen} screen={screen} onClose={() => setHelpOpen(false)} />
       <Toasts />
     </div>

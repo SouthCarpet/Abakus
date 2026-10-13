@@ -41,8 +41,8 @@ export function ThemeMode() {
   const { preference, choose } = useTheme()
   const name = useId()
   return (
-    <fieldset className="k-radio-group">
-      <legend className="k-group-legend">Vzhľad</legend>
+    <fieldset className="k-radio-group ab-theme-mode">
+      <legend className="k-group-legend k-sr-only">Vzhľad</legend>
       <div className="k-segmented">
         {MODES.map((mode) => (
           <label key={mode.value} className="k-segmented-item">

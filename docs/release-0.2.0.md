@@ -17,7 +17,7 @@ Podrobnosti a poctivé limity sú v README (sekcie Transakcie, Kategórie, Preh�
 
 ## Kaliber revízia 3 (plán 091, lane a1)
 
-- Kaliber r4 (Fira Sans): jadro (tokeny, `kaliber.css`, písmo) je prevzaté z r4; rozloženie obrazoviek sa mení v ďalších kolách.
+- Kaliber r4 (Fira Sans): jadro (tokeny, `kaliber.css`, písmo) je prevzaté z r4. Prehľad má súčty ako knihu (Čisté vedúci riadok, poplatky a prevody pod ňou) a jeden riadok s platbami čakajúcimi na zaradenie. Hlavička každej obrazovky má názov a jeden popis. Počty v dialógoch Kategórií a Importu sa skloňujú (1 transakcia, 2 transakcie, 5 transakcií). V okne do 599 px je dolná navigácia. Tlačidlá v Nastaveniach sa neroztiahnu cez celú šírku.
 - Jazyk dizajnu Kaliber, revízia 3 (R12 až R22): `src/tokens.css` a `src/kaliber.css` sú bajtové kópie `design/web`, písmo Fira Sans, vlastné triedy appky s predponou `ab-` v `src/abakus.css`.
 - Päť záložiek v hlavičke, Transakcie ako prvá obrazovka, hlavička obrazovky s jednou hlavnou akciou a menu **Ďalšie**, Pomocník v pätičke a na F1, hlásenia vpravo dole so **Späť**.
 - Vzhľad v kľúči `kaliber-theme` (prenos z `abakus.theme`), prepínač slnko a mesiac v hlavičke a voľba v **Nastavenia > Vzhľad**.
