@@ -11,7 +11,7 @@ export function CategoryBars({ rows, onCategoryClick }: {
   const extent = Math.max(1, ...categories.map((category) => Math.abs(category.cents)))
   if (categories.length === 0) return <p>Za vybrané obdobie nie sú údaje podľa kategórií.</p>
 
-  return <div className="k-well ab-category-bars">
+  return <div className="ab-category-bars">
     <p>Záporné hodnoty vľavo znižujú výdavky. Kladné hodnoty vpravo ich zvyšujú. Stred je 0 €.</p>
     {categories.every((category) => category.cents === 0) ? <p>Súčty všetkých kategórií sú nulové.</p> : null}
     {categories.map((category, index) => {

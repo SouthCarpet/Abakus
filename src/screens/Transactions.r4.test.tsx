@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, type TxRow } from '../api'
 import { Transactions } from './Transactions'
+import { HELP_TOPICS } from '../components/HelpPanel'
 import { resetToasts } from '../kaliber/toast'
 
 // Round 091-r4-a2: the Senate audit findings on Transakcie (screen S6), one test each.
@@ -132,12 +133,13 @@ describe('Transakcie in Kaliber r4', () => {
     expect(screen.queryByRole('status', { name: 'Čakajú na zaradenie' })).not.toBeInTheDocument()
   })
 
-  // Audit 4: the long help sits in a fold and the visible hint is capped to a reading measure.
-  it('puts the long rule text in a fold and caps the key hint line', async () => {
+  // Audit 4, then fix round a4 finding 1: the long help moved to the help panel (F1); the screen keeps one short hint.
+  it('keeps the long rule text out of the screen; the help panel holds it', async () => {
     await loaded()
-    const rule = screen.getByText(/Vytvorenie kategórie nevytvorí pravidlo/)
-    expect(rule.closest('details')).not.toBeNull()
-    expect(document.getElementById('ab-register-keys')).toHaveClass('ab-measure')
+    expect(screen.queryByText(/Vytvorenie kategórie nevytvorí pravidlo/)).not.toBeInTheDocument()
+    const lines = HELP_TOPICS.find((topic) => topic.id === 'transactions')?.lines.join('\n') ?? ''
+    expect(lines).toContain('Vytvorenie kategórie nevytvorí pravidlo')
+    expect(lines).toContain('Zaradiť podľa obchodníka')
   })
 
   // Audit 1: the filter block stays compact, the register is the first thing after it.
@@ -157,5 +159,46 @@ describe('Transakcie in Kaliber r4', () => {
     vi.mocked(api.listTransactions).mockResolvedValue(ROWS.map((r) => (r.id === 1 ? { ...r, status: 'confirmed' as const } : r)))
     await waitFor(() => expect(api.confirm).toHaveBeenCalled())
     await waitFor(() => expect(total()).toHaveClass('is-changed'))
+  })
+
+  // Fix round a4, finding 4 (R34a): the plain view carries a true meta line of the period and the account.
+  it('shows a meta line with the period and the account in the plain view', async () => {
+    await loaded()
+    expect(document.querySelector('.k-page-meta')).toHaveTextContent('Obdobie: všetky dátumy. Všetky účty.')
+  })
+
+  it('names the dates of a bounded period', async () => {
+    localStorage.setItem('abakus.period', JSON.stringify({ kind: 'custom', custom: { from: '2026-07-01', to: '2026-07-31' } }))
+    await loaded()
+    expect(document.querySelector('.k-page-meta')).toHaveTextContent(/Obdobie: .*2026.* až .*2026\./)
+  })
+
+  it('names the chosen account', async () => {
+    vi.mocked(api.listAccounts).mockResolvedValueOnce([{ id: 1, iban: 'SK31', kind: 'personal', label: 'Bežný účet', has_password: false }])
+    await loaded()
+    await screen.findByRole('option', { name: 'Osobný - Bežný účet' })
+    fireEvent.change(document.getElementById('f-acc') as HTMLSelectElement, { target: { value: '1' } })
+    await waitFor(() => expect(document.querySelector('.k-page-meta')).toHaveTextContent('Účet: Bežný účet.'))
+  })
+
+  // Fix round a4, finding 2: every checkbox sits in a label that owns the click area. The size
+  // comes from CSS (--k-hit) and is measured in a real browser by layout-geometry.test.ts.
+  it('wraps the row checkbox, the disabled transfer one included, in a click-area label', async () => {
+    await loaded()
+    for (const id of [1, 6]) {
+      const box = document.querySelector(`tr[data-row-id="${id}"] input[type="checkbox"]`) as HTMLInputElement
+      expect(box.closest('label')).toHaveClass('ab-check-hit')
+    }
+    expect((document.querySelector('tr[data-row-id="6"] input[type="checkbox"]') as HTMLInputElement).disabled).toBe(true)
+  })
+
+  // Finding 1: the long key text and the rule fold leave the screen; the short hint stays as the table's description.
+  it('keeps only a short key hint above the table and no fold', async () => {
+    await loaded()
+    const hint = document.getElementById('ab-register-keys') as HTMLElement
+    expect(hint.textContent?.length).toBeLessThanOrEqual(80)
+    expect(hint).toHaveTextContent('F1')
+    expect(document.querySelector('.ab-fold')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Transakcie' })).toHaveAttribute('aria-describedby', 'ab-register-keys')
   })
 })

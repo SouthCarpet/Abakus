@@ -28,7 +28,7 @@ export function IncomeExpense({
     onMonthClick(payload.month)
   }
   return (
-    <div className="k-well ab-chart-well">
+    <div className="ab-chart-well">
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={rows}>
           <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />

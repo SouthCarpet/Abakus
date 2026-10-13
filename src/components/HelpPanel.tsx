@@ -20,7 +20,7 @@ export const HELP_TOPICS: Topic[] = [
   {
     id: 'transactions', screen: 'transactions', title: 'Transakcie: zaradenie platieb', lines: [
       'Stav Odhad znamená, že Abakus navrhol kategóriu podľa pravidla. Potvrďte ho tlačidlom alebo klávesom Enter na zameranom riadku.',
-      'Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby.',
+      'Nezaradené platby: nad zoznamom je riadok „Čakajú na zaradenie“. Tlačidlo Zaradiť podľa obchodníka otvorí skupiny platieb podľa obchodníka a miesta. Kliknutím na skupinu vyberiete jej platby, potom vyberiete kategóriu a stlačíte Priradiť.',      'Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby.',
       'Použiť aj na podobné zaradí aj už importované nezaradené alebo navrhnuté platby rovnakého obchodníka. Potvrdený riadok sa nikdy neprepíše.',
       'Hromadné priradenie sa dá vrátiť tlačidlom Späť v hlásení vpravo dole alebo klávesmi Ctrl+Z. Ctrl+Y ho znova vykoná.',
       'Hľadanie spája obchodníka s miestom: Penny Neuss nenájde Penny Berlin.',

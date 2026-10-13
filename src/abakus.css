@@ -38,7 +38,11 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-field { display: flex; flex-direction: column; gap: var(--space-1); }
 .ab-field-label { font-size: var(--text-xs); color: var(--color-text-muted); }
 .ab-checkbox { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text); }
-.ab-checkbox input { accent-color: var(--color-accent); margin: 0; }
+.ab-checkbox input, .ab-check-hit input { accent-color: var(--color-accent); margin: 0; }
+/* A checkbox owns a click area of at least --k-hit (24 px, 44 px on a phone), through its label. */
+.ab-checkbox, .ab-check-hit { min-width: var(--k-hit); min-height: var(--k-hit); cursor: pointer; }
+.ab-check-hit { display: inline-flex; align-items: center; justify-content: center; }
+.ab-checkbox:has(input:disabled), .ab-check-hit:has(input:disabled) { cursor: not-allowed; }
 /* WebView2 hides its own password-reveal icon for good after the field is
    blurred once (Abakus draws its own, `PasswordInput`, which stays put). */
 .ab-password-row input::-ms-reveal { display: none; }
@@ -64,12 +68,12 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 /* One filter block: the period, then the fields, each with its permanent name above it. */
 .ab-filters { display: grid; gap: var(--space-4); padding: var(--space-4); }
 .ab-filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
-.ab-filter-field { flex: 1 1 11rem; min-width: 0; }
+.ab-filter-field { flex: 1 1 9.5rem; min-width: 0; }
 .ab-filter-field .k-select-wrap { display: grid; min-width: 0; }
 .ab-filter-field .k-input { width: 100%; }
 .ab-filter-field .k-select { min-width: 0; width: 100%; }
 /* The register search shows its whole placeholder: it takes the rest of the filter row. */
-.ab-filter-search { flex: 2 1 16rem; }
+.ab-filter-search { flex: 3 1 13rem; }
 .ab-filter-clear { margin-left: auto; min-height: var(--k-hit); font: inherit; font-size: var(--text-sm); background: transparent; border: 0; padding: 0 var(--space-2); cursor: pointer; }
 .ab-field-name { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
 .ab-period { display: grid; gap: var(--space-1); min-width: 0; }
@@ -78,10 +82,8 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-period-buttons .ab-pressed { background: var(--color-surface-selected); border-color: var(--color-border-strong); font-weight: 700; }
 .ab-cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
 .ab-cap b { font-weight: 700; }
-/* A help line keeps a reading measure, never the whole screen width. */
-.ab-measure { max-width: 68ch; }
-.ab-fold > summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-text-muted); min-height: var(--k-hit); display: flex; align-items: center; }
-.ab-fold[open] > summary { color: var(--color-text); }
+.ab-cap-counts { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); }
+.ab-cap { justify-content: space-between; }
 .ab-muted { color: var(--color-text-muted); }
 .ab-merch b { display: block; font-weight: 600; }
 .ab-merch small { display: block; font-size: var(--text-xs); color: var(--color-text-muted); }
@@ -133,7 +135,8 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-register tbody tr[aria-selected="true"] td { background: var(--color-surface-selected); }
 
 /* ---- charts --------------------------------------------------------------------- */
-.ab-chart-well { padding: var(--space-3); }
+/* The card around a chart is the one frame (SLOP-LAYOUT-02): the data area has space, no border. */
+.ab-chart-well { padding: var(--space-3) 0 0; }
 .ab-chart-legend { margin: var(--space-2) 0 0; padding: 0; list-style: none; justify-content: center; }
 .ab-chart-ostatne { fill: var(--color-border); fill-opacity: var(--color-chart-band-alpha); }
 .ab-chart-slice, .ab-chart-ostatne { vector-effect: non-scaling-stroke; }
@@ -152,7 +155,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 }
 .ab-chart-tooltip-label { font-weight: 600; color: var(--color-text); }
 .ab-chart-tooltip-row { display: flex; align-items: center; gap: var(--space-2); }
-.ab-category-bars { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.ab-category-bars { padding: var(--space-3) 0 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .ab-category-bar { width: 100%; min-width: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
 .ab-category-bar:hover { background: var(--color-surface-hover); }
 .ab-category-bar-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }

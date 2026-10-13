@@ -15,6 +15,19 @@
   cursor: pointer;
 }
 
+/* The expand mark of the trigger: laid over the end of the button, in the room .k-select keeps. */
+.category-picker__trigger { position: relative; }
+.category-picker__chevron {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  translate: 0 -50%;
+  pointer-events: none;
+  color: var(--color-text);
+}
+
+.category-picker__trigger:disabled .category-picker__chevron { color: var(--color-text-muted); }
+
 .category-picker__trigger:disabled {
   background: var(--color-disabled-fill);
   color: var(--color-text-muted);

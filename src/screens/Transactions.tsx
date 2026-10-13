@@ -367,14 +367,16 @@ export function TransactionRow({
     <>
       <tr className={rowClass(focused, selected, inked)} data-row-id={row.id}>
         <td>
-          <input
-            aria-label={`Vybrať transakciu ${row.id}: ${row.merchant_raw}`}
-            type="checkbox"
-            checked={selected}
-            disabled={isTransfer}
-            onChange={() => {}}
-            onClick={(e) => onSelect(row.id, e.currentTarget.checked, e.shiftKey)}
-          />
+          <label className="ab-check-hit">
+            <input
+              aria-label={`Vybrať transakciu ${row.id}: ${row.merchant_raw}`}
+              type="checkbox"
+              checked={selected}
+              disabled={isTransfer}
+              onChange={() => {}}
+              onClick={(e) => onSelect(row.id, e.currentTarget.checked, e.shiftKey)}
+            />
+          </label>
         </td>
         <td className="ab-hide-narrow k-num">{formatDate(row.tx_date)}</td>
         <td className="ab-hide-narrow ab-muted">{accountLabel ?? (row.account_kind === 'personal' ? 'Osobný' : 'Firemný')}</td>
@@ -834,7 +836,7 @@ export function Transactions({
   return (
     <div className="ab-screen">
       <ScreenHead
-        drilldown={drilldown}
+        meta={registerMeta(drilldown, { from, to }, accountId === null ? undefined : accountLabels.get(accountId))}
         onNavigateToImport={onNavigateToImport}
         menu={[
           { label: 'Obnoviť', onSelect: reload },
@@ -871,27 +873,20 @@ export function Transactions({
           <p className="ab-field-label ab-pad">Posledné hromadné priradenie sa dá vrátiť: {keyLabel(binding('undo').spec)}.</p>
         ) : null}
         <fieldset disabled={action.busy} className="ab-section">
-          <div className="ab-section ab-pad">
-          {groupsOpen ? <UnassignedGroupsBar groups={groups} onSelectGroup={(ids) => setSelected(new Set(ids))} /> : null}
-          <BulkBar
-            count={selected.size}
-            categories={categories}
-            categoryId={bulkCategoryId}
-            onCategoryChange={setBulkCategoryId}
-            onCreate={() => setCreateFor('bulk')}
-            onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
-            onConfirm={(applyToMatching) => void action.run(() => bulkConfirm(applyToMatching))}
-          />
-          <p className="ab-field-label ab-measure" id="ab-register-keys">
-            Klávesy v tabuľke: šípky a Home, End, PgUp, PgDn presúvajú, medzerník vyberie riadok, Enter prijme odhad, Ctrl+A vyberie všetko, Esc zruší výber. Zoznam je v Pomocníkovi (F1).
-          </p>
-          <details className="ab-fold">
-            <summary>Ako sa vytvárajú pravidlá</summary>
-            <p className="ab-field-label ab-measure">
-              Vytvorenie kategórie nevytvorí pravidlo. Priradenie kategórie alebo potvrdenie návrhu pri rozpoznateľnom obchodníkovi vytvorí pravidlo pre ďalšie platby. Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby rovnakého obchodníka.
-            </p>
-          </details>
-          </div>
+          {groupsOpen || selected.size > 0 ? (
+            <div className="ab-section ab-pad">
+              {groupsOpen ? <UnassignedGroupsBar groups={groups} onSelectGroup={(ids) => setSelected(new Set(ids))} /> : null}
+              <BulkBar
+                count={selected.size}
+                categories={categories}
+                categoryId={bulkCategoryId}
+                onCategoryChange={setBulkCategoryId}
+                onCreate={() => setCreateFor('bulk')}
+                onAssign={(catId, applyToMatching) => void action.run(() => bulkAssign(catId, applyToMatching))}
+                onConfirm={(applyToMatching) => void action.run(() => bulkConfirm(applyToMatching))}
+              />
+            </div>
+          ) : null}
           <div ref={tableRef} className="ab-table-scroll" role="region" aria-label="Transakcie" aria-describedby="ab-register-keys" tabIndex={0} onKeyDown={onTableKeyDown}>
             <table className="k-table ab-register">
               <thead>
@@ -942,15 +937,23 @@ type MenuItem = { label: string; disabled?: boolean; onSelect: () => void }
 
 // Page head of the r4 gallery screen: the title, a short meta line for a drill-down, then the
 // import shortcut and the "Ďalšie" menu.
-function ScreenHead({ drilldown, onNavigateToImport, menu }: {
-  drilldown: { statementId?: number | null; accountKind?: AccountKind | null }
+// The true meta line of the view (R34a): the period (or the chosen statement) and the account.
+function registerMeta(drilldown: { statementId?: number | null; accountKind?: AccountKind | null }, range: { from: string | null; to: string | null }, accountLabel: string | undefined): string {
+  const when = drilldown.statementId
+    ? 'Vybraný výpis, všetky jeho dátumy.'
+    : range.from && range.to
+      ? `Obdobie: ${formatDate(range.from)} až ${formatDate(range.to)}.`
+      : 'Obdobie: všetky dátumy.'
+  const who = accountLabel ? `Účet: ${accountLabel}.` : 'Všetky účty.'
+  const kind = drilldown.accountKind ? ` Druh účtu: ${drilldown.accountKind === 'personal' ? 'Osobný' : 'Firemný'}.` : ''
+  return `${when} ${who}${kind}`
+}
+
+function ScreenHead({ meta, onNavigateToImport, menu }: {
+  meta: string
   onNavigateToImport?: () => void
   menu: MenuItem[]
 }) {
-  const meta = [
-    drilldown.statementId ? 'Vybraný výpis, všetky jeho dátumy.' : '',
-    drilldown.accountKind ? `Druh účtu: ${drilldown.accountKind === 'personal' ? 'Osobný' : 'Firemný'}.` : '',
-  ].filter(Boolean).join(' ')
   return (
     <div className="ab-head">
       <div className="k-page-head">
@@ -1003,14 +1006,18 @@ function StateCounts({ rows, counts, loaded }: { rows: TxRow[]; counts: Record<S
   if (!loaded) return null
   const forms = { unassigned: tx.nezaradene, suggested: tx.odhad, confirmed: tx.potvrdene, transfer: tx.prevod }
   return (
-    <div className="ab-cap" role="status" aria-label="Počty podľa stavu">
-      <b>{countPhrase(rows.length, tx.platba)}</b>
-      {STATE_ORDER.filter((state) => state !== 'transfer' || counts.transfer > 0).map((state) => (
-        <span key={state} className="k-state-label">
-          <StateMark status={state} />
-          {countPhrase(counts[state], forms[state])}
-        </span>
-      ))}
+    <div className="ab-cap">
+      <div className="ab-cap-counts" role="status" aria-label="Počty podľa stavu">
+        <b>{countPhrase(rows.length, tx.platba)}</b>
+        {STATE_ORDER.filter((state) => state !== 'transfer' || counts.transfer > 0).map((state) => (
+          <span key={state} className="k-state-label">
+            <StateMark status={state} />
+            {countPhrase(counts[state], forms[state])}
+          </span>
+        ))}
+      </div>
+      {/* The one short key hint; the full list of keys and the rules are in the help (F1). */}
+      <span className="ab-field-label" id="ab-register-keys">Šípky a medzerník: pohyb a výber. Viac: F1.</span>
     </div>
   )
 }

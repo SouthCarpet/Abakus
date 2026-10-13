@@ -39,7 +39,7 @@ export function MonthlyStacked({
   const topIds = new Set(categories.filter((c) => c.category_id !== OSTATNE_ID).map((c) => c.category_id))
   const data = pivotByMonth(rows, topIds)
   return (
-    <div className="k-well ab-chart-well">
+    <div className="ab-chart-well">
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data}>
           <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />

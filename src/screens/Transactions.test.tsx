@@ -4,6 +4,7 @@ import { api, type TxRow } from '../api'
 import { files } from '../lib/files'
 import { Transactions, TransactionRow } from './Transactions'
 import { Toasts } from '../components/Toasts'
+import { HELP_TOPICS } from '../components/HelpPanel'
 import { resetToasts } from '../kaliber/toast'
 
 // Toasts render in the app's one region (Kaliber R12); the screen tests mount it beside the screen.
@@ -205,8 +206,11 @@ describe('Transactions empty state', () => {
     vi.mocked(api.listTransactions).mockResolvedValueOnce([])
     render(<Transactions />)
     expect(await screen.findByText('Za toto obdobie nič nie je. Skús iné obdobie hore.')).toBeInTheDocument()
-    expect(screen.getByText(/Vytvorenie kategórie nevytvorí pravidlo/)).toBeInTheDocument()
-    expect(screen.getByText(/Použiť aj na podobné navyše zaradí už importované nezaradené alebo navrhnuté platby/)).toBeInTheDocument()
+    // Fix round 091-r4-a4: the rule explanation moved from the screen to the help panel (F1).
+    expect(screen.queryByText(/Vytvorenie kategórie nevytvorí pravidlo/)).not.toBeInTheDocument()
+    const help = HELP_TOPICS.find((topic) => topic.id === 'transactions')?.lines.join('\n') ?? ''
+    expect(help).toContain('Vytvorenie kategórie nevytvorí pravidlo')
+    expect(help).toContain('Použiť aj na podobné zaradí aj už importované nezaradené alebo navrhnuté platby')
   })
 })
 
