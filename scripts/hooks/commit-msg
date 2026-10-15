@@ -1,0 +1,8 @@
+#!/bin/sh
+# managed-by: no-ai-trailer installer
+d=$(dirname "$0")
+sh "$d/commit-msg-no-ai-trailer" "$@" || exit $?
+if [ -f "$d/commit-msg.orig" ]; then
+    exec "$d/commit-msg.orig" "$@"
+fi
+exit 0
