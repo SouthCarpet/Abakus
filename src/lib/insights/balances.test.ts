@@ -12,6 +12,8 @@ const statement = (overrides: Partial<StatementHistoryRow> = {}): StatementHisto
   period_end: '2026-01-31',
   opening_cents: 10000,
   closing_cents: 12000,
+  transaction_count: 1,
+  total_cents: 2000,
   checksum: { status: 'ok' },
   ...overrides,
 })

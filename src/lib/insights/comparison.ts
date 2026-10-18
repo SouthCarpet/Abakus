@@ -18,6 +18,62 @@ export interface CategoryComparison {
   rows: CategoryComparisonRow[]
 }
 
+export type YearComparisonPeriod = 'month' | 'three-months'
+
+export interface YearComparisonRanges {
+  current: DateRange
+  previous: DateRange
+}
+
+const YEAR_MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/
+
+function periodMonthCount(period: YearComparisonPeriod): number {
+  if (period === 'month') return 1
+  if (period === 'three-months') return 3
+  throw new RangeError(`Unknown comparison period: ${String(period)}`)
+}
+
+function monthIndex(selectedMonth: string): number {
+  const match = YEAR_MONTH_RE.exec(selectedMonth)
+  if (!match) throw new RangeError(`Not a YYYY-MM calendar month: ${selectedMonth}`)
+  return Number(match[1]) * 12 + Number(match[2]) - 1
+}
+
+function monthParts(index: number): { year: number; month: number } {
+  if (index < 0 || index > 119_999) throw new RangeError('Comparison month is outside the supported 0000-9999 year range')
+  return { year: Math.floor(index / 12), month: (index % 12) + 1 }
+}
+
+function daysInMonth(year: number, month: number): number {
+  if (month !== 2) return [31, 0, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  return leap ? 29 : 28
+}
+
+function formatMonthDay(index: number, day: number): string {
+  const { year, month } = monthParts(index)
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function calendarMonthRange(fromIndex: number, toIndex: number): DateRange {
+  const { year, month } = monthParts(toIndex)
+  return {
+    from: formatMonthDay(fromIndex, 1),
+    to: formatMonthDay(toIndex, daysInMonth(year, month)),
+  }
+}
+
+/** Full calendar month(s) ending in `selectedMonth`, paired with the same
+ * calendar months one year earlier. Both returned ranges are inclusive. */
+export function yearComparisonRanges(selectedMonth: string, period: YearComparisonPeriod): YearComparisonRanges {
+  const currentTo = monthIndex(selectedMonth)
+  const currentFrom = currentTo - periodMonthCount(period) + 1
+  return {
+    current: calendarMonthRange(currentFrom, currentTo),
+    previous: calendarMonthRange(currentFrom - 12, currentTo - 12),
+  }
+}
+
 /** The immediately preceding inclusive range with the same UTC calendar-day
  * count as `current`. Not calendar-month aligned: a 28-day February compares
  * against the last 28 days of January, not all of January. */

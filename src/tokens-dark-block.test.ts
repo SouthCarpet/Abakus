@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// Only colour and shadow tokens are theme-dependent. Typography, spacing,
-// radius and motion tokens are the same in both themes on purpose and stay
-// defined once in :root, inherited by [data-theme="dark"]; requiring them
-// there too would fail well-formed CSS for no reason.
-const THEME_DEPENDENT = /^--(color|shadow)-/
+// Only colour tokens are theme-dependent. Typography, spacing, radius and
+// motion tokens are the same in both themes on purpose and stay defined once
+// in :root, inherited by [data-theme="dark"]; requiring them there too would
+// fail well-formed CSS for no reason. Kaliber direction A has no shadow
+// (`--shadow-raise: none`, declared once), so shadows left this set in 0.2.0.
+const THEME_DEPENDENT = /^--color-/
 
 function themeDependentProperties(block: string): Set<string> {
   const names = block.match(/--[\w-]+(?=:)/g) ?? []

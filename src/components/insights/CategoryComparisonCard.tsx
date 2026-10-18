@@ -22,28 +22,28 @@ export function CategoryComparisonCard({
         {`Aktuálne obdobie: ${formatDate(comparison.currentRange.from)}–${formatDate(comparison.currentRange.to)}. `}
         {`Predchádzajúce (rovnaký počet dní): ${formatDate(comparison.previousRange.from)}–${formatDate(comparison.previousRange.to)}.`}
       </p>
-      {comparison.incomplete ? <p className="k-text-danger">Vybrané obdobie ešte nie je uzavreté. Porovnanie je predbežné.</p> : null}
-      {currentCoverageIncomplete ? <p className="k-text-danger">Aktuálnemu obdobiu chýbajú výpisy aspoň pre jeden účet.</p> : null}
-      {previousCoverageIncomplete ? <p className="k-text-danger">Predchádzajúcemu obdobiu chýbajú výpisy aspoň pre jeden účet.</p> : null}
-      <div className="k-table-scroll">
+      {comparison.incomplete ? <p className="ab-text-danger">Vybrané obdobie ešte nie je uzavreté. Porovnanie je predbežné.</p> : null}
+      {currentCoverageIncomplete ? <p className="ab-text-danger">Aktuálnemu obdobiu chýbajú výpisy aspoň pre jeden účet.</p> : null}
+      {previousCoverageIncomplete ? <p className="ab-text-danger">Predchádzajúcemu obdobiu chýbajú výpisy aspoň pre jeden účet.</p> : null}
+      <div className="ab-table-scroll">
         <table className="k-table">
           <thead>
             <tr>
               <th>Kategória</th>
-              <th className="k-num">Aktuálne</th>
-              <th className="k-num">Predchádzajúce</th>
-              <th className="k-num">Zmena</th>
-              <th className="k-num">%</th>
+              <th className="k-num k-cell-number">Aktuálne</th>
+              <th className="k-num k-cell-number">Predchádzajúce</th>
+              <th className="k-num k-cell-number">Zmena</th>
+              <th className="k-num k-cell-number">%</th>
             </tr>
           </thead>
           <tbody>
             {comparison.rows.map((row) => (
               <tr key={row.categoryId ?? 'residual'}>
                 <td>{row.parentName ? `${row.parentName} · ${row.name}` : row.name}</td>
-                <td className="k-num">{formatEur(row.currentCents)}</td>
-                <td className="k-num">{formatEur(row.previousCents)}</td>
-                <td className="k-num">{formatEur(row.deltaCents)}</td>
-                <td className="k-num">{percentText(row.percent)}</td>
+                <td className="k-num k-cell-number">{formatEur(row.currentCents)}</td>
+                <td className="k-num k-cell-number">{formatEur(row.previousCents)}</td>
+                <td className="k-num k-cell-number">{formatEur(row.deltaCents)}</td>
+                <td className="k-num k-cell-number">{percentText(row.percent)}</td>
               </tr>
             ))}
           </tbody>

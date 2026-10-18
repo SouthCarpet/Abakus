@@ -2,9 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
 import { BackupSection } from '../components/BackupSection'
+import { RestoreSection } from '../components/RestoreSection'
 import { DeleteAccountDialog } from '../components/DeleteAccountDialog'
 import { SetPasswordDialog } from '../components/SetPasswordDialog'
 import type { Account, AccountKind, AuditFailure, NetLogRow, Release } from '../api'
+import { PageHead } from '../components/PageHead'
+import { useDeleteKey } from '../kaliber/deleteKey'
+import { ThemeMode } from '../components/ThemeControls'
+import { checkNow, describeLastCheck, invalidateChecks, useLastCheck } from '../lib/updateCheck'
 import { api } from '../api'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
@@ -15,6 +20,8 @@ import { fromSkParts, maskIban } from '../lib/iban'
 import { periodRange, validPeriod } from '../lib/period'
 import { parseReleaseNotes } from '../lib/releaseNotes'
 import { type UpdatePhase, updateButtonLabel } from '../lib/updatePhase'
+import { readUpdatePreference, saveUpdatePreference } from '../lib/updatePreference'
+import { setLatestRelease, useLatestRelease } from '../lib/updateStatus'
 
 // 0.1.4 (Michal, 2026-09-08): the release notes are third-party text from a
 // GitHub release body, so this renders them as plain React text nodes only
@@ -23,7 +30,7 @@ function ReleaseNotes({ notes }: { notes: string }) {
   const blocks = parseReleaseNotes(notes)
   if (blocks.length === 0) return null
   return (
-    <div className="k-release-notes">
+    <div className="ab-release-notes">
       {blocks.map((block, i) => {
         if (block.kind === 'heading') return <h4 key={i}>{block.text}</h4>
         if (block.kind === 'bullets') return <ul key={i}>{block.items.map((item, j) => <li key={j}>{item}</li>)}</ul>
@@ -66,7 +73,7 @@ function UpdateAvailable({ release }: { release: Release }) {
   const busy = phase === 'downloading' || phase === 'verifying' || phase === 'launching'
 
   return (
-    <div className="k-section">
+    <div className="ab-section">
       <p className="k-card-title">Dostupná aktualizácia {release.tag}</p>
       <ReleaseNotes notes={release.notes} />
       <Button variant="ghost" onClick={() => void api.openReleasePage(release.url).catch((e) => setError(String(e)))}>
@@ -77,12 +84,78 @@ function UpdateAvailable({ release }: { release: Release }) {
           {updateButtonLabel(phase, release.tag)}
         </Button>
       ) : null}
-      {error ? <p role="alert" className="k-text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
     </div>
   )
 }
 
+const REPO = 'https://github.com/SouthCarpet/Abakus'
+const LINKS = {
+  notes: `${REPO}/blob/main/CHANGELOG.md`,
+  issue: `${REPO}/issues`,
+  licence: `${REPO}/blob/main/THIRD_PARTY_NOTICES.md`,
+}
+
+// About (Kaliber R12, the last Settings section): name, mark, version, build, release notes,
+// "Nahlásiť problém", licences, the opt-in switch, "Skontrolovať aktualizácie" and the time
+// and result of the last check. The links open in the browser through `open_release_page`,
+// which accepts only this repository's addresses.
+// The quiet mark of a found update on the About heading (the start check sets it).
+function FoundBadge({ release }: { release: Release | null }) {
+  return release ? <span className="k-tag">Nová verzia {release.tag}</span> : null
+}
+
+function About({ checkUpdates, preferenceLoaded, checking, release, onToggle, onCheck, onOpen }: {
+  checkUpdates: boolean
+  preferenceLoaded: boolean
+  checking: boolean
+  release: Release | null
+  onToggle: (next: boolean) => void
+  onCheck: () => void
+  onOpen: (url: string) => void
+}) {
+  const last = useLastCheck()
+  return (
+    <>
+      <div className="ab-row">
+        <img className="ab-about-mark" src="/icon.svg" alt="" width={28} height={28} />
+        <p className="k-card-title">Abakus</p>
+      </div>
+      <dl className="k-summary">
+        <div className="k-summary-row"><dt>Verzia</dt><dd className="k-num">{__APP_VERSION__}</dd></div>
+        <div className="k-summary-row"><dt>Zostavenie</dt><dd className="k-num">{__APP_BUILD__}</dd></div>
+        <div className="k-summary-row"><dt>Licencia</dt><dd>AGPL-3.0-or-later</dd></div>
+      </dl>
+      <div className="ab-row">
+        <Button variant="ghost" onClick={() => onOpen(LINKS.notes)}>Poznámky k vydaniu</Button>
+        <Button variant="ghost" onClick={() => onOpen(LINKS.issue)}>Nahlásiť problém</Button>
+        <Button variant="ghost" onClick={() => onOpen(LINKS.licence)}>Licencie</Button>
+      </div>
+      <label className="k-switch">
+        <input type="checkbox" role="switch" className="k-switch-input" disabled={!preferenceLoaded} checked={checkUpdates} onChange={(e) => onToggle(e.target.checked)} />
+        <span className="k-switch-track" aria-hidden="true">
+          <span className="k-switch-bg" />
+          <span className="k-switch-mark k-switch-mark--on" />
+          <span className="k-switch-mark k-switch-mark--off" />
+          <span className="k-switch-thumb" />
+        </span>
+        <span className="k-switch-text">Kontrolovať aktualizácie (GitHub)</span>
+      </label>
+      <p className="ab-field-label">Zapnutá kontrola sa pozrie na GitHub pri spustení, pri otvorení tejto sekcie a na tlačidlo nižšie. Vypnutá neposiela nič.</p>
+      <div className="ab-row">
+        <Button variant="secondary" disabled={!checkUpdates || checking} onClick={onCheck}>
+          {checking ? 'Kontrolujem…' : 'Skontrolovať aktualizácie'}
+        </Button>
+        <span role="status">{describeLastCheck(last)}</span>
+      </div>
+      {release ? <UpdateAvailable release={release} /> : null}
+    </>
+  )
+}
+
 const NET_LOG_LIMIT = 20
+// Point 7: fetch stays at NET_LOG_LIMIT; only the on-screen list collapses.
+const NET_LOG_COLLAPSE_AT = 10
 
 function formatLogTime(startedAt: string): string {
   return startedAt.replace('T', ' ').replace('Z', '').slice(0, 19)
@@ -94,8 +167,8 @@ function formatLogTime(startedAt: string): string {
 function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
   if (failures.length === 0) return null
   return (
-    <div className="k-section">
-      <p className="k-card-title k-text-danger">Neúspešné zápisy auditu</p>
+    <div className="ab-section">
+      <p className="k-card-title ab-text-danger">Neúspešné zápisy auditu</p>
       <table className="k-table">
         <thead>
           <tr>
@@ -120,30 +193,39 @@ function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
 }
 
 function NetLogSection({ rows, failures, onScanNow }: { rows: NetLogRow[]; failures: AuditFailure[]; onScanNow: () => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const visible = expanded ? rows : rows.slice(0, NET_LOG_COLLAPSE_AT)
+  const hasMore = rows.length > NET_LOG_COLLAPSE_AT
   return (
-    <div className="k-section">
-      <p className="k-card-title">Sieťová aktivita</p>
+    <div className="ab-section">
       {rows.length === 0 ? (
         <p>Žiadna sieťová aktivita</p>
       ) : (
-        <table className="k-table">
-          <thead>
-            <tr>
-              <th>Čas</th>
-              <th>Adresa</th>
-              <th>Stav</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>{formatLogTime(row.started_at)}</td>
-                <td>{row.url}</td>
-                <td>{row.status}</td>
+        <>
+          <table className="k-table">
+            <thead>
+              <tr>
+                <th>Čas</th>
+                <th>Adresa</th>
+                <th>Stav</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visible.map((row) => (
+                <tr key={row.id}>
+                  <td>{formatLogTime(row.started_at)}</td>
+                  <td>{row.url}</td>
+                  <td>{row.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {hasMore ? (
+            <Button variant="ghost" onClick={() => setExpanded((v) => !v)}>
+              {expanded ? 'Zbaliť' : `Zobraziť všetky (${rows.length})`}
+            </Button>
+          ) : null}
+        </>
       )}
       <p>Vzorkovanie nemusí zachytiť krátke pripojenia. Skutočnú záruku dávajú CSP politika a test závislostí.</p>
       <AuditFailuresSection failures={failures} />
@@ -175,15 +257,17 @@ function AccountRow({
   onSetPassword,
   onEdit,
   onDelete,
+  rowProps,
 }: {
   account: Account
   onForgetPassword: (id: number) => void
   onSetPassword: (account: Account) => void
   onEdit: (account: Account) => void
   onDelete: (account: Account) => void
+  rowProps: (open?: () => void) => Record<string, unknown>
 }) {
   return (
-    <tr>
+    <tr {...rowProps(() => onDelete(account))}>
       <td>{account.label}</td>
       <td>{account.kind === 'personal' ? 'Osobný' : 'Firemný'}</td>
       <td>{maskIban(account.iban)}</td>
@@ -206,7 +290,12 @@ function AccountRow({
   )
 }
 
-export function Settings() {
+// 091/B10 p3 fix: `onRestored` bubbles a landed restore up to App, so screens
+// other than Settings can bump their own dbGeneration and drop old-DB
+// state. Settings never needs that same signal fed back to itself: it
+// refetches its own accounts/statements/net log directly below, the moment
+// the restore lands, through the same handler.
+export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestored?: () => void; aboutOpen?: boolean }) {
   const action = useAction()
   const accountRequest = useRef(0)
   const netRequest = useRef(0)
@@ -223,7 +312,11 @@ export function Settings() {
   const [error, setError] = useState('')
   const [period] = usePeriod()
   const [checkUpdates, setCheckUpdates] = useState(false)
-  const [release, setRelease] = useState<Release | null>(null)
+  const [updatePreferenceLoaded, setUpdatePreferenceLoaded] = useState(false)
+  const release = useLatestRelease()
+  const accountKeys = useDeleteKey<HTMLTableSectionElement>(accounts.length)
+  const [aboutOpen, setAboutOpen] = useState(Boolean(initialAboutOpen))
+  const [checking, setChecking] = useState(false)
   const [netLog, setNetLog] = useState<NetLogRow[]>([])
   const [auditFailures, setAuditFailures] = useState<AuditFailure[]>([])
   const [editTarget, setEditTarget] = useState<Account | null>(null)
@@ -250,35 +343,64 @@ export function Settings() {
     setAuditFailures(failures)
   }
 
+  // 091/B10 p3 fix: a restore swaps the whole database file, so the account
+  // list and the statement/net-log tables it feeds are all stale the moment
+  // `restoreDatabase` resolves. `dataDir` (a folder path, not DB content),
+  // the update preference and the found release (both outside the DB) stay
+  // as they are. Audit failures live only in the running process (see
+  // AuditFailuresSection), not in the DB, so they are not reset either;
+  // `refreshNetLog` still re-reads them alongside the log as its normal pair.
+  async function handleRestored() {
+    await refresh().catch((e) => action.setError(String(e)))
+    await refreshNetLog().catch((e) => action.setError(String(e)))
+    onRestored?.()
+  }
+
   useEffect(() => {
     void refresh().catch((e) => action.setError(String(e)))
     void api.dataDir().then(setDataDir).catch((e) => action.setError(String(e)))
     void refreshNetLog().catch((e) => action.setError(String(e)))
     const request = ++updateRequest.current
-    void loadUpdatePreference(request).catch((e) => action.setError(String(e)))
+    void loadUpdatePreference(request).catch((e) => {
+      if (request === updateRequest.current) action.setError(String(e))
+    })
     return () => { accountRequest.current++; netRequest.current++; updateRequest.current++ }
   }, [])
 
+  // Kaliber R20 (Michal 2026-10-12): Settings loads the saved consent only. The check runs at
+  // app start (App), when About opens and on the button, and only while checking is on.
   async function loadUpdatePreference(request: number) {
-    const on = await api.getCheckUpdates()
+    const on = await readUpdatePreference()
     if (request !== updateRequest.current) return
     setCheckUpdates(on)
-    if (!on) return
-    const nextRelease = await api.checkUpdateNow()
-    if (request === updateRequest.current) setRelease(nextRelease)
-    await refreshNetLog()
+    setUpdatePreferenceLoaded(true)
   }
 
   async function toggleCheckUpdates(next: boolean) {
     const request = ++updateRequest.current
-    await api.setCheckUpdates(next)
+    await saveUpdatePreference(next)
+    if (request !== updateRequest.current) return
     setCheckUpdates(next)
-    setRelease(null)
-    try {
-      const nextRelease = next ? await api.checkUpdateNow() : null
-      if (request === updateRequest.current) setRelease(nextRelease)
-    } finally { await refreshNetLog() }
+    if (!next) {
+      invalidateChecks()
+      setLatestRelease(null)
+    }
   }
+
+  async function runCheck() {
+    setChecking(true)
+    try { await checkNow(checkUpdates) } finally { setChecking(false) }
+    await refreshNetLog()
+  }
+
+  // The About-open path: once per opening, after the consent has loaded.
+  const checkedThisOpening = useRef(false)
+  useEffect(() => {
+    if (!aboutOpen) { checkedThisOpening.current = false; return }
+    if (!updatePreferenceLoaded || checkedThisOpening.current) return
+    checkedThisOpening.current = true
+    if (checkUpdates) void runCheck().catch((e) => action.setError(String(e)))
+  }, [aboutOpen, updatePreferenceLoaded])
 
   async function scanNow() {
     await api.runNetAudit()
@@ -352,13 +474,14 @@ export function Settings() {
   }
 
   return (
-    <div className="k-section">
+    <div className="ab-screen">
+      <PageHead title="Nastavenia" meta="Účty, údaje, záloha, vzhľad a aktualizácie. Verzia je v časti O aplikácii." />
       {action.error ? <p role="alert">{action.error}</p> : null}
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
       {exportMessage ? <p role="status">{exportMessage}</p> : null}
-      <fieldset disabled={action.busy} className="k-section">
-        <div className="k-settings-layout">
-          <div className="k-section">
+      <fieldset disabled={action.busy} className="ab-section">
+        <div className="ab-settings-layout">
+          <div className="ab-section">
             <Card
               title="Účty"
               footer={
@@ -367,8 +490,8 @@ export function Settings() {
                 </Button>
               }
             >
-              <div className="k-table-scroll" role="region" aria-label="Účty" tabIndex={0}>
-              <table className="k-table k-accounts-table">
+              <div className="ab-table-scroll" role="region" aria-label="Účty" tabIndex={0}>
+              <table className="k-table ab-accounts-table">
                 <thead>
                   <tr>
                     <th>Názov</th>
@@ -378,9 +501,9 @@ export function Settings() {
                     <th></th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody ref={accountKeys.containerRef}>
                   {accounts.map((account) => (
-                    <AccountRow key={account.id} account={account} onForgetPassword={(id) => void action.run(() => forgetPassword(id))} onSetPassword={openPassword} onEdit={openEdit} onDelete={setDeleteTarget} />
+                    <AccountRow key={account.id} account={account} onForgetPassword={(id) => void action.run(() => forgetPassword(id))} onSetPassword={openPassword} onEdit={openEdit} onDelete={setDeleteTarget} rowProps={accountKeys.rowProps} />
                   ))}
                 </tbody>
               </table>
@@ -388,33 +511,50 @@ export function Settings() {
             </Card>
             <Card title="Údaje">
               <p>Priečinok s dátami: {dataDir}</p>
-              <Button variant="secondary" onClick={() => void action.run(() => exportCsv())}>
-                Exportovať CSV
-              </Button>
-            </Card>
-            <BackupSection />
-          </div>
-          <div>
-            <Card title="Stav">
-              <p>Priečinok s dátami: {dataDir}</p>
               <p>
                 Účty: <span className="k-num">{accounts.length}</span>
               </p>
               <p>
                 Výpisy: <span className="k-num">{statementCount}</span>
               </p>
-              <label className="k-checkbox">
-                <input type="checkbox" checked={checkUpdates} onChange={(e) => void action.run(() => toggleCheckUpdates(e.target.checked))} />
-                Kontrolovať aktualizácie (GitHub)
-              </label>
-              <p>Sieťové volania: kontrola aktualizácií a stiahnutie inštalátora, obe len na tvoj pokyn; v predvolenom stave vypnuté.</p>
-              {release ? <UpdateAvailable release={release} /> : null}
-              <NetLogSection rows={netLog} failures={auditFailures} onScanNow={() => void action.run(() => scanNow())} />
+              <Button variant="secondary" onClick={() => void action.run(() => exportCsv())}>
+                Exportovať CSV
+              </Button>
             </Card>
+            <BackupSection />
+            <RestoreSection onRestored={() => void handleRestored()} />
           </div>
         </div>
+        <section className="k-settings-section" aria-labelledby="ab-settings-look">
+          <h3 id="ab-settings-look">Vzhľad</h3>
+          <ThemeMode />
+        </section>
+        <section className="k-settings-section" aria-labelledby="ab-settings-net">
+          <h3 id="ab-settings-net">Sieťová aktivita</h3>
+          <p>Sieťové volania: kontrola aktualizácií a stiahnutie inštalátora. Kontrola beží len po zapnutí v sekcii O aplikácii, inštalátor sa stiahne len na tvoj pokyn. V predvolenom stave je všetko vypnuté.</p>
+          <NetLogSection rows={netLog} failures={auditFailures} onScanNow={() => void action.run(() => scanNow())} />
+        </section>
+        <section className="k-settings-section" aria-labelledby="ab-settings-about">
+          <details className="k-disclosure" open={aboutOpen} onToggle={(event) => setAboutOpen(event.currentTarget.open)}>
+            <summary className="k-disclosure-summary">
+              <h3 id="ab-settings-about">O aplikácii</h3>
+              <FoundBadge release={release} />
+            </summary>
+            <div className="k-disclosure-body ab-section">
+              <About
+                checkUpdates={checkUpdates}
+                preferenceLoaded={updatePreferenceLoaded}
+                checking={checking}
+                release={release}
+                onToggle={(next) => void action.run(() => toggleCheckUpdates(next))}
+                onCheck={() => void action.run(runCheck)}
+                onOpen={(url) => void action.run(() => api.openReleasePage(url))}
+              />
+            </div>
+          </details>
+        </section>
       </fieldset>
-      {deleteTarget ? <DeleteAccountDialog account={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={refresh} /> : null}
+      {deleteTarget ? <DeleteAccountDialog account={deleteTarget} onClose={() => setDeleteTarget(null)} onDeleted={() => { accountKeys.deleted(); return refresh() }} /> : null}
       <Dialog
         open={addOpen}
         title="Pridať účet"
@@ -442,7 +582,7 @@ export function Settings() {
             <option value="business">Firemný</option>
           </select>
         </Field>
-        {error ? <p role="alert" className="k-text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
       </Dialog>
       <Dialog
         open={editTarget !== null}
@@ -471,9 +611,9 @@ export function Settings() {
             <option value="business">Firemný</option>
           </select>
         </Field>
-        {editError ? <p role="alert" className="k-text-danger">{editError}</p> : null}
+        {editError ? <p role="alert" className="ab-text-danger">{editError}</p> : null}
         {editError && editTarget && editKind !== editTarget.kind ? (
-          <label className="k-checkbox">
+          <label className="ab-checkbox">
             <input type="checkbox" checked={editAcknowledge} onChange={(e) => setEditAcknowledge(e.target.checked)} />
             Potvrdzujem zmenu typu účtu a nové zaradenie transakcií.
           </label>

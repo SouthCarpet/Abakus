@@ -20,6 +20,12 @@ pub struct StatementHistoryRow {
     pub period_end: NaiveDate,
     pub opening_cents: Option<i64>,
     pub closing_cents: Option<i64>,
+    /// Retained transactions whose stored owner is this statement. A
+    /// re-export can report zero after fingerprint deduplication keeps the
+    /// rows owned by the first import.
+    pub transaction_count: i64,
+    /// Signed sum of the same retained transaction rows in integer cents.
+    pub total_cents: i64,
     pub checksum: Checksum,
 }
 
@@ -33,7 +39,10 @@ impl Store {
     pub fn statement_history(&self, account_id: Option<i64>, account_kind: Option<AccountKind>) -> Result<Vec<StatementHistoryRow>> {
         let (where_sql, params) = history_where(account_id, account_kind);
         let sql = format!(
-            "SELECT s.id, s.account_id, a.label, a.kind, s.number, s.period_start, s.period_end, s.opening_cents, s.closing_cents, s.checksum_status, s.checksum_off_by \
+            "SELECT s.id, s.account_id, a.label, a.kind, s.number, s.period_start, s.period_end, s.opening_cents, s.closing_cents, \
+                    (SELECT COUNT(*) FROM transactions t WHERE t.statement_id = s.id), \
+                    COALESCE((SELECT SUM(t.amount_cents) FROM transactions t WHERE t.statement_id = s.id), 0), \
+                    s.checksum_status, s.checksum_off_by \
              FROM statements s JOIN accounts a ON a.id = s.account_id{where_sql} \
              ORDER BY s.account_id, s.period_start, s.period_end, s.id"
         );
@@ -77,8 +86,8 @@ fn row_identity(r: &rusqlite::Row) -> rusqlite::Result<HistoryIdentity> {
 
 fn row_to_history(r: &rusqlite::Row) -> rusqlite::Result<StatementHistoryRow> {
     let (statement_id, account_id, account_label, account_kind, number) = row_identity(r)?;
-    let status: String = r.get(9)?;
-    let off_by: Option<i64> = r.get(10)?;
+    let status: String = r.get(11)?;
+    let off_by: Option<i64> = r.get(12)?;
     Ok(StatementHistoryRow {
         statement_id,
         account_id,
@@ -89,6 +98,8 @@ fn row_to_history(r: &rusqlite::Row) -> rusqlite::Result<StatementHistoryRow> {
         period_end: parse_date(r, 6)?,
         opening_cents: r.get(7)?,
         closing_cents: r.get(8)?,
+        transaction_count: r.get(9)?,
+        total_cents: r.get(10)?,
         checksum: checksum_from_cols(&status, off_by),
     })
 }

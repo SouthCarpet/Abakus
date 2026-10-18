@@ -1,0 +1,6 @@
+{
+  "source": "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F7469/pdfium-win-x64.tgz",
+  "archiveSha256": "0fe2f635de4b56c47970a0ce85fbc8fab7f1e09e4cf4f44b60a025af4fe5c107",
+  "member": "bin/pdfium.dll",
+  "dllSha256": "215c405d13963395b38872a656a18f161a294e80bbcaa00849b842f524e5474b"
+}

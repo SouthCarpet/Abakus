@@ -1,5 +1,6 @@
 //! 0.1.2: `statement_history`, scoping/ordering/null-handling/checksum.
-use parser::{parse_text, AccountKind, Checksum};
+use chrono::NaiveDate;
+use parser::{parse_text, AccountKind, Checksum, Statement, Transaction, TxKind};
 use store::Store;
 
 const FIRST_PERSONAL: &str = "SK4411000000000012345678";
@@ -82,6 +83,26 @@ fn four_statements_three_accounts() -> Store {
 
 fn account_id(s: &Store, iban: &str) -> i64 { s.account_by_iban(iban).unwrap().unwrap().id }
 
+fn aggregate_statement(iban: &str, kind: AccountKind, number: u32, amounts: &[(TxKind, i64)]) -> Statement {
+    let date = NaiveDate::from_ymd_opt(2026, 8, number).unwrap();
+    let transactions = amounts
+        .iter()
+        .enumerate()
+        .map(|(index, (tx_kind, amount))| Transaction::blank(date, *amount, *tx_kind, format!("aggregate-{number}-{index}")))
+        .collect();
+    Statement {
+        iban: iban.into(),
+        account_kind: kind,
+        number,
+        period_start: date,
+        period_end: date,
+        opening_cents: None,
+        closing_cents: None,
+        transactions,
+        warnings: Vec::new(),
+    }
+}
+
 #[test]
 fn no_filters_returns_every_statement_sorted_by_account_then_period_then_id() {
     let s = four_statements_three_accounts();
@@ -158,4 +179,106 @@ fn an_ordinary_statement_reports_its_real_opening_closing_and_an_ok_checksum() {
     assert_eq!(june.closing_cents, Some(42_424));
     assert_eq!(june.checksum, Checksum::Ok);
     assert_eq!(june.account_label, "Osobný 1");
+}
+
+#[test]
+fn an_empty_statement_reports_zero_transactions_and_zero_total() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account(FIRST_PERSONAL, AccountKind::Personal, "Osobný").unwrap();
+    s.import_statement(&aggregate_statement(FIRST_PERSONAL, AccountKind::Personal, 1, &[]), "empty").unwrap();
+
+    let row = s.statement_history(None, None).unwrap().into_iter().next().unwrap();
+
+    assert_eq!(row.transaction_count, 0, "an empty retained statement owns no transactions");
+    assert_eq!(row.total_cents, 0, "an empty retained statement has a zero signed total");
+}
+
+#[test]
+fn a_statement_aggregates_every_transaction_kind_as_signed_integer_cents_without_fanout() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account(FIRST_PERSONAL, AccountKind::Personal, "Osobný").unwrap();
+    let statement = aggregate_statement(
+        FIRST_PERSONAL,
+        AccountKind::Personal,
+        2,
+        &[
+            (TxKind::Card, -100),
+            (TxKind::CardForeign, -200),
+            (TxKind::Refund, 50),
+            (TxKind::Atm, -300),
+            (TxKind::TransferIn, 1_000),
+            (TxKind::TransferOut, -400),
+            (TxKind::StandingOrder, -500),
+            (TxKind::Other, -25),
+        ],
+    );
+    s.import_statement(&statement, "all-kinds").unwrap();
+
+    let rows = s.statement_history(None, None).unwrap();
+
+    assert_eq!(rows.len(), 1, "transaction aggregation must not duplicate the statement row");
+    assert_eq!(rows[0].transaction_count, 8, "every retained transaction kind contributes to the count");
+    assert_eq!(rows[0].total_cents, -475, "positive and negative integer cents contribute with their stored sign");
+}
+
+#[test]
+fn statement_aggregates_stay_isolated_across_accounts_and_intersected_filters() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account(FIRST_PERSONAL, AccountKind::Personal, "Osobný").unwrap();
+    s.upsert_account(BUSINESS_IBAN, AccountKind::Business, "Firemný").unwrap();
+    s.import_statement(&aggregate_statement(FIRST_PERSONAL, AccountKind::Personal, 3, &[(TxKind::TransferIn, 700), (TxKind::Card, -200)]), "personal-aggregate").unwrap();
+    s.import_statement(&aggregate_statement(BUSINESS_IBAN, AccountKind::Business, 4, &[(TxKind::StandingOrder, -900)]), "business-aggregate").unwrap();
+    let personal = account_id(&s, FIRST_PERSONAL);
+
+    let matching = s.statement_history(Some(personal), Some(AccountKind::Personal)).unwrap();
+    let mismatched = s.statement_history(Some(personal), Some(AccountKind::Business)).unwrap();
+
+    assert_eq!(matching.len(), 1, "compatible account filters intersect at one statement");
+    assert_eq!(matching[0].transaction_count, 2, "the personal statement count excludes the business account");
+    assert_eq!(matching[0].total_cents, 500, "the personal statement total excludes the business account");
+    assert!(mismatched.is_empty(), "account_id and account_kind remain an AND filter");
+}
+
+#[test]
+fn a_reexport_with_deduplicated_transactions_reports_zero_owned_rows() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account(FIRST_PERSONAL, AccountKind::Personal, "Osobný").unwrap();
+    let statement = aggregate_statement(FIRST_PERSONAL, AccountKind::Personal, 5, &[(TxKind::Card, -250)]);
+    let first = s.import_statement(&statement, "original-file-hash").unwrap();
+    let reexport = s.import_statement(&statement, "reexport-file-hash").unwrap();
+
+    let rows = s.statement_history(None, None).unwrap();
+
+    assert_eq!(rows.len(), 2, "a new file hash retains a separate statement row");
+    let original = rows.iter().find(|row| row.statement_id == first.statement_id).unwrap();
+    let duplicate = rows.iter().find(|row| row.statement_id == reexport.statement_id).unwrap();
+    assert_eq!((original.transaction_count, original.total_cents), (1, -250));
+    assert_eq!((duplicate.transaction_count, duplicate.total_cents), (0, 0), "fingerprint-deduplicated transactions remain owned by the first statement");
+}
+
+#[test]
+fn an_integer_sum_overflow_returns_an_error_instead_of_wrapping() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account(FIRST_PERSONAL, AccountKind::Personal, "Osobný").unwrap();
+    let statement = aggregate_statement(FIRST_PERSONAL, AccountKind::Personal, 6, &[(TxKind::TransferIn, i64::MAX), (TxKind::Refund, 1)]);
+    s.import_statement(&statement, "overflow").unwrap();
+
+    let error = s.statement_history(None, None).unwrap_err();
+
+    assert!(error.to_string().contains("integer overflow"), "SQLite integer overflow must reach the caller: {error}");
+}
+
+#[test]
+fn an_overflow_in_an_excluded_account_does_not_fail_filtered_history() {
+    let mut s = Store::open_in_memory().unwrap();
+    s.upsert_account(FIRST_PERSONAL, AccountKind::Personal, "Osobný").unwrap();
+    s.upsert_account(BUSINESS_IBAN, AccountKind::Business, "Firemný").unwrap();
+    s.import_statement(&aggregate_statement(FIRST_PERSONAL, AccountKind::Personal, 7, &[(TxKind::TransferIn, 400)]), "valid-personal").unwrap();
+    s.import_statement(&aggregate_statement(BUSINESS_IBAN, AccountKind::Business, 8, &[(TxKind::TransferIn, i64::MAX), (TxKind::Refund, 1)]), "overflow-business").unwrap();
+    let personal = account_id(&s, FIRST_PERSONAL);
+
+    let rows = s.statement_history(Some(personal), Some(AccountKind::Personal)).unwrap();
+
+    assert_eq!(rows.len(), 1, "the account filters exclude the overflowing statement");
+    assert_eq!((rows[0].transaction_count, rows[0].total_cents), (1, 400));
 }

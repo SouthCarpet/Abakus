@@ -90,6 +90,11 @@ storage durability beyond write, flush, file sync, and no-clobber publication.
 and renders in `tauri::async_runtime::spawn_blocking`. No SQLite transaction or
 mutex crosses an await or the renderer.
 
+Both commands also take an optional `scope` (`full`, `summary_one_page`,
+`summary_three_pages`). A missing `scope` is `full`, so the calls above are
+unchanged. A summary scope reads its extra data in the same database snapshot
+(`Store::report_summary_snapshot`). See `docs/plan-084-summary-pdf.md`.
+
 Lane D added only these accepted integration lines to existing registries:
 
 - `pub mod report;` in `crates/store/src/lib.rs`

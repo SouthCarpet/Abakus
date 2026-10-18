@@ -81,9 +81,114 @@ fn search_still_matches_merchant_place_and_counterparty_as_before_alongside_note
     let db = TempDb::new("still-matches");
     let s = loaded(&db);
     let aldi = id_of(&s, "ALDI SUED");
+    let counterparty = s
+        .list_transactions(&TxFilter::default())
+        .unwrap()
+        .into_iter()
+        .find(|row| row.counterparty_name.as_deref() == Some("Landesdirektion Sachsen"))
+        .unwrap()
+        .id;
 
     assert_eq!(search(&s, "ALDI"), vec![aldi]);
     assert!(!search(&s, "neuss").is_empty(), "place search must still work");
+    assert_eq!(search(&s, "Landesdirektion"), vec![counterparty], "counterparty search must still work");
+}
+
+/// Existing merchant search is the oracle: adding the combined surface must
+/// not require a place value.
+#[test]
+fn search_matches_a_merchant_when_place_is_absent() {
+    let db = TempDb::new("absent-place");
+    let s = loaded(&db);
+    let fee = s
+        .list_transactions(&TxFilter::default())
+        .unwrap()
+        .into_iter()
+        .find(|row| row.merchant_raw == "Poplatok za vedenie účtu")
+        .unwrap();
+
+    assert_eq!(fee.place, None);
+    assert_eq!(search(&s, "POPLATOK ZA VEDENIE"), vec![fee.id]);
+}
+
+/// Plan 091 point 9 is the oracle: `Penny Neuss` selects that place and must
+/// not select the otherwise identical `Penny Berlin` merchant.
+#[test]
+fn search_matches_a_folded_phrase_across_merchant_and_place_without_matching_another_place() {
+    let db = TempDb::new("merchant-place");
+    let s = loaded(&db);
+    let penny_neuss = id_of(&s, "ALDI SUED");
+    let penny_berlin = id_of(&s, "AMAZON* NQ97D00C4");
+    drop(s);
+
+    let raw = Connection::open(&db.0).unwrap();
+    raw.execute(
+        "UPDATE transactions SET merchant_raw = 'PENNY', merchant_norm = 'penny', place = 'Neuss', place_norm = 'neuss' WHERE id = ?1",
+        [penny_neuss],
+    )
+    .unwrap();
+    raw.execute(
+        "UPDATE transactions SET merchant_raw = 'PENNY', merchant_norm = 'penny', place = 'Berlin', place_norm = 'berlin' WHERE id = ?1",
+        [penny_berlin],
+    )
+    .unwrap();
+    drop(raw);
+    let reopened = Store::open(&db.0).unwrap();
+
+    let filter = TxFilter { text: Some("Penny Neuss".into()), ..Default::default() };
+    let hits: Vec<i64> = reopened.list_transactions(&filter).unwrap().into_iter().map(|row| row.id).collect();
+    let csv = reopened.export_csv(&filter).unwrap();
+
+    assert_eq!(hits, vec![penny_neuss], "the phrase must match across the merchant/place boundary and exclude Penny Berlin");
+    assert!(csv.contains("\"PENNY\";\"Neuss\""), "CSV must include the same Penny Neuss row as the transaction list:\n{csv}");
+    assert!(!csv.contains("\"PENNY\";\"Berlin\""), "CSV must exclude Penny Berlin under the same filter:\n{csv}");
+    assert_eq!(search(&reopened, "  PÉNNY\t  NEUSS "), vec![penny_neuss], "the combined phrase must use the established case, diacritic and whitespace folding");
+}
+
+/// `TxFilter` fields are an intersection. Matching text outside the selected
+/// account or transaction-date range must stay excluded.
+#[test]
+fn combined_merchant_place_search_intersects_with_account_and_time_filters() {
+    let db = TempDb::new("merchant-place-scope");
+    let mut s = loaded(&db);
+    let personal_account = s.account_by_iban("SK4411000000000012345678").unwrap().unwrap().id;
+    s.upsert_account("SK3711000000000098765432", AccountKind::Business, "Podnikateľský").unwrap();
+    s.import_statement(&fixture("business-2026-06.txt"), "h2").unwrap();
+    let in_scope = id_of(&s, "ALDI SUED");
+    let outside_time = id_of(&s, "AMAZON* NQ97D00C4");
+    let outside_account = id_of(&s, "BAUHAUS");
+    drop(s);
+
+    let raw = Connection::open(&db.0).unwrap();
+    raw.execute(
+        "UPDATE transactions SET merchant_raw = 'PENNY', merchant_norm = 'penny', place = 'Neuss', place_norm = 'neuss', tx_date = '2026-05-29' WHERE id = ?1",
+        [in_scope],
+    )
+    .unwrap();
+    raw.execute(
+        "UPDATE transactions SET merchant_raw = 'PENNY', merchant_norm = 'penny', place = 'Neuss', place_norm = 'neuss', tx_date = '2026-06-15' WHERE id = ?1",
+        [outside_time],
+    )
+    .unwrap();
+    raw.execute(
+        "UPDATE transactions SET merchant_raw = 'PENNY', merchant_norm = 'penny', place = 'Neuss', place_norm = 'neuss', tx_date = '2026-05-29' WHERE id = ?1",
+        [outside_account],
+    )
+    .unwrap();
+    drop(raw);
+    let reopened = Store::open(&db.0).unwrap();
+
+    let hits = reopened
+        .list_transactions(&TxFilter {
+            from: chrono::NaiveDate::from_ymd_opt(2026, 5, 29),
+            to: chrono::NaiveDate::from_ymd_opt(2026, 5, 29),
+            account_id: Some(personal_account),
+            text: Some("Penny Neuss".into()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    assert_eq!(hits.into_iter().map(|row| row.id).collect::<Vec<_>>(), vec![in_scope]);
 }
 
 /// The CSV round trip: a leading LF then a leading `=` on the next line (a

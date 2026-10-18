@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, type Account } from '../../api'
-import { reportApi, type PdfReportOutcome, type ReportPreview, type ReportRequest } from '../../lib/report-api'
+import { reportApi, type PdfReportOutcome, type ReportDocumentScope, type ReportPreview, type ReportRequest } from '../../lib/report-api'
 import { reportFiles } from '../../lib/report-files'
 import { Button } from '../Button'
 import { Dialog } from '../Dialog'
@@ -16,6 +16,7 @@ interface Draft {
   endingMonth: string
   year: string
   scope: ScopeChoice
+  document: ReportDocumentScope
 }
 
 function currentMonth(): string {
@@ -25,7 +26,7 @@ function currentMonth(): string {
 
 function initialDraft(): Draft {
   const month = currentMonth()
-  return { period: 'month', month, endingMonth: month, year: month.slice(0, 4), scope: 'all' }
+  return { period: 'month', month, endingMonth: month, year: month.slice(0, 4), scope: 'all', document: 'full' }
 }
 
 function validMonth(value: string): boolean {
@@ -57,6 +58,27 @@ function accountScope(account: Account): ScopeChoice {
   return `account:${account.id}`
 }
 
+const DOCUMENT_CHOICES: { value: ReportDocumentScope; label: string }[] = [
+  { value: 'full', label: 'Úplný výpis' },
+  { value: 'summary_one_page', label: 'Sumár na 1 stranu' },
+  { value: 'summary_three_pages', label: 'Sumár do 3 strán' },
+]
+
+/** Summaries have a fixed page count. The full report knows it only after the export. */
+function pageCaption(document: ReportDocumentScope): string | null {
+  if (document === 'summary_one_page') return '1 strana'
+  if (document === 'summary_three_pages') return '3 strany'
+  return null
+}
+
+function previewFor(request: ReportRequest, document: ReportDocumentScope) {
+  return document === 'full' ? reportApi.preview(request) : reportApi.preview(request, document)
+}
+
+function exportFor(request: ReportRequest, path: string, document: ReportDocumentScope) {
+  return document === 'full' ? reportApi.export(request, path) : reportApi.export(request, path, document)
+}
+
 function periodCaption(preview: ReportPreview): string {
   if (!preview.range) return 'Bez transakcií'
   return `${preview.range.from} až ${preview.range.to}`
@@ -79,8 +101,9 @@ function selectedPeriodLabel(draft: Draft): string {
   return 'Celé obdobie'
 }
 
-function PreviewDetails({ preview }: { preview: ReportPreview }) {
+function PreviewDetails({ preview, document }: { preview: ReportPreview; document: ReportDocumentScope }) {
   const coverage = coverageCaption(preview)
+  const pages = pageCaption(document)
   return <section className="report-preview" aria-label="Náhľad PDF reportu">
     <h2>Náhľad</h2>
     <dl>
@@ -89,13 +112,14 @@ function PreviewDetails({ preview }: { preview: ReportPreview }) {
       <div><dt>Transakcie</dt><dd>{preview.transaction_count}</dd></div>
       <div><dt>Posledná transakcia</dt><dd>{preview.latest_transaction_date ?? 'Bez transakcií'}</dd></div>
       <div><dt>Údaje zachytené</dt><dd>{preview.captured_at}</dd></div>
+      {pages ? <div><dt>Strany</dt><dd>{pages}</dd></div> : null}
     </dl>
     {preview.unfinished_period ? <p>Obdobie ešte neskončilo.</p> : null}
     {coverage ? <p>{coverage}</p> : null}
     <ul className="report-account-list">
       {preview.accounts.map((account) => <li key={account.id}>{account.label} ({account.kind === 'personal' ? 'osobný' : 'firemný'} účet, IBAN ···{account.iban_suffix})</li>)}
     </ul>
-    <p>Všetky transakcie vo zvolenom období a účtoch. Filtre tabuľky sa nepoužijú.</p>
+    <p>{pages ? 'Sumár vychádza zo zaznamenaných transakcií vo zvolenom období a účtoch.' : 'Všetky transakcie vo zvolenom období a účtoch.'} Filtre tabuľky sa nepoužijú.</p>
     <p>Náhľad sa môže zmeniť. PDF zachytí údaje pri uložení.</p>
   </section>
 }
@@ -127,11 +151,21 @@ function PeriodInputs({ draft, updateDraft }: Pick<ExportDialogContentProps, 'dr
   return null
 }
 
+function DocumentScopeChoice({ busy, draft, updateDraft }: Pick<ExportDialogContentProps, 'busy' | 'draft' | 'updateDraft'>) {
+  return <fieldset className="report-scope-choice" disabled={busy}>
+    <legend>Rozsah dokumentu</legend>
+    {DOCUMENT_CHOICES.map((choice) => <label key={choice.value}>
+      <input type="radio" name="report-document" value={choice.value} checked={draft.document === choice.value} onChange={() => updateDraft({ document: choice.value })} />
+      {choice.label}
+    </label>)}
+  </fieldset>
+}
+
 function ExportDialogContent(props: ExportDialogContentProps) {
   const { accounts, accountsError, accountsLoading, busy, draft, exportError, exporting, invalidPeriod, outcome, preview, previewError, previewLoading, updateDraft } = props
   return <div className="report-export-dialog">
-    <p>Vyberte obdobie a účty pre úplný výpis. Filtre tabuľky sa nepoužijú.</p>
-    <fieldset className="k-section" disabled={busy}>
+    <p>Vyberte obdobie, účty a rozsah dokumentu. Filtre tabuľky sa nepoužijú.</p>
+    <fieldset className="ab-section" disabled={busy}>
       <Field label="Obdobie">
         <select className="k-select k-well" value={draft.period} onChange={(event) => updateDraft({ period: event.target.value as PeriodChoice })}>
           <option value="month">Mesiac</option>
@@ -150,13 +184,14 @@ function ExportDialogContent(props: ExportDialogContentProps) {
         </select>
       </Field>
     </fieldset>
+    <DocumentScopeChoice busy={busy} draft={draft} updateDraft={updateDraft} />
     {invalidPeriod ? <p role="alert">Zadajte platný kalendárny {draft.period === 'year' ? 'rok' : 'mesiac'}.</p> : null}
     {draft.period === 'six_months' ? <p>Report zahŕňa šesť po sebe idúcich mesiacov končiacich vo vybranom mesiaci.</p> : null}
     {draft.period === 'all_time' ? <p>{selectedPeriodLabel(draft)} použije všetky uložené dátumy transakcií vo zvolených účtoch.</p> : null}
     <OperationStatus busy={accountsLoading} error={accountsError}>Načítavajú sa účty...</OperationStatus>
     <OperationStatus busy={previewLoading} error={previewError}>Pripravuje sa náhľad...</OperationStatus>
     <OperationStatus busy={exporting} error={exportError}>Vyberá sa miesto a vytvára PDF...</OperationStatus>
-    {preview ? <PreviewDetails preview={preview} /> : null}
+    {preview ? <PreviewDetails preview={preview} document={draft.document} /> : null}
     {outcome ? <SuccessDetails outcome={outcome} /> : null}
   </div>
 }
@@ -214,14 +249,14 @@ export function ExportPdfDialog({ open, onClose }: { open: boolean; onClose: () 
       return
     }
     setPreviewLoading(true)
-    void reportApi.preview(request).then((value) => {
+    void previewFor(request, draft.document).then((value) => {
       if (previewGeneration.current === generation) setPreview(value)
     }).catch((error: unknown) => {
       if (previewGeneration.current === generation) setPreviewError(String(error))
     }).finally(() => {
       if (previewGeneration.current === generation) setPreviewLoading(false)
     })
-  }, [accountsError, accountsReady, open, request])
+  }, [accountsError, accountsReady, draft.document, open, request])
 
   function updateDraft(change: Partial<Draft>) {
     if (!busy) setDraft((value) => ({ ...value, ...change }))
@@ -238,9 +273,9 @@ export function ExportPdfDialog({ open, onClose }: { open: boolean; onClose: () 
     setExportError('')
     setOutcome(null)
     try {
-      const path = await reportFiles.save()
+      const path = await reportFiles.save(draft.document)
       if (!path) return
-      const value = await reportApi.export(request, path)
+      const value = await exportFor(request, path, draft.document)
       setOutcome(value)
     } catch (error) {
       setExportError(String(error))
@@ -252,7 +287,7 @@ export function ExportPdfDialog({ open, onClose }: { open: boolean; onClose: () 
 
   const invalidPeriod = !request && !accountsLoading && !accountsError
   const canExport = Boolean(preview) && !busy && !previewLoading && !exportPending.current
-  return <Dialog open={open} title="Exportovať PDF" onClose={close} actions={<ExportActions busy={busy} canExport={canExport} close={close} exportReport={exportReport} />}>
+  return <Dialog wide open={open} title="Exportovať PDF" onClose={close} actions={<ExportActions busy={busy} canExport={canExport} close={close} exportReport={exportReport} />}>
     <ExportDialogContent
       accounts={accounts}
       accountsError={accountsError}

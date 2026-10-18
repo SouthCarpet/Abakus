@@ -10,11 +10,22 @@ worktrees were touched.
 
 ## What shipped
 
+Plan 091 now also provides a separate [statement review API](plan-091-statement-review.md)
+at schema version 6. It stores parser warnings for new imports and reads live
+open counts from retained transactions owned by one statement. Old warning
+evidence remains unknown. Its status does not establish bank-data completeness.
+Current initialization, seeding, migrations and the final schema marker share
+one transaction. The release history below describes the earlier 0.1.2 work.
+
 - `crates/store/src/history.rs` (new): `Store::statement_history(account_id,
   account_kind)`, both filters optional and independent (AND when both are
   given), sorted `account_id, period_start, period_end, statement_id`
   ascending. Read-only, separate from the existing `recent_statements`
   (newest-first, capped, Import screen only).
+  Plan 091 later added required `transaction_count` and `total_cents` fields
+  to each row. They count and sum the retained stored transactions owned by
+  that statement. The sum uses each stored integer-cent amount with its sign
+  and includes every transaction kind.
 - `crates/store/src/notes.rs` (new): `Store::save_transaction_note(id, note)`.
   Validates BEFORE writing (a U+0000 byte, over `NOTE_MAX_CHARS` = 2000
   Unicode code points via `note.chars().count()`, or an id that does not
@@ -148,6 +159,11 @@ the brief.
   "Posledný výpis"/closing line reports `None`/`None`/`Checksum::NotVerifiable`
   instead of a defaulted zero; an ordinary statement reports its real
   cents and `Checksum::Ok`.
+  The plan 091 extension also covers an empty statement, mixed signed amounts
+  across every current transaction kind, account and filter isolation, one
+  result row despite multiple transactions, fingerprint-deduplicated
+  re-exports, and SQLite integer-sum overflow as an error instead of a
+  wrapped value.
 - **Backup** (`crates/store/tests/backup.rs`): a snapshot of a REAL seeded
   database (an imported statement, a learned exact rule from `assign`, a
   note, a changed setting) opens independently and keeps all four; a write
@@ -179,6 +195,8 @@ the brief.
   `save_transaction_note`; `{path}` for `backup_database`; `StatementHistoryRow`
   and `BackupOutcome` serialize the fields the UI reads; `TxRow`'s existing
   round-trip test extended with `note`.
+  The plan 091 DTO check makes `transaction_count` and `total_cents` present
+  as required snake_case JSON fields.
 
 ## Commands and results (080-backup-final, 2026-09-07)
 
@@ -245,6 +263,34 @@ to fail in this pass's runs.
   signature exactly (no limit parameter is specified), but is worth flagging
   for the parent/Insights lane if a very large multi-year history ever makes
   an unbounded history screen worth paginating.
+- `transaction_count` and `total_cents` describe retained database rows owned
+  by the statement. They are not totals copied from the original PDF. A
+  re-export with a new file hash creates a statement row, but fingerprint
+  deduplication can leave that row with `0` transactions and `0` cents while
+  the first import keeps ownership of the stored rows.
+
+## Plan 091 fee backend extension
+
+Plan 091 adds a dedicated `fee` transaction kind without changing the
+existing income, expense, transfer, net, history, or CSV contracts.
+`TxFilter.kind` is optional and intersects with every earlier filter,
+including the Rust-side literal text match. CSV export calls the same filtered
+query, so its rows stay equal to the transaction list.
+
+`Summary.fee_cents` and `MonthRow.fee_cents` are signed integer cents. Each is
+the expense contribution from rows whose stored kind is `fee` in the same
+account and inclusive date scope. The contribution is already included in
+`expense_cents`. A booked fee of `-250` contributes `250`; a positive fee
+correction in an expense category contributes a negative value. Fee rows do
+not add a second expense, income, transfer, or net contribution.
+
+Schema version 5 changes no table shape. Its one-time migration reads only
+legacy rows with `kind = 'other'` and a non-transfer status. It changes `kind`
+to `fee` only when the stored `raw_block` has a valid parser first line whose
+folded description starts with `poplat`. IDs, fingerprints, amounts,
+categories, status, rules, source, notes, and all other columns stay intact.
+The migration runs in the existing initialization transaction, is idempotent
+on reopen, and cannot recast a protected transfer row.
 
 ## Integration notes for the parent
 

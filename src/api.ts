@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 
 export type AccountKind = 'personal' | 'business'
+export type TxKind = 'card' | 'card_foreign' | 'refund' | 'atm' | 'transfer_in' | 'transfer_out' | 'standing_order' | 'fee' | 'other'
 export type CategoryKind = 'expense' | 'income'
 export type Status = 'transfer' | 'confirmed' | 'suggested' | 'unassigned'
 export type Checksum = { status: 'ok' } | { status: 'off_by'; off_by: number } | { status: 'not_verifiable' }
@@ -13,14 +14,18 @@ export interface StatementDeletePreview { statement_id: number; number: number; 
 export interface StatementDeleteOutcome { statement_id: number; number: number; transactions_deleted: number; rules_deleted: number; open_rows_reclassified: number }
 export interface Category { id: number; parent_id: number | null; name: string; kind: CategoryKind; sort: number; system: boolean; archived: boolean }
 export interface RuleView { id: number; kind: 'exact' | 'merchant' | 'counterparty_account' | 'seed'; key: string; place: string | null; category_id: number; category_name: string; parent_name: string | null; hit_count: number }
-export interface TxFilter { from?: string | null; to?: string | null; account_id?: number | null; account_kind?: AccountKind | null; category_id?: number | null; status?: Status | null; text?: string | null; statement_id?: number | null }
+export interface TxFilter { from?: string | null; to?: string | null; account_id?: number | null; account_kind?: AccountKind | null; category_id?: number | null; status?: Status | null; kind?: TxKind | null; text?: string | null; statement_id?: number | null }
 export interface TxRow { id: number; account_id: number; account_kind: AccountKind; statement_number: number; posted_date: string; tx_date: string; kind: string; amount_cents: number; orig_amount_cents: number | null; orig_currency: string | null; merchant_raw: string; place: string | null; counterparty_name: string | null; counterparty_iban: string | null; category_id: number | null; category_name: string | null; parent_name: string | null; status: Status; source: string; raw_block: string; note: string }
 export interface ImportReport { path: string; status: ImportStatus; accountLabel: string | null; accountKind: AccountKind | null; ibanMasked: string | null; iban: string | null; statementNumber: number | null; periodStart: string | null; periodEnd: string | null; inserted: number; duplicates: number; checksum: Checksum | null; warnings: string[]; message: string | null; statementId: number | null }
-export interface Summary { income_cents: number; expense_cents: number; transfer_cents: number; net_cents: number; unassigned_count: number; suggested_count: number; by_category: { category_id: number; name: string; parent_name: string | null; cents: number }[]; by_month: { month: string; income_cents: number; expense_cents: number }[]; by_month_category: { month: string; category_id: number; name: string; cents: number }[]; top_merchants: { merchant: string; cents: number; count: number }[] }
+export interface Summary { income_cents: number; expense_cents: number; transfer_cents: number; fee_cents: number; net_cents: number; unassigned_count: number; suggested_count: number; by_category: { category_id: number; name: string; parent_name: string | null; cents: number }[]; by_month: { month: string; income_cents: number; expense_cents: number; fee_cents: number }[]; by_month_category: { month: string; category_id: number; name: string; cents: number }[]; top_merchants: { merchant: string; cents: number; count: number }[] }
 export interface BadChecksum { statement_id: number; number: number; account_label: string; off_by_cents: number }
 export interface RecentStatement { statement_id: number; number: number; period_end: string; account_label: string; transaction_count: number; checksum: Checksum }
-export interface StatementHistoryRow { statement_id: number; account_id: number; account_label: string; account_kind: AccountKind; number: number; period_start: string; period_end: string; opening_cents: number | null; closing_cents: number | null; checksum: Checksum }
+export interface StatementHistoryRow { statement_id: number; account_id: number; account_label: string; account_kind: AccountKind; number: number; period_start: string; period_end: string; opening_cents: number | null; closing_cents: number | null; transaction_count: number; total_cents: number; checksum: Checksum }
 export interface BackupOutcome { path: string; bytes: number }
+export interface BackupPreview { accounts: number; statements: number; transactions: number; schema_version: number }
+export interface RestoreOutcome { safety_copy_path: string }
+export type StatementReviewStatus = 'needs_attention' | 'evidence_incomplete' | 'no_open_checks'
+export interface StatementReview { statement_id: number; checksum: Checksum; parser_warnings: string[] | null; unassigned_count: number; suggested_count: number; status: StatementReviewStatus }
 export interface Release {
   tag: string
   url: string
@@ -33,6 +38,9 @@ export interface Release {
 export interface DownloadedUpdate { path: string; sha256: string }
 export interface NetLogRow { id: number; started_at: string; url: string; status: string; duration_ms: number; bytes_in: number }
 export interface AuditFailure { at: string; url: string; error: string }
+export interface AssignOutcome { updated: number; rules_created: number; skipped_transfers: number }
+export interface BulkAssignOutcome { updated: number; rules_created: number; skipped_transfers: number; undo_id: string | null }
+export interface UndoAssignmentOutcome { restored_rows: number }
 
 export const api = {
   importStatements: (paths: string[]) => invoke<ImportReport[]>('import_statements', { paths }),
@@ -53,10 +61,15 @@ export const api = {
   listTransactions: (filter: TxFilter) => invoke<TxRow[]>('list_transactions', { filter }),
   saveTransactionNote: (id: number, note: string) => invoke<void>('save_transaction_note', { id, note }),
   backupDatabase: (path: string) => invoke<BackupOutcome>('backup_database', { path }),
+  restorePreview: (backupPath: string) => invoke<BackupPreview>('restore_preview', { backupPath }),
+  restoreDatabase: (backupPath: string) => invoke<RestoreOutcome>('restore_database', { backupPath }),
   statementHistory: (accountId: number | null = null, accountKind: AccountKind | null = null) =>
     invoke<StatementHistoryRow[]>('statement_history', { accountId, accountKind }),
-  assign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<{ updated: number; rules_created: number; skipped_transfers: number }>('assign', { ids, categoryId, applyToMatching }),
-  confirm: (ids: number[]) => invoke<number>('confirm', { ids }),
+  statementReview: (statementId: number) => invoke<StatementReview>('statement_review', { statementId }),
+  assign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<AssignOutcome>('assign', { ids, categoryId, applyToMatching }),
+  bulkAssign: (ids: number[], categoryId: number, applyToMatching: boolean) => invoke<BulkAssignOutcome>('bulk_assign', { ids, categoryId, applyToMatching }),
+  undoLastAssignment: (expectedUndoId: string) => invoke<UndoAssignmentOutcome | null>('undo_last_assignment', { expectedUndoId }),
+  confirm: (ids: number[], applyToMatching = false) => invoke<AssignOutcome>('confirm', { ids, applyToMatching }),
   summary: (from: string | null, to: string | null, accountId: number | null, accountKind: AccountKind | null = null) =>
     invoke<Summary>('summary', { from, to, accountId, accountKind }),
   exportCsv: (filter: TxFilter, path: string) => invoke<number>('export_csv', { filter, path }),

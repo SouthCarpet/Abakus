@@ -1,0 +1,194 @@
+/* Abakus: the app's own layer, loaded after tokens.css and kaliber.css
+   (adoption.md Step 2: tokens, then kaliber.css, then the app). kaliber.css is a
+   byte copy of design/web/kaliber.css and is never edited here; every class of
+   the app has the prefix ab- (check_refs.py refuses a .k-* selector outside
+   kaliber.css). Every colour, size and duration is a var(--...) token; the
+   tokens-only vitest enforces it. Fixed geometry (1px hairlines) as in
+   components.md. */
+
+/* ---- app window ------------------------------------------------------------ */
+html, body, #root { height: 100%; }
+.ab-app { min-height: 100%; }
+.ab-app-header { position: sticky; top: 0; z-index: 10; }
+.ab-brand { display: inline-flex; align-items: center; gap: var(--space-2); }
+.ab-brand img { display: block; }
+.ab-screen { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; max-width: 1392px; }
+.ab-footer-status { min-height: var(--k-hit); display: inline-flex; align-items: center; }
+
+/* R31: on a phone the five sections sit in the bottom navigation; the page reserves its 56 px. */
+.ab-app:has(.ab-bottom-nav) { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+.ab-bottom-nav { z-index: 10; }
+.ab-bottom-nav .k-bottom-nav-item { border: 0; background: transparent; font: inherit; font-size: var(--text-xs); cursor: pointer; min-width: 0; padding: 0 var(--space-1); }
+.ab-bottom-nav .k-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); }
+.ab-nav-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: square; }
+
+/* ---- layout helpers ---------------------------------------------------------- */
+.ab-section { display: flex; flex-direction: column; gap: var(--space-2); }
+fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
+.ab-section-body { padding: var(--space-4); }
+.ab-row { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+.ab-text-danger { color: var(--color-danger); }
+.ab-text-success { color: var(--color-success); }
+.ab-card-body { display: flex; flex-direction: column; gap: var(--space-2); }
+/* A command button keeps its own width; it never stretches over the whole sheet. */
+.ab-card-body > .k-btn, .ab-section > .k-btn { align-self: flex-start; width: auto; padding: 0 var(--space-4); }
+.ab-theme-mode .k-segmented { max-width: 28rem; }
+
+/* ---- fields ------------------------------------------------------------------- */
+.ab-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.ab-field-label { font-size: var(--text-xs); color: var(--color-text-muted); }
+.ab-checkbox { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text); }
+.ab-checkbox input, .ab-check-hit input { accent-color: var(--color-accent); margin: 0; }
+/* A checkbox owns a click area of at least --k-hit (24 px, 44 px on a phone), through its label. */
+.ab-checkbox, .ab-check-hit { min-width: var(--k-hit); min-height: var(--k-hit); cursor: pointer; }
+.ab-check-hit { display: inline-flex; align-items: center; justify-content: center; }
+.ab-checkbox:has(input:disabled), .ab-check-hit:has(input:disabled) { cursor: not-allowed; }
+/* WebView2 hides its own password-reveal icon for good after the field is
+   blurred once (Abakus draws its own, `PasswordInput`, which stays put). */
+.ab-password-row input::-ms-reveal { display: none; }
+.ab-password-row { display: flex; gap: var(--space-2); align-items: stretch; }
+.ab-password-row input { flex: 1 1 auto; min-width: 0; }
+.ab-password-row button { flex: none; }
+
+/* ---- touch widths: 44 px hit area (components.md "Hit target": --k-hit) --------------
+   kaliber.css gives --k-hit 24px; a phone window raises it to the touch size, so every
+   Kaliber control that already reads --k-hit follows, and these two Abakus classes join them. */
+@media (max-width: 599px) { :root { --k-hit: var(--control-h-touch); } }
+.ab-btn { height: max(var(--control-h), var(--k-hit)); }
+.ab-icon-hit { width: max(var(--control-h), var(--k-hit)); height: max(var(--control-h), var(--k-hit)); }
+/* A category row keeps its name field and its actions on one line, also at 390 px. */
+.ab-category-row { flex-wrap: nowrap; gap: var(--space-2); }
+.ab-category-name { flex: 1 1 0; min-width: 0; }
+/* ---- the register screen (Transakcie, r4 gallery screen abakus-transakcie) ------------ */
+.ab-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
+.ab-head > .k-page-head { margin-bottom: 0; }
+.ab-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ab-flush { padding: 0; overflow: hidden; }
+.ab-pad { padding: var(--space-4); }
+/* One filter block: the period, then the fields, each with its permanent name above it. */
+.ab-filters { display: grid; gap: var(--space-4); padding: var(--space-4); }
+.ab-filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
+.ab-filter-field { flex: 1 1 9.5rem; min-width: 0; }
+.ab-filter-field .k-select-wrap { display: grid; min-width: 0; }
+.ab-filter-field .k-input { width: 100%; }
+.ab-filter-field .k-select { min-width: 0; width: 100%; }
+/* The register search shows its whole placeholder: it takes the rest of the filter row. */
+.ab-filter-search { flex: 3 1 13rem; }
+.ab-filter-clear { margin-left: auto; min-height: var(--k-hit); font: inherit; font-size: var(--text-sm); background: transparent; border: 0; padding: 0 var(--space-2); cursor: pointer; }
+.ab-field-name { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
+.ab-period { display: grid; gap: var(--space-1); min-width: 0; }
+.ab-period-buttons { gap: var(--space-2); }
+/* The selected period takes the selected tone and bold text, not the accent fill. */
+.ab-period-buttons .ab-pressed { background: var(--color-surface-selected); border-color: var(--color-border-strong); font-weight: 700; }
+.ab-cap { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); font-size: var(--text-sm); }
+.ab-cap b { font-weight: 700; }
+.ab-cap-counts { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-6); }
+.ab-cap { justify-content: space-between; }
+.ab-muted { color: var(--color-text-muted); }
+.ab-merch b { display: block; font-weight: 600; }
+.ab-merch small { display: block; font-size: var(--text-xs); color: var(--color-text-muted); }
+.ab-cat { min-width: 11rem; }
+/* State and action live in separate cells; the action cell holds the button and its option. */
+.ab-act { white-space: nowrap; }
+.ab-act > * + * { margin-left: var(--space-3); }
+.ab-narrow-only { display: none !important; }
+/* R28: a transfer (outside the totals) is a square with a line through it. */
+.ab-mark--transfer::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--color-text); }
+.ab-ledger-end { max-width: 26rem; margin-left: auto; }
+.ab-ledger-cap { margin: 0 0 var(--space-2); }
+/* Lines named under a ledger: they are not added to it. */
+.ab-ledger-memo { display: grid; gap: var(--space-1); margin: var(--space-3) 0 0; max-width: 26rem; margin-left: auto; font-size: var(--text-sm); color: var(--color-text-muted); }
+.ab-ledger-memo > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ab-ledger-memo dt, .ab-ledger-memo dd { margin: 0; }
+.ab-ledger-memo dt::after { content: ":"; }
+@media (max-width: 599px) {
+  .ab-hide-narrow { display: none; }
+  .ab-narrow-only { display: block !important; }
+  .ab-head { align-items: flex-start; }
+  .ab-filter-clear { margin-left: 0; }
+  .ab-cat { min-width: 8rem; }
+  /* Two filter fields per line; the search takes the full line. */
+  .ab-filter-field { flex: 1 1 8rem; }
+  .ab-filter-search { flex: 1 1 100%; }
+  .ab-filters { gap: var(--space-3); }
+}
+
+/* ---- tables -------------------------------------------------------------------- */
+.ab-table-scroll { position: relative; min-width: 0; max-width: 100%; overflow-x: auto; padding: var(--space-1); }
+/* A header stays on one line; a narrow window scrolls the region and never breaks a header word. */
+.ab-table-scroll th { white-space: nowrap; }
+.ab-money { white-space: nowrap; min-width: calc(var(--space-8) * 4); }
+.ab-accounts-table td:first-child { overflow-wrap: anywhere; min-width: calc(var(--space-8) * 3); }
+.ab-accounts-table td:last-child { min-width: calc(var(--space-8) * 5); }
+.ab-accounts-table button { white-space: nowrap; }
+.ab-rules-table td:first-child { overflow-wrap: anywhere; max-width: calc(var(--space-8) * 8); }
+.ab-rules-card-col .ab-card-body { min-width: 0; }
+.ab-recurring-actions { flex-direction: column; align-items: stretch; flex-wrap: nowrap; min-width: calc(var(--space-8) * 5); }
+.ab-recurring-actions button { height: auto; min-height: var(--control-h); padding-top: var(--space-2); padding-bottom: var(--space-2); white-space: normal; }
+.ab-settings-layout { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: stretch; }
+.ab-settings-layout > * { flex: 1 1 calc(var(--space-8) * 20); min-width: 0; }
+
+/* The register (Transakcie): the focused row has the focus ring inside its box,
+   a selected row the selected fill (Kaliber "Keyboard", selection model). */
+.ab-register tbody tr.is-active td { background: var(--color-surface-hover); }
+.ab-register tbody tr.is-active { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.ab-register tbody tr[aria-selected="true"] td { background: var(--color-surface-selected); }
+
+/* ---- charts --------------------------------------------------------------------- */
+/* The card around a chart is the one frame (SLOP-LAYOUT-02): the data area has space, no border. */
+.ab-chart-well { padding: var(--space-3) 0 0; }
+.ab-chart-legend { margin: var(--space-2) 0 0; padding: 0; list-style: none; justify-content: center; }
+.ab-chart-ostatne { fill: var(--color-border); fill-opacity: var(--color-chart-band-alpha); }
+.ab-chart-slice, .ab-chart-ostatne { vector-effect: non-scaling-stroke; }
+.ab-chart-slice { cursor: pointer; transition: opacity var(--motion-fast) var(--ease-standard); }
+.ab-chart-slice:hover { opacity: 0.85; }
+.ab-chart-cursor { fill: var(--color-chart-grid); fill-opacity: var(--color-chart-band-alpha); }
+.ab-chart-tooltip {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+.ab-chart-tooltip-label { font-weight: 600; color: var(--color-text); }
+.ab-chart-tooltip-row { display: flex; align-items: center; gap: var(--space-2); }
+.ab-category-bars { padding: var(--space-3) 0 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.ab-category-bar { width: 100%; min-width: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
+.ab-category-bar:hover { background: var(--color-surface-hover); }
+.ab-category-bar-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
+.ab-category-bar-label > :first-child { overflow-wrap: anywhere; min-width: 0; }
+.ab-category-bar svg { display: block; width: 100%; height: var(--space-6); margin-top: var(--space-1); }
+
+/* ---- import ---------------------------------------------------------------------- */
+.ab-dropzone { border-style: dashed; padding: var(--space-6); text-align: center; display: flex; flex-direction: column; gap: var(--space-3); align-items: center; }
+.ab-round-list { display: flex; flex-direction: column; gap: 1px; }
+.ab-round-row-head { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); }
+.ab-round-row { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-2) var(--space-3); font-size: var(--text-xs); border-bottom: 1px solid var(--color-border); transition: background-color var(--motion-base) var(--ease-standard); }
+.ab-round-row:last-child { border-bottom: 0; }
+/* Inside its scroll region a row keeps one line; a narrow window scrolls the region. */
+.ab-table-scroll .ab-round-row, .ab-table-scroll .ab-round-row-head { min-width: max-content; }
+.ab-round-row:hover { background: var(--color-surface-hover); }
+.ab-review-chip { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.ab-review-detail { font-size: var(--text-xs); color: var(--color-text-muted); }
+.ab-review-detail ul { margin: 0; padding-left: 1.1em; list-style: disc; }
+
+/* ---- settings and about ----------------------------------------------------------- */
+.ab-release-notes { display: flex; flex-direction: column; gap: var(--space-1); }
+.ab-release-notes ul { padding-left: 1.1em; list-style: disc; }
+.ab-about-mark { display: block; }
+.ab-dialog-wide { width: min(620px, calc(100vw - var(--space-6))); max-height: calc(100vh - var(--space-6)); overflow: auto; }
+.ab-dialog { width: min(420px, calc(100vw - var(--space-6))); }
+.ab-dialog-body { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* ---- help panel --------------------------------------------------------------------- */
+.ab-help-keys { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-4); margin: 0; }
+.ab-help-keys dt { font-weight: 600; color: var(--color-text); white-space: nowrap; }
+.ab-help-keys dd { margin: 0; }
+.ab-help-search { width: 100%; margin-bottom: var(--space-3); }
+
+/* ---- page head and menu ------------------------------------------------------------- */
+.ab-menu-item { justify-content: space-between; gap: var(--space-4); }
+.ab-menu-key { color: var(--color-text-muted); font-size: var(--text-xs); }

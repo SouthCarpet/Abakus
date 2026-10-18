@@ -16,10 +16,10 @@ export function RecurringMembership({
   return (
     <div>
       <p>Ďalšie platby priraďte ručne. Výber platí len pre označené riadky, budúce zhody sa samy nepridajú.</p>
-      <ul className="k-round-list">
+      <ul className="ab-round-list">
         {members.map((tx) => (
-          <li key={tx.id} className="k-round-row">
-            <label className="k-checkbox">
+          <li key={tx.id} className="ab-round-row">
+            <label className="ab-checkbox">
               <input
                 type="checkbox"
                 checked={selectedIds.includes(tx.id)}

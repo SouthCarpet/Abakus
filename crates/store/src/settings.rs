@@ -2,6 +2,7 @@
 //! `check_updates` (spec A14) lives here today: absent means opted out, so
 //! every existing database keeps its current opt-out behaviour untouched.
 use crate::{Result, Store};
+use rusqlite::OptionalExtension;
 
 const CHECK_UPDATES_KEY: &str = "check_updates";
 
@@ -10,7 +11,7 @@ impl Store {
         let value: Option<String> = self
             .conn
             .query_row("SELECT value FROM settings WHERE key = ?1", [CHECK_UPDATES_KEY], |r| r.get(0))
-            .ok();
+            .optional()?;
         Ok(value.as_deref() == Some("1"))
     }
 
@@ -48,5 +49,29 @@ mod tests {
         assert!(store.get_check_updates().unwrap());
         store.set_check_updates(false).unwrap();
         assert!(!store.get_check_updates().unwrap());
+    }
+
+    /// Plan 091 point 5: a saved choice survives closing and reopening the same DB.
+    #[test]
+    fn saved_choices_survive_store_close_and_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("preference.db");
+        let mut store = Store::open(&path).unwrap();
+        store.set_check_updates(true).unwrap();
+        drop(store);
+        let mut reopened = Store::open(&path).unwrap();
+        assert!(reopened.get_check_updates().unwrap());
+        reopened.set_check_updates(false).unwrap();
+        drop(reopened);
+        let reopened = Store::open(&path).unwrap();
+        assert!(!reopened.get_check_updates().unwrap());
+    }
+
+    /// An unreadable setting is unknown, not a successful opt-out read.
+    #[test]
+    fn unreadable_settings_return_an_error_instead_of_false() {
+        let store = Store::open_in_memory().unwrap();
+        store.conn.execute_batch("DROP TABLE settings").unwrap();
+        assert!(store.get_check_updates().is_err());
     }
 }

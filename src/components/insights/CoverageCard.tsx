@@ -35,7 +35,7 @@ export function CoverageCard({ coverages, allTime }: { coverages: AccountCoverag
     <Card title="Pokrytie výpismi">
       <p>{allTime ? 'Medzery sa počítajú len medzi najstarším a najnovším výpisom daného účtu.' : 'Medzery sa počítajú vo vybranom období.'}</p>
       <p>Pokrytie sa týka období výpisov. Dátumy transakcií sa môžu líšiť.</p>
-      <div className="k-table-scroll">
+      <div className="ab-table-scroll">
         <table className="k-table">
           <thead>
             <tr><th>Účet</th><th>Známa história</th><th>Medzery</th></tr>

@@ -98,7 +98,7 @@ export function RecurringDetailDialog({
     >
       <div data-recurring-wide>
         <RecurringWideDialogStyle />
-        <div className="k-row" role="group" aria-label="Rozsah detailu">
+        <div className="ab-row" role="group" aria-label="Rozsah detailu">
           <Button variant={fullHistory ? 'secondary' : 'primary'} aria-pressed={!fullHistory} onClick={() => showFullHistory(false)}>
             Vybrané obdobie
           </Button>
@@ -141,16 +141,16 @@ function MemberTable({
   rows: RecurringDetail['transactions']
   memberSet: Set<number>
 }) {
-  if (rows.length === 0) return <p className="k-field-label">{caption}: žiadne.</p>
+  if (rows.length === 0) return <p className="ab-field-label">{caption}: žiadne.</p>
   return (
-    <div className="k-table-scroll">
+    <div className="ab-table-scroll">
       <table className="k-table">
-        <caption className="k-field-label">{caption}</caption>
+        <caption className="ab-field-label">{caption}</caption>
         <thead>
           <tr>
             <th>Dátum</th>
             <th>Popis</th>
-            <th className="k-num">Suma</th>
+            <th className="k-num k-cell-number">Suma</th>
             <th>Pôvodná</th>
             <th>Kategória</th>
             <th>Účet</th>
@@ -162,7 +162,7 @@ function MemberTable({
             <tr key={tx.id}>
               <td>{formatDate(tx.tx_date)}</td>
               <td>{tx.merchant_raw}</td>
-              <td className="k-num k-money">{formatEur(tx.amount_cents)}</td>
+              <td className="k-num k-cell-number ab-money">{formatEur(tx.amount_cents)}</td>
               <td>{originalMoney(tx.orig_amount_cents, tx.orig_currency)}</td>
               <td>{tx.category_name ?? 'Bez kategórie'}</td>
               <td>{tx.account_kind === 'personal' ? 'Osobný' : 'Firemný'}</td>

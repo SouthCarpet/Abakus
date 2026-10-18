@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Summary } from '../../api'
-import { compareCategories, isIncompletePeriod, percentDelta, previousEqualRange } from './comparison'
+import { compareCategories, isIncompletePeriod, percentDelta, previousEqualRange, yearComparisonRanges } from './comparison'
 
 describe('previousEqualRange', () => {
   it('gives the immediately preceding 31 days for a 31-day August window', () => {
@@ -17,6 +17,35 @@ describe('previousEqualRange', () => {
   })
   it('crosses a year boundary', () => {
     expect(previousEqualRange({ from: '2026-01-01', to: '2026-01-10' })).toEqual({ from: '2025-12-22', to: '2025-12-31' })
+  })
+})
+
+// Oracle: plan 091 point 20 defines full calendar months ending in the
+// selected month and the same calendar months one year earlier.
+describe('yearComparisonRanges', () => {
+  it('returns full February ranges when selected month 2028-02 is a leap February', () => {
+    expect(yearComparisonRanges('2028-02', 'month')).toEqual({
+      current: { from: '2028-02-01', to: '2028-02-29' },
+      previous: { from: '2027-02-01', to: '2027-02-28' },
+    })
+  })
+
+  it('returns three full months across the year boundary when selected month is 2026-01', () => {
+    expect(yearComparisonRanges('2026-01', 'three-months')).toEqual({
+      current: { from: '2025-11-01', to: '2026-01-31' },
+      previous: { from: '2024-11-01', to: '2025-01-31' },
+    })
+  })
+
+  it('returns December and the same December one year earlier when selected month is 2026-12', () => {
+    expect(yearComparisonRanges('2026-12', 'month')).toEqual({
+      current: { from: '2026-12-01', to: '2026-12-31' },
+      previous: { from: '2025-12-01', to: '2025-12-31' },
+    })
+  })
+
+  it('rejects an invalid calendar month instead of rolling 2026-13 into the next year', () => {
+    expect(() => yearComparisonRanges('2026-13', 'month')).toThrow(RangeError)
   })
 })
 

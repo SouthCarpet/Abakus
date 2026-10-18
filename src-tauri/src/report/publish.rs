@@ -1,13 +1,18 @@
-use super::{render_pdf_to, PdfReportLimits, PdfReportOutcome};
+use super::{PdfReportLimits, PdfReportOutcome};
 use std::io::{self, ErrorKind, Write};
 use std::path::Path;
 
-pub(crate) fn write(
-    snapshot: &store::report::ReportSnapshot,
+/// Publishes the document `render` writes. `render` returns the page count.
+pub(crate) fn write<R>(
+    preview: &store::report::ReportPreview,
     destination: &Path,
     limits: PdfReportLimits,
     fault: PdfIoFault,
-) -> Result<PdfReportOutcome, String> {
+    render: R,
+) -> Result<PdfReportOutcome, String>
+where
+    R: FnOnce(&mut ByteLimitedWriter<&mut tempfile::NamedTempFile>) -> Result<u32, String>,
+{
     validate_destination(destination)?;
     let parent = destination
         .parent()
@@ -17,7 +22,7 @@ pub(crate) fn write(
     })?;
     let pages = {
         let mut bounded = ByteLimitedWriter::new(&mut temporary, limits.max_bytes);
-        render_pdf_to(snapshot, limits, &mut bounded)?
+        render(&mut bounded)?
     };
     let bytes = finish_file(&mut temporary, limits, fault)?;
     publish_file(temporary, destination, fault)?;
@@ -25,11 +30,11 @@ pub(crate) fn write(
         path: destination.to_string_lossy().into_owned(),
         bytes,
         pages,
-        report: snapshot.preview.clone(),
+        report: preview.clone(),
     })
 }
 
-struct ByteLimitedWriter<W> {
+pub(crate) struct ByteLimitedWriter<W> {
     inner: W,
     maximum: u64,
     written: u64,

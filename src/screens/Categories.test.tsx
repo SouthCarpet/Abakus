@@ -1,8 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
 import { categoryApi } from '../lib/category-api'
 import { Categories, RulesTable } from './Categories'
+import { Toasts } from '../components/Toasts'
+import { resetToasts } from '../kaliber/toast'
+
+// Toasts render in the app's one region (Kaliber R12); the screen tests mount it beside the screen.
+beforeEach(() => { resetToasts(); render(<Toasts />) })
 
 describe('RulesTable', () => {
   it('labels rule kinds in Slovak and hides delete for seed rules', () => {
@@ -10,18 +15,30 @@ describe('RulesTable', () => {
       { id: 1, kind: 'exact', key: 'aldi sued', place: 'neuss', category_id: 2, category_name: 'potraviny', parent_name: 'Jedlo', hit_count: 3 },
       { id: 2, kind: 'seed', key: 'lidl', place: null, category_id: 2, category_name: 'potraviny', parent_name: 'Jedlo', hit_count: 0 },
     ] as const
-    render(<RulesTable rules={[...rules]} onDelete={vi.fn()} />)
+    render(<RulesTable rules={[...rules]} categories={[]} onRedirect={vi.fn()} onDelete={vi.fn()} />)
     expect(screen.getByText('presné')).toBeInTheDocument(); expect(screen.getByText('slovník')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Zmazať' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /^Zmazať pravidlo / })).toHaveLength(1)
   })
 
   it('carries the overflow-safe key cell class so a long merchant string wraps instead of widening the card', () => {
     const rules = [
       { id: 1, kind: 'exact', key: 'aldi sued', place: 'neuss', category_id: 2, category_name: 'potraviny', parent_name: 'Jedlo', hit_count: 3 },
     ] as const
-    const { container } = render(<RulesTable rules={[...rules]} onDelete={vi.fn()} />)
+    const { container } = render(<RulesTable rules={[...rules]} categories={[]} onRedirect={vi.fn()} onDelete={vi.fn()} />)
     const table = container.querySelector('table')
-    expect(table).toHaveClass('k-table', 'k-rules-table')
+    expect(table).toHaveClass('k-table', 'ab-rules-table')
+  })
+
+  // Oracle: Kaliber R12, danger colour only in the confirm step.
+  it('draws the row delete as a quiet ghost icon with the 44 px hit class', () => {
+    const rules = [
+      { id: 1, kind: 'exact', key: 'aldi sued', place: 'neuss', category_id: 2, category_name: 'potraviny', parent_name: 'Jedlo', hit_count: 3 },
+    ] as const
+    const { container } = render(<RulesTable rules={[...rules]} categories={[]} onRedirect={vi.fn()} onDelete={vi.fn()} />)
+    const button = within(container).getByRole('button', { name: 'Zmazať pravidlo aldi sued' })
+    expect(button).toHaveClass('k-btn-ghost', 'k-icon-btn', 'ab-icon-hit')
+    expect(button).not.toHaveClass('k-btn-danger')
+    expect(button).toHaveTextContent('')
   })
 })
 
@@ -39,7 +56,16 @@ vi.mock('../api', async (importOriginal) => {
   }
 })
 
-vi.mock('../lib/category-api', () => ({ categoryApi: { preview: vi.fn(), update: vi.fn() } }))
+vi.mock('../lib/category-api', () => ({
+  categoryApi: {
+    preview: vi.fn(),
+    update: vi.fn(),
+    previewDelete: vi.fn(),
+    deleteCategory: vi.fn(),
+    previewRuleDelete: vi.fn(),
+    redirectRule: vi.fn(),
+  },
+}))
 
 const JEDLO: import('../api').Category = { id: 1, parent_id: null, name: 'Jedlo', kind: 'expense', sort: 0, system: false, archived: false }
 const POTRAVINY: import('../api').Category = { id: 2, parent_id: 1, name: 'potraviny', kind: 'expense', sort: 0, system: false, archived: false }
@@ -47,20 +73,22 @@ const FAKTURY: import('../api').Category = { id: 3, parent_id: null, name: 'Fakt
 
 // Oracle: live r4 measure at 1024/1280; minWidth 560 wraps the Pravidlá card
 // onto its own row at 1024 and keeps both columns at 1280 with every header
-// inside .k-table-scroll (scrollLeft = 0, no page overflow).
+// inside .ab-table-scroll (scrollLeft = 0, no page overflow). Kaliber r3 phone check
+// (390 px, r3/shots/metrics.json): a fixed 560px pushed the page to 576 px wide, so the floor
+// is capped at the container width.
 describe('Categories rules column wrap threshold', () => {
   afterEach(() => {
     cleanup()
     vi.mocked(api.listCategories).mockReset()
   })
 
-  it('sets the rules column min-width to 560px so the flex row wraps before the table clips', async () => {
+  it('sets the rules column min-width to 560px, capped at the window width, so the flex row wraps before the table clips', async () => {
     vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
     const { container } = render(<Categories />)
     await waitFor(() => expect(screen.getByText('Pravidlá')).toBeInTheDocument())
-    const col = container.querySelector('.k-rules-card-col')
+    const col = container.querySelector('.ab-rules-card-col')
     expect(col).toBeInstanceOf(HTMLElement)
-    expect((col as HTMLElement).style.minWidth).toBe('560px')
+    expect((col as HTMLElement).style.minWidth).toBe('min(560px, 100%)')
   })
 })
 
@@ -96,8 +124,8 @@ describe('Categories edit flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
 
-    expect(await screen.findByText(/2 kategórií a 3 transakcií/)).toBeInTheDocument()
-    expect(screen.getByText(/2 potvrdených/)).toBeInTheDocument()
+    expect(await screen.findByText(/2 kategórie a 3 transakcie/)).toBeInTheDocument()
+    expect(screen.getByText(/2 potvrdené/)).toBeInTheDocument()
     expect(categoryApi.update).not.toHaveBeenCalled()
 
     vi.mocked(categoryApi.update).mockResolvedValue({ ...JEDLO, kind: 'income' })
@@ -112,11 +140,159 @@ describe('Categories edit flow', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: 'Upraviť' })[0]).toBeInTheDocument())
     fireEvent.click(screen.getAllByRole('button', { name: 'Upraviť' })[0])
     fireEvent.click(screen.getByRole('button', { name: 'Uložiť' }))
-    await screen.findByText(/1 kategórií a 1 transakcií/)
+    await screen.findByText(/1 kategória a 1 transakcia/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
 
     expect(screen.getByLabelText('Upraviť názov kategórie')).toBeInTheDocument()
     expect(categoryApi.update).not.toHaveBeenCalled()
+  })
+})
+
+// Point 4: the archive control loses its text label and becomes icon-only,
+// but keeps the exact accessible name the existing Audit078 archive tests
+// already rely on; a native title attribute carries the hover explanation.
+describe('Categories archive control (point 4)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.mocked(api.listCategories).mockReset()
+  })
+
+  it('shows an icon-only archive control with a hover title explaining it archives', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    render(<Categories />)
+
+    const archiveButton = await screen.findByRole('button', { name: 'Archivovať' })
+
+    expect(archiveButton).toHaveAttribute('title', 'Archivuje kategóriu. História ostáva.')
+    expect(archiveButton.textContent).not.toBe('Archivovať')
+  })
+
+  // Oracle: Kaliber R12 and components.md "Hit target". The row keeps name and actions on one
+  // line (nowrap row, shrinkable name) and both icon actions carry the 44 px hit class.
+  it('keeps the name field and the icon actions on one row with the touch hit class', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    render(<Categories />)
+
+    const name = await screen.findByRole('textbox', { name: `Názov kategórie ${JEDLO.id}` })
+    expect(name).toHaveClass('ab-category-name')
+    expect(name.parentElement).toHaveClass('ab-category-row')
+    const row = name.parentElement as HTMLElement
+    for (const label of ['Archivovať', `Zmazať kategóriu ${JEDLO.name}`]) {
+      expect(within(row).getByRole('button', { name: label })).toHaveClass('ab-icon-hit')
+    }
+  })
+})
+
+// Point 4: a red trash control previews the delete before it happens, states
+// how many rows move to unassigned, and shows the outcome afterward.
+describe('Categories delete control (point 4)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.mocked(api.listCategories).mockReset()
+    vi.mocked(categoryApi.previewDelete).mockReset()
+    vi.mocked(categoryApi.deleteCategory).mockReset()
+  })
+
+  const preview = {
+    category_id: 1,
+    affected_categories: [{ id: 1, parent_id: null, name: 'Jedlo', archived: false }],
+    transaction_count: 4,
+    confirmed_count: 2,
+    rule_count: 1,
+    rule_source_count: 1,
+    recurring_member_count: 0,
+  }
+
+  it('states the reassignment count before deleting and shows the outcome after', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    vi.mocked(categoryApi.previewDelete).mockResolvedValue(preview)
+    vi.mocked(categoryApi.deleteCategory).mockResolvedValue(preview)
+    render(<Categories />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' }))
+
+    expect(await screen.findByText(/4 transakcie sa presunú do nezaradených/)).toBeInTheDocument()
+    expect(screen.getByText(/2 potvrdené/)).toBeInTheDocument()
+    expect(categoryApi.deleteCategory).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať' }))
+
+    await waitFor(() => expect(categoryApi.deleteCategory).toHaveBeenCalledWith(preview))
+    expect(await screen.findByText(/Zmazané. 4 transakcie presunuté do nezaradených/)).toBeInTheDocument()
+  })
+
+  // Audit 091-r4-a4 finding 3: the rule count and its verb take the Slovak form of 1, 2 and 5.
+  it.each([
+    [1, 'Zmaže sa aj 1 pravidlo.'],
+    [2, 'Zmažú sa aj 2 pravidlá.'],
+    [5, 'Zmaže sa aj 5 pravidiel.'],
+  ])('writes the rule count %i of the delete preview in the right form', async (ruleCount, sentence) => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    vi.mocked(categoryApi.previewDelete).mockResolvedValue({ ...preview, rule_count: ruleCount })
+    render(<Categories />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' }))
+    expect(await screen.findByText(sentence)).toBeInTheDocument()
+  })
+
+  it('cancelling the delete confirmation makes no write', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+    vi.mocked(categoryApi.previewDelete).mockResolvedValue(preview)
+    render(<Categories />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' })).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať kategóriu Jedlo' }))
+    await screen.findByText(/4 transakcie sa presunú do nezaradených/)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(categoryApi.deleteCategory).not.toHaveBeenCalled()
+  })
+})
+
+// Point 14: the rules table gets an inline category picker for redirecting a
+// rule's target, and a delete preview naming the affected open rows.
+describe('Categories rule editing (point 14)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.mocked(api.listCategories).mockReset()
+    vi.mocked(api.listRules).mockReset()
+    vi.mocked(categoryApi.previewRuleDelete).mockReset()
+    vi.mocked(categoryApi.redirectRule).mockReset()
+  })
+
+  const rule = { id: 4, kind: 'exact' as const, key: 'aldi sued', place: 'neuss', category_id: 2, category_name: 'potraviny', parent_name: 'Jedlo', hit_count: 3 }
+
+  it('redirects a rule to a newly picked category through categoryApi.redirectRule', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO, POTRAVINY, FAKTURY])
+    vi.mocked(api.listRules).mockResolvedValue([rule])
+    vi.mocked(categoryApi.redirectRule).mockResolvedValue({ rule_id: 4, category_id: 3, updated: 2 })
+    render(<Categories />)
+    const picker = await screen.findByRole('combobox', { name: 'Kategória pravidla aldi sued' })
+
+    fireEvent.click(picker)
+    fireEvent.click(screen.getByRole('option', { name: 'Faktúry' }))
+
+    await waitFor(() => expect(categoryApi.redirectRule).toHaveBeenCalledWith(4, 3))
+  })
+
+  it('shows the open-row impact before deleting a rule', async () => {
+    vi.mocked(api.listCategories).mockResolvedValue([JEDLO, POTRAVINY, FAKTURY])
+    vi.mocked(api.listRules).mockResolvedValue([rule])
+    vi.mocked(categoryApi.previewRuleDelete).mockResolvedValue({ rule_id: 4, open_rule_references: 5, open_classification_changes: 2 })
+    render(<Categories />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Zmazať pravidlo aldi sued' })).toBeInTheDocument())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať pravidlo aldi sued' }))
+
+    expect(await screen.findByText(/Otvorených riadkov s týmto pravidlom: 5/)).toBeInTheDocument()
+    expect(screen.getByText(/2 riadkoch/)).toBeInTheDocument()
+    expect(api.deleteRule).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zmazať pravidlo' }))
+
+    await waitFor(() => expect(api.deleteRule).toHaveBeenCalledWith(4))
   })
 })

@@ -1,9 +1,30 @@
-/* Kaliber base, ported class-for-class from design/gallery-web/gallery.css
-   for the classes the app screens use, plus a .k-rail / .k-shell / .k-modal-root /
-   .k-dropzone geometry block for the app shell (not present in the gallery,
-   which has no navigation or app-wide dialog). Every colour, size and
-   duration is a var(--...) reference into tokens.css; the tokens-only vitest
-   enforces it. */
+/* Kaliber: shared web component layer (design/web/kaliber.css). Direction A,
+   "Register" (plan 094 revision 2, ledger 7753): a dense, ruled register.
+   Flat surfaces, hairlines and tone steps instead of shadows, small square
+   corners, tabular numbers, one accent. AI slop wins over Kaliber (plan
+   111): no edge stripe, no tracked uppercase, no pill chip, no hero tile,
+   no hatching, no reveal stagger, no press scale.
+   One file, imported by every web consumer after its generated
+   tokens.css: `<name>.tokens.css`, then `kaliber.css`, then the app's own
+   CSS (adoption.md Step 2).
+   Face (plan 125, spec R23): Fira Sans (SIL OFL 1.1), static 400, 500, 600
+   and 700, declared below. The URLs are relative to this file: a consumer
+   vendors design/assets/fonts/fira-sans/ to ../assets/fonts/fira-sans/
+   beside its copy of kaliber.css. Numbers use tnum and lnum; the zero
+   feature is never enabled (the Fira zero stays plain).
+   Revision 4 (plan 125) is one style for every surface: app, web, shop and
+   phone use the same tokens and the same pieces; the content decides which
+   pieces a screen uses (spec R26, R34).
+   Rule: every colour, radius, type size and duration below is a var(--...)
+   reference into the generated tokens.css. Fixed geometry the brief names
+   directly (1px hairlines, 2px focus ring/offset, 3px gauge track, 8px
+   marks, dialog z-index) is documented in
+   vault/knowledge/wiki/design-language/components.md, not a token. */
+
+@font-face { font-family: "Fira Sans"; font-weight: 400; font-style: normal; font-display: swap; src: url("../assets/fonts/fira-sans/FiraSans-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Fira Sans"; font-weight: 500; font-style: normal; font-display: swap; src: url("../assets/fonts/fira-sans/FiraSans-Medium.ttf") format("truetype"); }
+@font-face { font-family: "Fira Sans"; font-weight: 600; font-style: normal; font-display: swap; src: url("../assets/fonts/fira-sans/FiraSans-SemiBold.ttf") format("truetype"); }
+@font-face { font-family: "Fira Sans"; font-weight: 700; font-style: normal; font-display: swap; src: url("../assets/fonts/fira-sans/FiraSans-Bold.ttf") format("truetype"); }
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -11,64 +32,136 @@ body {
   background: var(--color-background);
   color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: var(--text-body);
   line-height: 1.5;
+  font-feature-settings: "kern" 1;
   -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3, p, ul, dl, figure { margin: 0; }
 ul { padding: 0; list-style: none; }
 
+/* ---- focus geometry: one ring everywhere, 2px ring + 2px offset -------- */
 :focus { outline: none; }
 :focus-visible, .is-focus {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
+/* ---- tabular, decimal-aligned numerals (token type.numerals) ----------- */
 .k-num {
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
-.k-page { max-width: 1392px; margin: 0 auto; padding: var(--space-6) var(--space-6) var(--space-8); display: flex; flex-direction: column; gap: var(--space-6); flex: 1 1 auto; }
-
-.k-section { display: flex; flex-direction: column; gap: var(--space-2); }
-.k-row { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
-
+/* ---- raised pane: one tone step, a hairline, no shadow ------------------ */
+/* The class keeps its old name for consumers. It no longer draws a milled
+   edge or a shadow (direction A): depth is a tone step plus a 1px border. */
 .k-milled {
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
-  border-top: 1px solid var(--color-border-top);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-raise), inset 0 1px 0 var(--color-milled);
 }
-.k-section-body { padding: var(--space-4); }
 
+/* ---- recessed well: by lightness only, no inset shadow (Tier-1 parity
+   with the iced gallery, which cannot draw an inset shadow) -------------- */
 .k-well {
   background: var(--color-well);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
 }
 
-/* ---- buttons ------------------------------------------------------------ */
+/* ---- art well + caption plate ------------------------------------------ */
+/* A plain surface: the well tone and a hairline. No hatching, no gradient,
+   no tinted rim (SLOP-DECOR-05). Put a drawing to scale or the real image
+   inside it. */
+.k-art-well {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-well);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.k-plate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-well);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ---- display type role (type.display, --text-display) ------------------- */
+.k-display {
+  font-size: var(--text-display);
+  line-height: 1.05;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+/* A label is sentence case at the normal tracking (SLOP-TYPE-04). */
+.k-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.k-lede {
+  font-size: var(--text-lg);
+  color: var(--color-text-muted);
+  max-width: 44ch;
+}
+.k-caption {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ---- buttons: 4 variants x 5 states -------------------------------------- */
+/* Height: the control height, at least --k-hit, so a button is 44px high on a phone
+   (spec R31, fix round k14) and keeps 32px on a desktop. */
 .k-btn {
-  height: var(--control-h);
+  height: max(var(--control-h), var(--k-hit));
   padding: 0 var(--space-4);
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: 600;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+  width: 100%;
+  /* Focus draws in (lane K2): the ring starts transparent and
+     --motion-offset-focus further out, then settles at the 2px ring and the
+     2px offset over one fast step. Named properties only. */
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
 }
-.k-btn:disabled, .k-btn.is-disabled { cursor: not-allowed; }
+/* A disabled control has zero motion, always (motion.md). */
+.k-btn:disabled, .k-btn.is-disabled { cursor: not-allowed; transition: none; }
+.k-btn:focus-visible { outline-color: var(--color-focus); outline-offset: 2px; }
+/* Pressed: the darker tone below plus a 1px downward translate, never a scale
+   (SLOP-MOTION-02). The offset is a token, --motion-offset-press. */
+.k-btn:active:not(:disabled), .k-btn.is-active:not(.is-disabled) { transform: translateY(var(--motion-offset-press)); }
+/* Width-neutral helper for a button that sits in a row (a menu trigger, a tool). */
+.k-btn-auto { width: auto; }
 
 .k-btn-primary { background: var(--color-accent); color: var(--color-on-accent); }
 .k-btn-primary:hover, .k-btn-primary.is-hover { background: var(--color-accent-hover); }
 .k-btn-primary:active, .k-btn-primary.is-active { background: var(--color-accent-active); }
 .k-btn-primary:disabled, .k-btn-primary.is-disabled { background: var(--color-disabled-fill); color: var(--color-text-muted); }
 
-.k-btn-secondary { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-border); }
+/* Secondary and ghost hover = surface-hover; active = the well (the recessed
+   surface means "pressed", everywhere). Ghost shares secondary's two states.
+   The secondary boundary is --color-control (3:1, WCAG 1.4.11). A pressed
+   button changes tone and steps down 1px (a translate, never a scale,
+   SLOP-MOTION-02). */
+.k-btn-secondary { background: var(--color-surface-raised); color: var(--color-text); border-color: var(--color-control); }
 .k-btn-secondary:hover, .k-btn-secondary.is-hover,
 .k-btn-ghost:hover, .k-btn-ghost.is-hover {
   background: var(--color-surface-hover);
@@ -86,218 +179,2370 @@ ul { padding: 0; list-style: none; }
 .k-btn-danger:disabled, .k-btn-danger.is-disabled { background: var(--color-disabled-fill); color: var(--color-text-muted); }
 
 .k-btn.is-focus { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-.k-btn:active, .k-btn.is-active { transform: translateY(1px); }
 
-/* ---- inputs --------------------------------------------------------------- */
-.k-field { display: flex; flex-direction: column; gap: var(--space-1); }
-.k-field-label { font-size: var(--text-xs); color: var(--color-text-muted); }
-/* background comes from the composed .k-well class (signature c, recessed
-   data well); every k-input/k-select usage carries both classes. */
+/* ---- inputs: text, select, checkbox, switch, radio ---------------------- */
+/* Every control boundary is --color-control (3:1 against the page). */
 .k-input, .k-select {
-  height: var(--control-h);
+  height: max(var(--control-h), var(--k-hit));
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control);
+  background: var(--color-surface-raised);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
 }
 .k-input.is-focus, .k-select.is-focus { border-color: var(--color-accent); }
 .k-input:disabled, .k-input.is-disabled { background: var(--color-disabled-fill); color: var(--color-text-muted); }
-/* WebView2 hides its own password-reveal icon for good after the field is
-   blurred once (Abakus draws its own, `PasswordInput`, which stays put). */
-.k-input[type="password"]::-ms-reveal, .k-input[type="text"]::-ms-reveal { display: none; }
-/* `PasswordInput`: the field grows, the toggle button keeps its own width. */
-.k-password-row { display: flex; gap: var(--space-2); align-items: stretch; }
-.k-password-row .k-input { flex: 1 1 auto; min-width: 0; }
-.k-password-row .k-btn { flex: none; }
 
-.k-checkbox { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+/* The checkbox, switch and radio are real form controls now: see the control
+   set (lane K4) after the motion layer. The static span forms of direction A
+   (.k-checkbox-box, .k-switch-track, .k-radio) left with it. */
+
+/* ---- tabs ---------------------------------------------------------------- */
+/* Revision 4 (Senate R7, SLOP-DECOR-01): the active tab is a fill step
+   (surface-selected), bold text and a 6px square mark before the name. There
+   is no accent edge and no sliding underline. The tone changes on hover in
+   80ms (colour and tone transitions stay allowed); the selection itself is
+   instant. A tab may be a span, a button or a link: the reset keeps all three
+   alike. The mark slot and the bold width are reserved on every tab, so a
+   selection never moves a name: kaliber-motion.js copies the name into
+   data-k-label and ::after holds that space in bold. */
+.k-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--color-border); }
+.k-tab {
+  appearance: none;
+  display: inline-grid;
+  grid-template-columns: 6px auto;
+  column-gap: 6px;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-family: inherit;
+  text-decoration: none;
+  padding: var(--space-2) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard);
+}
+.k-tab::before { content: ""; grid-column: 1; grid-row: 1; width: 6px; height: 6px; background: transparent; }
+.k-tab::after { content: attr(data-k-label); grid-column: 2; grid-row: 2; height: 0; overflow: hidden; visibility: hidden; font-weight: 700; }
+.k-tab:hover { color: var(--color-text); background: var(--color-surface-hover); }
+.k-tab.is-active { color: var(--color-text); background: var(--color-surface-selected); font-weight: 700; }
+.k-tab.is-active::before { background: var(--color-accent); }
 
 /* ---- card ------------------------------------------------------------- */
 .k-card-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: var(--space-3); margin-bottom: var(--space-3); border-bottom: 1px solid var(--color-border); }
 .k-card-title { font-size: var(--text-md); font-weight: 600; }
-.k-card-badge { font-size: var(--text-xs); color: var(--color-accent-soft-foreground); background: var(--color-accent-soft); padding: 2px var(--space-2); border-radius: var(--radius-pill); }
-.k-card-body { color: var(--color-text-muted); font-size: var(--text-sm); display: flex; flex-direction: column; gap: var(--space-2); }
+.k-card-body { color: var(--color-text-muted); font-size: var(--text-sm); }
 .k-card-footer { display: flex; gap: var(--space-2); justify-content: flex-end; padding-top: var(--space-3); margin-top: var(--space-3); border-top: 1px solid var(--color-border); }
+.k-card-footer .k-btn { width: auto; padding: 0 var(--space-4); }
 
-/* ---- KPI micro-gauge ---------------------------------------------------- */
-.k-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
-.k-kpi { display: flex; flex-direction: column; gap: var(--space-1); }
-.k-kpi-value { font-size: var(--text-xl); font-weight: 600; }
-.k-kpi-label { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* ---- tag: a square mark plus text (replaces the pill chip, SLOP-DECOR-06) */
+/* The mark is 8px square. --k-tag-mark picks its colour (default: the
+   accent); a category may pass a chart step, for example
+   style="--k-tag-mark: var(--color-chart-3)". .k-card-badge is the same
+   device in a card header. */
+.k-tag, .k-card-badge { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-tag::before, .k-card-badge::before { content: ""; width: 8px; height: 8px; flex: none; background: var(--k-tag-mark, var(--color-accent)); }
+
+/* ---- dialog + scrim: a fixed modal root, real usage contract ----------- */
+/* z-index 50 is a literal stacking value (documented in components.md),
+   not a token: Kaliber has no z-index scale. The scrim is a flat fill, no
+   backdrop blur (SLOP-DECOR-03). The dialog is one bordered surface. */
+.k-modal-root { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; }
+.k-scrim { position: absolute; inset: 0; background: var(--color-scrim); }
+.k-dialog {
+  position: relative;
+  width: 300px;
+  padding: var(--space-4);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+}
+.k-dialog-title { font-size: var(--text-md); font-weight: 600; margin-bottom: var(--space-2); }
+.k-dialog-body { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); }
+.k-dialog-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+.k-dialog-actions .k-btn { width: auto; padding: 0 var(--space-4); }
+
+/* ---- toast / tooltip ------------------------------------------------------ */
+.k-toast { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+.k-toast-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--color-success); flex: none; }
+.k-tooltip-bubble { display: inline-block; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); background: var(--color-text); color: var(--color-background); font-size: var(--text-xs); }
+
+/* ---- empty / loading / error: one ruled list of rows, not three cards ---- */
+/* Each state is a row: a 10px square mark, a title and a note. */
+.k-state-list { display: flex; flex-direction: column; }
+.k-state { display: flex; align-items: baseline; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+.k-state-icon { width: 10px; height: 10px; flex: none; }
+.k-state-title { font-size: var(--text-sm); font-weight: 600; min-width: 11ch; }
+.k-state-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-state.is-empty .k-state-icon { background: var(--color-control); }
+.k-state.is-error .k-state-icon { background: var(--color-danger-soft); border: 1px solid var(--color-danger); }
+/* Static loading placeholder: no loop here. A running process shows the
+   activity line (lane K2), not a spinner. */
+.k-state.is-loading .k-state-icon { background: var(--color-text-muted); opacity: .6; }
+
+/* ---- summary: a small ruled table, a label, a value and an optional gauge
+   (replaces the hero KPI tiles, SLOP-LAYOUT-05) --------------------------- */
+/* 10px is the row padding and 7rem the label column: documented geometry. */
+.k-summary { margin: 0; }
+.k-summary-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr) minmax(90px, 0.8fr);
+  column-gap: var(--space-4);
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-border);
+}
+.k-summary-row dt { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; }
+.k-summary-row dd { margin: 0; }
+.k-summary-value { font-weight: 700; }
+.k-summary-note { color: var(--color-text-muted); font-weight: 400; }
+.k-summary-row .k-gauge { margin: 0; }
+
+/* ---- micro-gauge: 3px track, 2px accent tick ------------------------------ */
 .k-gauge { position: relative; height: 3px; border-radius: var(--radius-pill); background: var(--color-border); margin-top: var(--space-2); }
 .k-gauge-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: var(--radius-pill); background: var(--color-accent); }
 .k-gauge-tick { position: absolute; top: -2px; width: 2px; height: 7px; border-radius: 0; background: var(--color-accent-active); }
 
-/* ---- dialog + scrim ------------------------------------------------------ */
-.k-modal-root { position: fixed; inset: 0; z-index: 50; }
-.k-scrim { position: absolute; inset: 0; background: var(--color-scrim); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
-.k-dialog { width: 300px; padding: var(--space-4); }
-.k-dialog-title { font-size: var(--text-md); font-weight: 600; margin-bottom: var(--space-2); }
-.k-dialog-body { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
-.k-dialog-actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
+/* ---- table: ruled, tabular numerals ---------------------------------------- */
+/* A hairline under every row, a strong rule under the header, numbers
+   right-aligned in tabular figures (.k-num, .k-cell-number). */
+.k-table-wrap { overflow-x: auto; }
+.k-table { border-collapse: collapse; width: 100%; font-size: var(--text-sm); }
+.k-table caption { text-align: left; padding: var(--space-3); color: var(--color-text-muted); }
+.k-table th, .k-table td { padding: var(--space-2) var(--space-3); text-align: left; font-weight: inherit; border-bottom: 1px solid var(--color-border); }
+.k-table thead th { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); border-bottom-color: var(--color-border-strong); }
+.k-table tbody th { font-weight: 600; }
+.k-table .k-cell-number { text-align: right; white-space: nowrap; }
 
-/* ---- toast ---------------------------------------------------------------- */
-.k-toast { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); }
-.k-toast-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--color-success); flex: none; }
-
-/* ---- table: hairline rows, right-aligned tabular numeric columns ---------- */
-table { border-collapse: collapse; }
-.k-table { width: 100%; font-size: var(--text-sm); }
-.k-table th { text-align: left; font-size: var(--text-xs); color: var(--color-text-muted); font-weight: 600; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
-.k-table td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); }
-.k-table tr:last-child td { border-bottom: 0; }
-td.k-num { text-align: right; font-variant-numeric: tabular-nums; }
-/* hairline rule only between adjoining numeric columns, not every column */
-.k-table th.k-num + th.k-num, .k-table td.k-num + td.k-num { border-left: 1px solid var(--color-border); }
-
-/* Akcie column: stack the row actions so a wrapped ghost label does not crowd its neighbours. */
-.k-recurring-actions { flex-direction: column; align-items: stretch; flex-wrap: nowrap; min-width: calc(var(--space-8) * 5); }
-.k-recurring-actions .k-btn { height: auto; min-height: var(--control-h); padding-top: var(--space-2); padding-bottom: var(--space-2); white-space: normal; }
-
-/* ---- chart Ostatné band (folded "everything else" series/slice) ----------- */
-.k-chart-ostatne { fill: var(--color-border); fill-opacity: var(--color-chart-band-alpha); }
-
-/* ---- chart drilldown affordance (donut slice / stacked segment / month bar) */
-.k-chart-slice { cursor: pointer; transition: opacity var(--motion-fast) var(--ease-standard); }
-.k-chart-slice:hover { opacity: 0.85; }
-
-/* ---- chart tooltip cursor highlight: grid colour at band alpha ------------ */
-.k-chart-cursor { fill: var(--color-chart-grid); fill-opacity: var(--color-chart-band-alpha); }
-
-/* ---- chart tooltip content: well background, milled border edge ----------- */
-.k-chart-tooltip {
-  background: var(--color-well);
-  border: 1px solid var(--color-border);
-  border-top: 1px solid var(--color-border-top);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-raise), inset 0 1px 0 var(--color-milled);
-  padding: var(--space-2) var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
-}
-.k-chart-tooltip-label { font-weight: 600; color: var(--color-text); }
-.k-chart-tooltip-row { display: flex; align-items: center; gap: var(--space-2); }
-
-/* ---- chart legend (ported class-for-class from gallery.css) --------------- */
-.k-legend { display: flex; gap: var(--space-4); flex-wrap: wrap; font-size: var(--text-xs); color: var(--color-text-muted); }
+/* ---- legend --------------------------------------------------------------- */
+.k-legend { display: flex; gap: var(--space-2) var(--space-4); flex-wrap: wrap; font-size: var(--text-xs); color: var(--color-text-muted); }
 .k-legend-item { display: inline-flex; align-items: center; gap: var(--space-1); }
-.k-legend-swatch { width: 10px; height: 10px; border-radius: var(--radius-sm); flex: none; }
+/* The swatch is an inline SVG line sample: --k-legend-color is the series
+   colour (default the text colour), --k-legend-dash is its dash pattern, for
+   example style="--k-legend-color: var(--color-chart-2); --k-legend-dash: var(--chart-dash-2)",
+   so a series is identified by its pattern and not by colour alone. */
+.k-legend-swatch { width: 36px; height: 4px; flex: none; }
+.k-legend-swatch line { stroke: var(--k-legend-color, currentColor); stroke-width: 2; stroke-dasharray: var(--k-legend-dash, none); }
 
-/* ---- text tone utilities --------------------------------------------------- */
-.k-text-danger { color: var(--color-danger); }
-.k-text-success { color: var(--color-success); }
-
-/* ---- app shell -------------------------------------------------------------- */
-.k-shell { display: flex; min-height: 100vh; }
-
-/* ---- left rail (app-specific, not in the gallery) --------------------------- */
-.k-rail {
-  width: calc(var(--space-8) * 7);
-  flex: none;
-  background: var(--color-well);
-  border-right: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4) var(--space-2);
+/* ---- list item: selected = a fill step + weight + a square marker -------- */
+/* A <button> carries a native browser border/background/font by default;
+   the reset keeps a row borderless. The selected state is three cues and no
+   edge stripe of any kind: the --color-surface-selected fill, a bold title
+   (.k-list-title) and a filled 8px square marker (.k-list-mark). Muted text
+   (.k-list-muted) steps up to the full text colour inside a selected row so
+   it clears 4.5:1 on the fill. The row has no border, so it never shifts. */
+.k-list-item {
+  appearance: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  border: 0;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
 }
-.k-rail-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-4);
-  font-weight: 600;
+.k-list-item:hover { background: var(--color-surface-hover); }
+.k-list-item[aria-pressed="true"], .k-list-item.is-selected,
+.k-list-item[aria-pressed="true"]:hover, .k-list-item.is-selected:hover {
+  background: var(--color-surface-selected);
 }
-.k-rail-item {
+.k-list-title { font-weight: 600; }
+.k-list-muted { color: var(--color-text-muted); }
+.k-list-mark { width: 8px; height: 8px; flex: none; }
+.k-list-item[aria-pressed="true"] .k-list-title, .k-list-item.is-selected .k-list-title { font-weight: 700; }
+.k-list-item[aria-pressed="true"] .k-list-muted, .k-list-item.is-selected .k-list-muted { color: var(--color-text); }
+.k-list-item[aria-pressed="true"] .k-list-mark, .k-list-item.is-selected .k-list-mark { background: var(--color-accent); }
+
+/* ---- control modes: compact (default, control.h) and touch (control.touch)
+   -- a mode a region opts into, not a viewport breakpoint --------------- */
+.k-touch .k-btn, .k-touch .k-input, .k-touch .k-select { height: var(--control-h-touch); min-width: var(--control-h-touch); }
+.k-compact .k-btn, .k-compact .k-input, .k-compact .k-select { height: var(--control-h); }
+
+/* ---- phone: the summary row drops its gauge under the value --------------- */
+@media (max-width: 599px) {
+  .k-summary-row { grid-template-columns: 6.5rem minmax(0, 1fr); row-gap: var(--space-2); }
+  .k-summary-gauge { grid-column: 1 / -1; }
+}
+
+/* ==== motion layer (plan 094 revision 2, lane K2) ============================ */
+/* Rules (spec R3, catalog SLOP-MOTION-01 to 04). A motion answers a user
+   action or a running process. Nothing moves on page load, on scroll or on
+   hover of a card or an image. Allowed: colour and tone, opacity, and a short
+   transform that starts from its trigger. Never: a hover lift or scale, a
+   bounce, `transition: all`, or width, height, margin, top or left in a
+   transition or keyframe. Durations are the tokens --motion-fast (80 ms),
+   --motion-base (120 ms) and --motion-slow (200 ms) with --ease-standard, an
+   ease-out. One loop per screen, only while a process runs (--motion-live,
+   --ease-loop); the owner is named on <html data-k-loop> by kaliber-motion.js.
+   Every motion has a reduced-motion form in the last block of this file.
+   Fixed geometry named here and in components.md, not tokens: the 2px activity
+   line, the 4px header activity zone, the 2px tab underline, the 12rem menu
+   and 18rem popover widths, and z-index 10 (header), 30 (menu, popover), 40
+   (toast region) and 50 (dialog). */
+
+/* ---- theme switch (a) ----------------------------------------------------- */
+/* One short cross-fade of the whole page through the View Transitions API.
+   kaliber-motion.js calls document.startViewTransition and falls back to an
+   instant switch where it is missing or reduced motion is on. */
+::view-transition-old(root), ::view-transition-new(root) {
+  animation-duration: var(--motion-slow);
+  animation-timing-function: var(--ease-standard);
+}
+/* kaliber-motion.js sets .k-theme-flip on <html> for the one style recalculation
+   that flips the theme, so no button, tab or link runs its own tone transition
+   under the cross-fade. The toggle icon is left out: it is the one part that turns.
+   So are the parts of the other theme controls that move (lane K4): the sun and
+   moon thumb, its icons and the sliding surface of the segmented control carry
+   .k-theme-part and keep their own transform and opacity transitions. */
+html.k-theme-flip :not(.k-theme-icon):not(.k-theme-part),
+html.k-theme-flip ::before,
+html.k-theme-flip ::after { transition: none !important; }
+html.k-theme-flip .k-slider::-webkit-slider-thumb { transition: none !important; }
+html.k-theme-flip .k-slider::-moz-range-thumb { transition: none !important; }
+/* (the dot form is the same thumb, so the same two rules cover it) */
+/* A part that turns or slides keeps its transform and opacity, and only those: its
+   colour follows the cross-fade like everything else. */
+html.k-theme-flip .k-theme-part { transition-property: transform, opacity; }
+/* While kaliber-motion.js wires the page it sets the first state of the controls (the
+   saved theme, the place of a sliding surface, a slider fill). k-booting turns every
+   transition off for that one recalculation, so nothing moves at page load. */
+html.k-booting, html.k-booting *, html.k-booting *::before, html.k-booting *::after { transition: none !important; }
+/* The toggle icon (a circle with one half filled) turns half a turn, once per
+   switch: a transition on the theme attribute, nothing at page load. */
+.k-icon-btn { width: max(var(--control-h), var(--k-hit)); padding: 0; display: inline-grid; place-items: center; flex: none; }
+.k-theme-icon { display: block; transition: transform var(--motion-slow) var(--ease-standard); }
+[data-theme="dark"] .k-theme-icon { transform: rotate(180deg); }
+
+/* ---- header and footer (c) ------------------------------------------------- */
+/* .k-shell holds the content width. A page sets --k-shell-max (the gallery
+   sets 1240px); without it the shell is as wide as the window. The header is
+   a raised surface with a hairline, not glass and not a gradient. Its bottom
+   4px is the activity zone: the 2px line sits at the very bottom. */
+.k-shell { max-width: var(--k-shell-max, none); margin: 0 auto; padding: 0 var(--space-6); }
+.k-header { position: relative; background: var(--color-surface-raised); border-bottom: 1px solid var(--color-border); padding-bottom: 4px; }
+.k-header-sticky { position: sticky; top: 0; z-index: 10; }
+.k-header .k-shell { display: flex; align-items: stretch; gap: var(--space-6); min-height: 48px; }
+.k-header-name { align-self: center; font-size: var(--text-md); font-weight: 700; color: var(--color-text); text-decoration: none; }
+.k-header .k-tabs { border-bottom: 0; min-width: 0; gap: 0; }
+.k-header .k-tab { align-content: center; flex: none; border-radius: 0; padding-inline: 6px; }
+.k-header-tools { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+.k-status { font-size: var(--text-xs); color: var(--color-text-muted); }
+/* Text for assistive technology only: the polite live region of the activity
+   status (below). The visible status texts are aria-hidden duplicates. */
+.k-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.k-footer { border-top: 1px solid var(--color-border); }
+.k-footer .k-shell { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-6); padding-top: var(--space-4); padding-bottom: var(--space-4); font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-footer-links { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.k-link { color: var(--color-text-muted); text-decoration: none; border-radius: var(--radius-sm); transition: color var(--motion-fast) var(--ease-standard); }
+.k-link:hover { color: var(--color-text); text-decoration: underline; }
+
+/* ---- background activity (d) ------------------------------------------------ */
+/* A 2px indeterminate line along the bottom of the header while a process
+   runs. Idle, it is gone: display none, not faded. The bar is a real element
+   (not a pseudo-element) and moves by transform only. It loops only while
+   <html data-k-loop="header">, so a second loop on the same screen stays
+   still. The status text (.k-status) carries the same meaning in words. */
+.k-activity { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; overflow: hidden; display: none; }
+.k-header.is-busy .k-activity { display: block; }
+.k-activity-bar { display: block; width: 30%; height: 100%; background: var(--color-accent); }
+html[data-k-loop="header"] .k-header.is-busy .k-activity-bar { animation: k-activity var(--motion-live) var(--ease-loop) infinite; }
+@keyframes k-activity {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(333%); }
+}
+
+/* ---- buttons: the loading state (b) ------------------------------------------ */
+/* The label swaps to a short progress text and an inline indeterminate bar
+   shows inside the button. Both labels sit in one grid cell, so the button
+   keeps the width of the longer one. The bar loops only while
+   <html data-k-loop="button"> (one loop per screen). */
+.k-btn-loadable { position: relative; display: inline-grid; place-items: center; }
+.k-btn-loadable > .k-btn-label, .k-btn-loadable > .k-btn-busy { grid-area: 1 / 1; }
+.k-btn-loadable > .k-btn-busy { visibility: hidden; }
+.k-btn-loadable.is-loading { cursor: progress; }
+.k-btn-loadable.is-loading > .k-btn-label { visibility: hidden; }
+.k-btn-loadable.is-loading > .k-btn-busy { visibility: visible; }
+.k-btn-bar { position: absolute; left: var(--space-3); right: var(--space-3); bottom: 4px; height: 2px; overflow: hidden; visibility: hidden; }
+.k-btn-loadable.is-loading > .k-btn-bar { visibility: visible; }
+.k-btn-bar > span { display: block; width: 30%; height: 100%; background: currentColor; }
+html[data-k-loop="button"] .k-btn-loadable.is-loading > .k-btn-bar > span { animation: k-activity var(--motion-live) var(--ease-loop) infinite; }
+
+/* ---- menus and popovers (e) ----------------------------------------------------- */
+/* A menu or popover opens from its trigger edge: opacity 0 to 1 and scale
+   --motion-scale-enter (0.98) to 1, transform-origin at the trigger, 120 ms.
+   Closing is faster, 80 ms. The closed panel is display: none (no scroll
+   overflow, out of the accessibility tree), and `display` is a discrete
+   transition (`allow-discrete`, with @starting-style for the open frame), so
+   the fade still plays. The trigger is any button with aria-controls;
+   keyboard behaviour is in kaliber-motion.js (arrows, Home, End, Escape,
+   focus back on the trigger). */
+.k-menu, .k-popover-host { position: relative; display: inline-block; }
+.k-menu-list, .k-popover, .k-listbox-list {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 30;
+  transform-origin: top left;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  display: none;
+  opacity: 0;
+  transform: scale(var(--motion-scale-enter));
+  transition: opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    display var(--motion-fast) allow-discrete;
+}
+.k-menu-list.is-open, .k-popover.is-open, .k-listbox-list.is-open {
+  display: block;
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard),
+    display var(--motion-base) allow-discrete;
+}
+@starting-style {
+  .k-menu-list.is-open, .k-popover.is-open, .k-listbox-list.is-open { opacity: 0; transform: scale(var(--motion-scale-enter)); }
+}
+.k-menu-list--end, .k-popover--end { left: auto; right: 0; transform-origin: top right; }
+.k-menu-list { min-width: 12rem; padding: var(--space-1); }
+.k-menu-item {
+  appearance: none;
   display: flex;
   align-items: center;
   width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  border-radius: var(--radius-md);
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
-  transition: background var(--motion-base) var(--ease-standard), color var(--motion-base) var(--ease-standard);
+  transition: background-color var(--motion-fast) var(--ease-standard);
 }
-.k-rail-item:hover { background: var(--color-surface-hover); }
-.k-rail-item:active { transform: translateY(1px); }
-.k-rail-item.is-active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent-soft-foreground);
-  font-weight: 500;
+.k-menu-item:hover, .k-menu-item:focus-visible { background: var(--color-surface-hover); }
+.k-menu-item:active { background: var(--color-well); }
+.k-menu-sep { height: 1px; margin: var(--space-1) 0; background: var(--color-border); }
+.k-popover { width: 18rem; max-width: calc(100vw - 2 * var(--space-6)); padding: var(--space-3) var(--space-4); font-size: var(--text-sm); }
+.k-popover-title { font-weight: 600; margin-bottom: var(--space-1); }
+.k-popover-body { color: var(--color-text-muted); }
+.k-chevron { flex: none; transition: transform var(--motion-base) var(--ease-standard); }
+[aria-expanded="true"] > .k-chevron { transform: rotate(180deg); }
+.k-btn-menu { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
+
+/* ---- dialog and toast (f) -------------------------------------------------------- */
+/* A dialog driven by kaliber-motion.js is a .k-modal-root[data-k-modal]. It
+   opens from the centre (opacity and scale --motion-scale-enter, 200 ms) while
+   the scrim fades in; closing is 80 ms. A .k-modal-root without data-k-modal
+   stays a static, always-visible specimen. */
+.k-modal-root[data-k-modal] { visibility: hidden; transition: visibility 0s linear var(--motion-fast); }
+.k-modal-root[data-k-modal].is-open { visibility: visible; transition: visibility 0s; }
+.k-modal-root[data-k-modal] .k-scrim { opacity: 0; transition: opacity var(--motion-fast) var(--ease-standard); }
+.k-modal-root[data-k-modal].is-open .k-scrim { opacity: 1; transition: opacity var(--motion-slow) var(--ease-standard); }
+.k-modal-root[data-k-modal] .k-dialog {
+  opacity: 0;
+  transform: scale(var(--motion-scale-enter));
+  transform-origin: center;
+  transition: opacity var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.k-modal-root[data-k-modal].is-open .k-dialog {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--motion-slow) var(--ease-standard), transform var(--motion-slow) var(--ease-standard);
+}
+/* A toast enters from its edge (opacity and an --motion-offset-enter slide
+   from the right) and leaves with opacity only. kaliber-motion.js adds the
+   two classes and removes the toast when the leave ends. */
+.k-toast-region { position: fixed; right: var(--space-6); bottom: var(--space-6); z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+.k-toast.is-entering { animation: k-toast-in var(--motion-slow) var(--ease-standard) both; }
+.k-toast.is-leaving { animation: k-toast-out var(--motion-fast) var(--ease-standard) both; }
+@keyframes k-toast-in {
+  from { opacity: 0; transform: translateX(var(--motion-offset-enter)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes k-toast-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
-/* ---- import drop zone (app-specific) -----------------------------------------
-   Geometry only: background/border-color/radius come from the composed
-   .k-well class (signature c), matching how the gallery composes .k-well
-   with a purpose class instead of restating its colours. */
-.k-dropzone {
-  border-style: dashed;
-  padding: var(--space-6);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+/* ==== control set (plan 094 revision 2, lane K4, spec R9) ====================== */
+/* A control is a real form element underneath (a checkbox, a radio, a range, a
+   select, a details, a number input), styled here, and every one is keyboard
+   operable. The same rules as the motion layer (spec R3) hold: a motion answers
+   a user action, colour and tone, opacity and a short transform are allowed, no
+   bounce, no `transition: all`, no width, height, margin, top or left in a
+   transition, nothing at page load or on scroll, nothing loops when idle,
+   80 to 200 ms from tokens, every motion has its reduced form (the last block).
+   A state is never carried by colour alone: a mark, a shape or a label says it too.
+   States: :hover, :active and :focus-visible are real. The state classes
+   .is-hover and .is-active (on the label row) and .is-focus (on the input) force
+   a state for the gallery matrix, as the button matrix does.
+   Hit target: --k-hit, 24px by default (WCAG 2.5.8), 44px (--control-h-touch) on
+   a phone and inside .k-touch. Fixed geometry named here and in components.md,
+   not tokens: the 18px check and radio box with a 12px mark and an 8px dot; the
+   switch, 40x22 with a 16px thumb (small 32x18 and 12px, theme 52x28 and 22px),
+   thumb inset 3px; the segmented item 26px high in a 2px frame; the 4px slider
+   rail with an 18px thumb; the 8px progress rail; the 8px carousel mark inside a
+   --k-hit button; the 14rem listbox list limit; the 4rem stepper field. */
+:root { --k-hit: 24px; }
+.k-touch { --k-hit: var(--control-h-touch); }
+.k-compact { --k-hit: 24px; }
+
+/* ---- checkbox and radio ---------------------------------------------------------- */
+/* The input is the box (appearance none). The mark (an inline SVG) and the dot are
+   siblings laid over it in one grid cell. The whole label row is the hit target. */
+.k-check, .k-radio-row {
+  display: inline-grid;
+  grid-template-columns: 18px auto;
   align-items: center;
+  column-gap: var(--space-2);
+  min-height: var(--k-hit);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
 }
+.k-check-text, .k-radio-text { grid-row: 1; grid-column: 2; }
+.k-check-input, .k-radio-input {
+  appearance: none;
+  grid-area: 1 / 1;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--color-control);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-check-input { border-radius: var(--radius-sm); }
+.k-radio-input { border-radius: var(--radius-pill); }
+.k-check-input:focus-visible, .k-check-input.is-focus,
+.k-radio-input:focus-visible, .k-radio-input.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+/* Off: hover steps to the hover tone, pressed to the well (the recessed tone means
+   pressed, everywhere). On: the accent, its hover and its pressed tone. */
+.k-check:where(:hover, .is-hover) > .k-check-input:where(:not(:disabled)),
+.k-radio-row:where(:hover, .is-hover) > .k-radio-input:where(:not(:disabled)) { background: var(--color-surface-hover); }
+.k-check:where(:active, .is-active) > .k-check-input:where(:not(:disabled)),
+.k-radio-row:where(:active, .is-active) > .k-radio-input:where(:not(:disabled)) { background: var(--color-well); }
+.k-check-input:checked, .k-check-input:indeterminate { background: var(--color-accent); border-color: var(--color-accent); }
+.k-check:where(:hover, .is-hover) > .k-check-input:is(:checked, :indeterminate):where(:not(:disabled)) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.k-check:where(:active, .is-active) > .k-check-input:is(:checked, :indeterminate):where(:not(:disabled)) { background: var(--color-accent-active); border-color: var(--color-accent-active); }
+.k-radio-input:checked { border-color: var(--color-accent); }
+.k-radio-row:where(:hover, .is-hover) > .k-radio-input:checked:where(:not(:disabled)) { border-color: var(--color-accent-hover); }
+.k-radio-row:where(:active, .is-active) > .k-radio-input:checked:where(:not(:disabled)) { border-color: var(--color-accent-active); }
+/* A disabled control has zero motion, always. */
+.k-check-input:disabled, .k-radio-input:disabled { background: var(--color-disabled-fill); border-color: var(--color-border); cursor: not-allowed; transition: none; }
+.k-check-input:disabled ~ .k-check-text, .k-radio-input:disabled ~ .k-radio-text { color: var(--color-text-muted); cursor: not-allowed; }
 
-/* ---- recent-imports list (ported class-for-class from gallery.css) ----------- */
-.k-round-list { display: flex; flex-direction: column; gap: 1px; }
-/* header row for a round list: geometry of .k-round-row, typography of
-   .k-table th (both already exist; this composes them, no new pattern). */
-.k-round-row-head {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-xs);
+/* The check mark draws in (stroke-dashoffset, 120 ms) on check and leaves with
+   opacity (80 ms) on uncheck. The dash of the indeterminate state draws the same
+   way. Both paths carry pathLength="1", so the dash length is 1 for any size. */
+.k-check-mark {
+  grid-area: 1 / 1;
+  place-self: center;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  color: var(--color-on-accent);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: square;
+}
+.k-check-tick, .k-check-dash {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-standard),
+    stroke-dashoffset 0s linear var(--motion-fast);
+}
+.k-check-input:checked ~ .k-check-mark .k-check-tick,
+.k-check-input:indeterminate ~ .k-check-mark .k-check-dash {
+  stroke-dashoffset: 0;
+  opacity: 1;
+  transition: stroke-dashoffset var(--motion-base) var(--ease-standard),
+    opacity 0s linear;
+}
+.k-check-input:indeterminate ~ .k-check-mark .k-check-tick { stroke-dashoffset: 1; opacity: 0; }
+.k-check-input:disabled ~ .k-check-mark { color: var(--color-text-muted); }
+.k-check-input:disabled ~ .k-check-mark path { transition: none; }
+
+/* The radio dot grows from the centre of the control itself (a mark inside a
+   control, not a card scale): opacity and scale --motion-scale-mark to 1, 120 ms;
+   it leaves with opacity in 80 ms. */
+.k-radio-dot {
+  grid-area: 1 / 1;
+  place-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(var(--motion-scale-mark));
+  transition: opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+.k-radio-input:checked ~ .k-radio-dot {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
+}
+.k-radio-input:disabled ~ .k-radio-dot { background: var(--color-text-muted); transition: none; }
+.k-radio-group { display: flex; flex-direction: column; gap: var(--space-1); border: 0; margin: 0; padding: 0; }
+.k-radio-group--row { flex-direction: row; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.k-group-legend { padding: 0; margin-bottom: var(--space-1); font-size: var(--text-xs); color: var(--color-text-muted); }
+
+/* ---- switch ------------------------------------------------------------------------ */
+/* role="switch" on a native checkbox. The thumb slides by transform (120 ms), the
+   track changes tone (80 ms), and the state shows as a mark as well: a ring on the
+   off side, a bar on the on side (the two ISO power marks). The thumb covers the
+   mark on its own side, so one mark shows at a time. The vertical variant puts the
+   on side up. The input lies over the whole label and is invisible, so the label
+   row is the hit target and the native element keeps focus and the keys. */
+.k-switch {
+  --k-sw-w: 40px;
+  --k-sw-h: 22px;
+  --k-sw-thumb: 16px;
+  --k-sw-inset: 3px;
+  --k-sw-travel: calc(var(--k-sw-w) - var(--k-sw-thumb) - 2 * var(--k-sw-inset));
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  min-height: var(--k-hit);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.k-switch--sm { --k-sw-w: 32px; --k-sw-h: 18px; --k-sw-thumb: 12px; }
+.k-switch--theme { --k-sw-w: 52px; --k-sw-h: 28px; --k-sw-thumb: 22px; }
+.k-switch-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.k-switch-text { grid-row: 1; grid-column: 2; }
+.k-switch-track {
+  position: relative;
+  grid-row: 1;
+  grid-column: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: var(--k-sw-w);
+  height: var(--k-sw-h);
+}
+.k-switch--vertical .k-switch-track { grid-template-columns: none; grid-template-rows: 1fr 1fr; width: var(--k-sw-h); height: var(--k-sw-w); }
+.k-switch-bg {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-switch-mark { position: relative; place-self: center; pointer-events: none; }
+.k-switch-mark--on { grid-column: 1; width: 2px; height: calc(var(--k-sw-thumb) / 2); background: var(--color-on-accent); }
+.k-switch-mark--off { grid-column: 2; width: calc(var(--k-sw-thumb) / 2); height: calc(var(--k-sw-thumb) / 2); border: 2px solid var(--color-text-muted); border-radius: var(--radius-pill); }
+.k-switch--vertical .k-switch-mark--on { grid-column: auto; grid-row: 2; }
+.k-switch--vertical .k-switch-mark--off { grid-column: auto; grid-row: 1; }
+.k-switch-thumb {
+  position: absolute;
+  top: var(--k-sw-inset);
+  left: var(--k-sw-inset);
+  display: grid;
+  place-items: center;
+  width: var(--k-sw-thumb);
+  height: var(--k-sw-thumb);
+  border-radius: var(--radius-pill);
+  background: var(--color-control);
+  transition: transform var(--motion-base) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+.k-switch--vertical .k-switch-thumb { transform: translateY(var(--k-sw-travel)); }
+/* Off: hover tone, then the well when pressed. */
+.k-switch:where(:hover, .is-hover) .k-switch-input:where(:not(:disabled)) ~ .k-switch-track .k-switch-bg { background: var(--color-surface-hover); }
+.k-switch:where(:active, .is-active) .k-switch-input:where(:not(:disabled)) ~ .k-switch-track .k-switch-bg { background: var(--color-well); }
+/* On: the track takes the accent, the thumb slides to the on side and turns light. */
+.k-switch-input:checked ~ .k-switch-track .k-switch-bg { background: var(--color-accent); border-color: var(--color-accent); }
+.k-switch-input:checked ~ .k-switch-track .k-switch-thumb { transform: translateX(var(--k-sw-travel)); background: var(--color-on-accent); }
+.k-switch--vertical .k-switch-input:checked ~ .k-switch-track .k-switch-thumb { transform: none; }
+.k-switch:where(:hover, .is-hover) .k-switch-input:checked:where(:not(:disabled)) ~ .k-switch-track .k-switch-bg { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.k-switch:where(:active, .is-active) .k-switch-input:checked:where(:not(:disabled)) ~ .k-switch-track .k-switch-bg { background: var(--color-accent-active); border-color: var(--color-accent-active); }
+.k-switch-input:focus-visible ~ .k-switch-track .k-switch-bg,
+.k-switch-input.is-focus ~ .k-switch-track .k-switch-bg { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-switch-input:disabled ~ .k-switch-track .k-switch-bg { background: var(--color-disabled-fill); border-color: var(--color-border); transition: none; }
+.k-switch-input:disabled ~ .k-switch-track .k-switch-thumb { background: var(--color-text-muted); transition: none; }
+.k-switch-input:disabled ~ .k-switch-track .k-switch-mark--on { background: var(--color-text-muted); }
+.k-switch-input:disabled ~ .k-switch-text { color: var(--color-text-muted); cursor: not-allowed; }
+.k-switch-input:disabled { cursor: not-allowed; }
+
+/* The sun and moon switch: the thumb carries the icon. Unchecked is the light theme
+   (the sun), checked is the dark theme (the moon). The sun turns a quarter turn and
+   fades out while the moon turns in and fades in, in the 120 ms the thumb slides.
+   .k-theme-part keeps these transitions alive while the page flips its theme. */
+.k-switch--theme .k-switch-thumb { color: var(--color-surface-raised); }
+.k-switch--theme .k-switch-input:checked ~ .k-switch-track .k-switch-thumb { color: var(--color-accent); }
+.k-sun, .k-moon {
+  grid-area: 1 / 1;
+  transition: transform var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
+}
+.k-sun { opacity: 1; transform: none; }
+.k-moon { opacity: 0; transform: rotate(-90deg); }
+.k-switch-input:checked ~ .k-switch-track .k-sun { opacity: 0; transform: rotate(90deg); }
+.k-switch-input:checked ~ .k-switch-track .k-moon { opacity: 1; transform: none; }
+.k-switch-input:disabled ~ .k-switch-track .k-sun, .k-switch-input:disabled ~ .k-switch-track .k-moon { transition: none; }
+
+/* ---- segmented control -------------------------------------------------------------- */
+/* One selection out of a few, native radios in one group (the arrow keys move and
+   select, Tab enters at the selected one). The items are equally wide, so the
+   selected surface (.k-segmented-thumb, added by kaliber-motion.js) slides by
+   transform only: --k-seg-x is its offset, --k-seg-w its width, set at once and
+   never transitioned. Without the script the selected item draws its own surface. */
+.k-segmented {
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 2px;
+  background: var(--color-well);
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-md);
+}
+.k-segmented-item { position: relative; z-index: 1; display: grid; }
+.k-segmented-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.k-segmented-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--k-hit);
+  height: max(26px, var(--k-hit));
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-text-muted);
+  transition: color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
 }
-.k-round-row {
+.k-segmented-item:where(:hover, .is-hover) .k-segmented-label { color: var(--color-text); }
+.k-segmented-input:checked + .k-segmented-label { color: var(--color-text); }
+.k-segmented:not(.is-sliding) .k-segmented-input:checked + .k-segmented-label { background: var(--color-surface-raised); border-color: var(--color-border-strong); }
+.k-segmented-input:focus-visible + .k-segmented-label, .k-segmented-input.is-focus + .k-segmented-label { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.k-segmented-input:disabled { cursor: not-allowed; }
+.k-segmented-input:disabled + .k-segmented-label { color: var(--color-text-muted); }
+.k-segmented-thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: var(--k-seg-w, 0px);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  transform: translateX(var(--k-seg-x, 0px));
+}
+.k-segmented.is-ready .k-segmented-thumb { transition: transform var(--motion-base) var(--ease-standard); }
+.k-segmented-item:where(:hover, .is-hover) .k-segmented-input:where(:not(:checked):not(:disabled)) + .k-segmented-label { background: var(--color-surface-hover); }
+.k-segmented-item:where(:active, .is-active) .k-segmented-input:where(:not(:checked):not(:disabled)) + .k-segmented-label { background: var(--color-border); }
+
+/* ---- select: a styled native select, and the listbox ------------------------------ */
+/* The plain case is a native select, only restyled: the list it opens is the
+   browser's own. The chevron is an inline SVG laid over the select's end. */
+.k-select-wrap { display: inline-grid; min-width: 10rem; }
+.k-select {
+  appearance: none;
+  grid-area: 1 / 1;
+  height: max(var(--control-h), var(--k-hit));
+  padding-right: calc(var(--space-3) + 20px);
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-select:hover:not(:disabled), .k-select.is-hover { background: var(--color-surface-hover); }
+.k-select:active:not(:disabled), .k-select.is-active { background: var(--color-well); }
+.k-select:focus-visible, .k-select.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-select:disabled { background: var(--color-disabled-fill); border-color: var(--color-border); color: var(--color-text-muted); cursor: not-allowed; transition: none; }
+.k-select option { background: var(--color-surface-raised); color: var(--color-text); }
+.k-select-chevron { grid-area: 1 / 1; justify-self: end; align-self: center; margin-right: var(--space-3); pointer-events: none; color: var(--color-text); }
+.k-select:disabled ~ .k-select-chevron { color: var(--color-text-muted); }
+
+/* The listbox is the select-only combobox pattern: the trigger is a button with
+   role="combobox" that keeps the focus, the options are role="option" and the
+   active one is named by aria-activedescendant. The list opens with the menu
+   motion (opacity and scale 0.98, 120 ms, close 80 ms; see the menu block above). */
+.k-listbox { position: relative; display: inline-block; }
+.k-listbox-trigger { justify-content: space-between; min-width: 12rem; }
+.k-listbox-list { min-width: 100%; max-height: 14rem; overflow-y: auto; margin: 0; padding: var(--space-1); list-style: none; }
+.k-option {
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: max(var(--control-h), var(--k-hit));
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+/* The selected option carries a check mark, drawn from borders, and a fill step. */
+.k-option::before { content: ""; flex: none; width: 5px; height: 9px; margin: 0 var(--space-1) 3px 2px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); opacity: 0; }
+.k-option:hover { background: var(--color-surface-hover); }
+.k-option.is-active { background: var(--color-surface-hover); outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.k-option[aria-selected="true"] { background: var(--color-surface-selected); font-weight: 600; }
+.k-option[aria-selected="true"]::before { opacity: 1; }
+
+/* ---- disclosure and accordion ------------------------------------------------------ */
+/* Native details and summary. The height changes in one step (the browser's own),
+   and only the content animates: opacity and a short offset from the trigger
+   (--motion-offset-enter) in 120 ms, plus the chevron turning. kaliber-motion.js
+   adds .is-entering on a click that opens it, so nothing moves at page load and an
+   already open item stays still. Open count (R19): details elements in one .k-accordion
+   stay open independently, so several sections may be open by default. One item open at
+   a time is opt-in: the details elements share a name attribute (native, no script). */
+.k-disclosure { border-bottom: 1px solid var(--color-border); }
+.k-disclosure-summary {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-height: max(var(--control-h), var(--k-hit));
   padding: var(--space-2) var(--space-3);
-  font-size: var(--text-xs);
-  border-bottom: 1px solid var(--color-border);
-  transition: background var(--motion-base) var(--ease-standard);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  list-style: none;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
 }
-.k-round-row:last-child { border-bottom: 0; }
-.k-round-row:hover { background: var(--color-surface-hover); }
+.k-disclosure-summary::-webkit-details-marker { display: none; }
+.k-disclosure-summary:hover { background: var(--color-surface-hover); }
+.k-disclosure-summary:active { background: var(--color-well); }
+.k-disclosure[open] > .k-disclosure-summary > .k-chevron { transform: rotate(180deg); }
+.k-disclosure-body { padding: var(--space-2) var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-disclosure.is-entering > .k-disclosure-body { animation: k-disclosure-in var(--motion-base) var(--ease-standard) both; }
+@keyframes k-disclosure-in {
+  from { opacity: 0; transform: translateY(calc(-1 * var(--motion-offset-enter))); }
+  to { opacity: 1; transform: none; }
+}
+.k-accordion { border-top: 1px solid var(--color-border); }
 
-/* Mutation groups use native disabled propagation without browser fieldset framing. */
-fieldset.k-section { border: 0; padding: 0; margin: 0; min-width: 0; }
+/* ---- carousel ---------------------------------------------------------------------- */
+/* The track moves by transform, only on a user action: the previous and next
+   buttons, the position marks (real buttons), ArrowLeft, ArrowRight, Home and End
+   on the carousel, or a swipe on touch. No autoplay and no loop on idle. Off-screen
+   slides are inert. The buttons disable at the ends (no wrap). */
+.k-carousel { display: flex; flex-direction: column; gap: var(--space-3); }
+.k-carousel-viewport { overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-raised); touch-action: pan-y; }
+.k-carousel-track { display: flex; transform: translateX(calc(var(--k-slide, 0) * -100%)); transition: transform var(--motion-slow) var(--ease-standard); }
+.k-carousel-slide { flex: 0 0 100%; min-width: 0; padding: var(--space-4); }
+.k-carousel-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.k-carousel-marks { display: flex; }
+.k-carousel-mark { appearance: none; display: grid; place-items: center; width: var(--k-hit); height: var(--k-hit); padding: 0; border: 0; background: transparent; cursor: pointer; }
+.k-carousel-mark::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-control);
+  background: transparent;
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+.k-carousel-mark:hover::before { background: var(--color-surface-hover); border-color: var(--color-text); }
+.k-carousel-mark:active::before { background: var(--color-well); }
+.k-carousel-mark[aria-current="true"]::before { background: var(--color-accent); border-color: var(--color-accent); }
+/* The position text stays on one line; when the bar is too narrow (a phone) the text wraps
+   to its own row under the buttons, it never breaks inside. */
+.k-carousel-status { margin-left: auto; font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; }
+.k-arrow--prev { transform: rotate(90deg); }
+.k-arrow--next { transform: rotate(-90deg); }
+.k-carousel-bar .k-icon-btn { height: max(var(--control-h), var(--k-hit)); width: max(var(--control-h), var(--k-hit)); }
 
-/* Let bounded table regions shrink inside the shell instead of widening the page. */
-.k-page { min-width: 0; }
-.k-table-scroll { min-width: 0; max-width: 100%; overflow-x: auto; padding: var(--space-1); }
-.k-money { white-space: nowrap; min-width: calc(var(--space-8) * 4); }
-.k-settings-layout { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: stretch; }
-.k-settings-layout > * { flex: 1 1 calc(var(--space-8) * 20); min-width: 0; }
-.k-accounts-table td:first-child { overflow-wrap: anywhere; }
-.k-accounts-table td:last-child { min-width: calc(var(--space-8) * 5); }
-.k-accounts-table .k-btn { white-space: nowrap; }
+/* ---- slider ------------------------------------------------------------------------ */
+/* A native range input, styled. --k-fill (a percentage, set by kaliber-motion.js
+   and in the markup) paints the part up to the thumb. The value is text beside it
+   (.k-slider-value, an output). Moving the thumb is direct manipulation, so the
+   only motion is the tone of the thumb (80 ms). */
+.k-slider-row { display: grid; grid-template-columns: minmax(0, 1fr) 4rem; align-items: center; column-gap: var(--space-3); }
+.k-slider-label { grid-column: 1 / -1; margin-bottom: var(--space-1); font-size: var(--text-sm); color: var(--color-text); }
+.k-slider-value { text-align: right; font-size: var(--text-sm); font-weight: 600; }
+.k-slider { --k-fill: 0%; appearance: none; width: 100%; height: var(--k-hit); margin: 0; background: transparent; cursor: pointer; }
+.k-slider::-webkit-slider-runnable-track { height: 4px; border-radius: var(--radius-pill); background: linear-gradient(to right, var(--color-accent) var(--k-fill), var(--color-control) var(--k-fill)); }
+.k-slider::-moz-range-track { height: 4px; border-radius: var(--radius-pill); background: linear-gradient(to right, var(--color-accent) var(--k-fill), var(--color-control) var(--k-fill)); }
+.k-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.k-slider::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.k-slider:hover::-webkit-slider-thumb, .k-slider.is-hover::-webkit-slider-thumb { background: var(--color-surface-hover); }
+.k-slider:hover::-moz-range-thumb, .k-slider.is-hover::-moz-range-thumb { background: var(--color-surface-hover); }
+.k-slider:active::-webkit-slider-thumb, .k-slider.is-active::-webkit-slider-thumb { background: var(--color-well); }
+.k-slider:active::-moz-range-thumb, .k-slider.is-active::-moz-range-thumb { background: var(--color-well); }
+.k-slider:disabled { cursor: not-allowed; }
+.k-slider:disabled::-webkit-slider-runnable-track { background: var(--color-disabled-fill); }
+.k-slider:disabled::-moz-range-track { background: var(--color-disabled-fill); }
+.k-slider:disabled::-webkit-slider-thumb { background: var(--color-disabled-fill); border-color: var(--color-text-muted); transition: none; }
+.k-slider:disabled::-moz-range-thumb { background: var(--color-disabled-fill); border-color: var(--color-text-muted); transition: none; }
 
-/* Rules table key cell can hold a long merchant string; wrap it instead of widening the card. */
-.k-rules-table td:first-child { overflow-wrap: anywhere; max-width: calc(var(--space-8) * 8); }
-/* Card body is a flex item with no min-width override, so its automatic minimum grows to the
-   table's unwrapped content width and the page scrolls instead of the table scroll region.
-   Scoped to the Pravidlá card column so other cards keep their current sizing. */
-.k-rules-card-col .k-card-body { min-width: 0; }
+/* The dot form (lane K4 fix round 1, Michal 2026-10-01): the same native range input with a
+   round thumb, for a volume or level control. Only the corner radius of the thumb differs
+   (a round control mark, like the radio dot, not a pill tag): the size, the 2 px accent
+   border, the states and the tone-only motion are the slider's own. The focus ring follows
+   the round shape: the input draws none and the thumb draws the 2 px ring 2 px out. */
+.k-slider--dot::-webkit-slider-thumb { border-radius: 50%; }
+.k-slider--dot::-moz-range-thumb { border-radius: 50%; }
+.k-slider--dot:focus-visible, .k-slider--dot.is-focus { outline: none; }
+.k-slider--dot:focus-visible::-webkit-slider-thumb, .k-slider--dot.is-focus::-webkit-slider-thumb { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.k-slider--dot:focus-visible::-moz-range-thumb, .k-slider--dot.is-focus::-moz-range-thumb { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+/* A volume control: a speaker and its word, the slider and the value as text. */
+.k-volume { display: flex; align-items: center; gap: var(--space-3); }
+.k-volume-label { display: inline-flex; flex: none; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text); }
+.k-volume .k-slider { flex: 1 1 auto; width: auto; min-width: 0; }
+.k-volume .k-slider-value { min-width: 3.5ch; }
 
-.k-category-bars { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
-.k-category-bar { width: 100%; min-width: 0; padding: var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font: inherit; text-align: left; cursor: pointer; }
-.k-category-bar:hover { background: var(--color-surface-hover); }
-.k-category-bar-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
-.k-category-bar-label > :first-child { overflow-wrap: anywhere; min-width: 0; }
-.k-category-bar svg { display: block; width: 100%; height: var(--space-6); margin-top: var(--space-1); }
+/* ---- determinate progress ----------------------------------------------------------- */
+/* A bar with a value and text, not a loop. It is a div with role="progressbar"
+   (and aria-valuenow, -min, -max) and not a native progress element, because the
+   fill must change by transform, and a native fill has no such handle. A new value
+   moves the fill in 120 ms, only after a user action or a real process step. */
+.k-progress-head { display: flex; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-1); font-size: var(--text-sm); }
+.k-progress-text { font-weight: 600; }
+.k-progress { height: 8px; overflow: hidden; background: var(--color-well); border: 1px solid var(--color-control); border-radius: var(--radius-pill); }
+.k-progress-fill { display: block; width: 100%; height: 100%; background: var(--color-accent); transform-origin: 0 50%; transform: scaleX(var(--k-value, 0)); transition: transform var(--motion-base) var(--ease-standard); }
+
+/* ---- pagination ---------------------------------------------------------------------- */
+/* A nav of links or buttons. The current page is a fill step, a full 1px accent
+   border, a bold number and aria-current="page", never colour alone. */
+.k-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.k-page-btn {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: max(var(--control-h), var(--k-hit));
+  height: max(var(--control-h), var(--k-hit));
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+.k-page-btn:hover, .k-page-btn.is-hover { background: var(--color-surface-hover); }
+.k-page-btn:active, .k-page-btn.is-active { background: var(--color-well); }
+.k-page-btn[aria-current="page"] { background: var(--color-surface-selected); border-color: var(--color-accent); font-weight: 700; }
+.k-page-btn:disabled, .k-page-btn[aria-disabled="true"] { background: transparent; color: var(--color-text-muted); cursor: not-allowed; transition: none; }
+.k-page-step { padding: 0 var(--space-3); border-color: var(--color-control); }
+.k-page-gap { min-width: var(--control-h); text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); }
+
+/* ---- breadcrumb ---------------------------------------------------------------------- */
+.k-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.k-breadcrumb li + li::before { content: "/"; content: "/" / ""; margin-right: var(--space-2); color: var(--color-text-muted); }
+.k-breadcrumb a { display: inline-flex; align-items: center; min-height: var(--k-hit); color: var(--color-text-muted); text-decoration: none; border-radius: var(--radius-sm); transition: color var(--motion-fast) var(--ease-standard); }
+.k-breadcrumb a:hover { color: var(--color-text); text-decoration: underline; }
+.k-breadcrumb [aria-current="page"] { font-weight: 600; color: var(--color-text); }
+
+/* ---- number stepper ------------------------------------------------------------------- */
+/* A native number input between two buttons. The buttons call stepDown and stepUp
+   and disable at the limits. Typing and the arrow keys of the input still work. */
+.k-stepper { display: inline-flex; align-items: stretch; }
+.k-stepper .k-btn { width: max(var(--control-h), var(--k-hit)); height: max(var(--control-h), var(--k-hit)); padding: 0; flex: none; }
+.k-stepper .k-btn:first-of-type { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.k-stepper .k-btn:last-of-type { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.k-stepper .k-input { width: 4rem; height: max(var(--control-h), var(--k-hit)); border-radius: 0; border-left-width: 0; border-right-width: 0; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.k-stepper .k-input::-webkit-inner-spin-button, .k-stepper .k-input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+
+/* ==== gap controls (plan 094 revision 2, lane K5) ================================== */
+/* Eighteen more controls and six carousel kinds, on the rules of the control set above
+   (spec R3, R9, catalog SLOP-MOTION-01 to 04 and SLOP-DECOR-01). A control is a native
+   element or the correct ARIA pattern, keyboard operable, with its states forced by the
+   same .is-hover, .is-active and .is-focus classes for the gallery. Height, width, margin,
+   top and left never sit in a transition; a panel that is dragged is direct manipulation.
+   No carousel plays by itself, in any kind. Motion: tone steps (fast), the tooltip, the
+   context menu and the combobox list open with the menu motion, the drawer and the palette
+   with the dialog motion, a tree chevron turns, a fade carousel changes opacity.
+   Behaviour is in kaliber-controls.js. Fixed geometry named here and in components.md, not
+   tokens: the 5rem textarea, the 16rem tooltip, the 24px drawer close and tag remove hit
+   (44px stands alone on a phone), the 24rem drawer, the 20px tree indent, the 32px calendar
+   day (44px on a phone), the 34rem palette, the 20px star, the 24px swatch, the 56px largest
+   avatar, the 12rem panels and the 24px panel handle. */
+
+/* ---- text fields: shared states, textarea, count, message --------------------------- */
+.k-input {
+  height: max(var(--control-h), var(--k-hit));
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-input:where(:hover, .is-hover):not(:disabled) { background: var(--color-surface-hover); }
+.k-input:focus-visible, .k-input.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-input[aria-invalid="true"] { border-color: var(--color-danger); }
+.k-input:disabled { border-color: var(--color-border); cursor: not-allowed; transition: none; }
+.k-input[type="date"], .k-input[type="time"] { min-width: 10rem; font-variant-numeric: tabular-nums lining-nums; }
+.k-input[type="date"]::-webkit-calendar-picker-indicator, .k-input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+.k-textarea { width: 100%; height: auto; min-height: 5rem; padding: var(--space-2) var(--space-3); line-height: 1.4; resize: vertical; }
+.k-field-block { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.k-field-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-field-count { flex: none; margin-left: auto; }
+.k-field-msg { display: inline-flex; align-items: flex-start; gap: var(--space-2); color: var(--color-text); }
+.k-field-msg:empty { display: none; }
+.k-field-msg::before { content: ""; flex: none; width: 8px; height: 8px; margin-top: 0.42em; background: var(--color-danger); }
+
+/* ---- tooltip -------------------------------------------------------------------------- */
+/* A short description on hover and keyboard focus, after --motion-tooltip-delay. It never
+   carries information that is needed to use the control: the label says that. It opens
+   from its trigger with the menu motion, and Escape dismisses it. */
+.k-tip-host { position: relative; display: inline-block; }
+.k-tip {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 50%;
+  z-index: 35;
+  width: max-content;
+  max-width: 16rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-text);
+  color: var(--color-background);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  display: none;
+  opacity: 0;
+  transform: translateX(-50%) scale(var(--motion-scale-enter));
+  transform-origin: 50% 100%;
+  transition: opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    display var(--motion-fast) allow-discrete;
+}
+.k-tip::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: var(--space-2); }
+.k-tip--below { bottom: auto; top: calc(100% + var(--space-2)); transform-origin: 50% 0; }
+.k-tip--below::after { top: auto; bottom: 100%; }
+.k-tip.is-open {
+  display: block;
+  opacity: 1;
+  transform: translateX(-50%);
+  transition: opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard),
+    display var(--motion-base) allow-discrete;
+}
+@starting-style {
+  .k-tip.is-open { opacity: 0; transform: translateX(-50%) scale(var(--motion-scale-enter)); }
+}
+/* A specimen that the gallery shows open must not run its opening at page load. */
+.k-tip.is-static, .k-listbox-list.is-static { transition: none; }
+
+/* ---- toggle button and group -------------------------------------------------------- */
+/* aria-pressed on a native button. Pressed is a fill step, a full accent border and a
+   filled square mark (the mark is hollow when off), never colour alone. */
+.k-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: max(var(--control-h), var(--k-hit));
+  height: max(var(--control-h), var(--k-hit));
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-toggle::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-control);
+  background: transparent;
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+.k-toggle:where(:hover, .is-hover):not(:disabled) { background: var(--color-surface-hover); }
+.k-toggle[aria-pressed="true"] { background: var(--color-surface-selected); border-color: var(--color-accent); }
+.k-toggle[aria-pressed="true"]::before { background: var(--color-accent); border-color: var(--color-accent); }
+.k-toggle:where(:active, .is-active):not(:disabled) { background: var(--color-well); }
+.k-toggle:focus-visible, .k-toggle.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-toggle:disabled { background: var(--color-disabled-fill); border-color: var(--color-border); color: var(--color-text-muted); cursor: not-allowed; transition: none; }
+.k-toggle:disabled::before { border-color: var(--color-text-muted); transition: none; }
+.k-toggle[aria-pressed="true"]:disabled::before { background: var(--color-text-muted); }
+.k-toggle-group { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; border: 0; }
+
+/* ---- combobox with filtering -------------------------------------------------------- */
+/* ARIA 1.2 combobox: the input keeps the focus, the list is a listbox, and the active
+   option is named by aria-activedescendant. The list is the menu list of the listbox and
+   opens with the menu motion. A polite local status says how many options match. */
+.k-combobox { position: relative; display: block; min-width: 14rem; }
+.k-combobox > .k-field-label, .k-multi > .k-field-label { display: block; margin-bottom: var(--space-1); }
+.k-combobox-field { position: relative; display: grid; }
+.k-combobox-input { width: 100%; padding-right: calc(var(--space-3) + 28px); }
+.k-combobox-toggle {
+  appearance: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: max(var(--control-h), var(--k-hit));
+  padding: 0;
+  border: 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.k-combobox-toggle:disabled { color: var(--color-text-muted); cursor: not-allowed; }
+.k-combobox.is-open .k-combobox-toggle .k-chevron { transform: rotate(180deg); }
+.k-combobox .k-listbox-list { right: 0; min-width: 0; }
+.k-option[hidden] { display: none; }
+.k-option-empty { color: var(--color-text-muted); cursor: default; }
+.k-option-empty:hover { background: transparent; }
+.k-option-empty::before { display: none; }
+
+/* ---- multi-select and tag input ----------------------------------------------------- */
+/* The chosen items are removable tags, square rectangles and not pills, each with a
+   named remove button. Backspace in the empty input removes the last one. */
+.k-multi { position: relative; display: block; min-width: 18rem; }
+.k-tagfield {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: max(var(--control-h), var(--k-hit));
+  padding: 3px var(--space-2) 3px 3px;
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  cursor: text;
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-tagfield:where(:hover, .is-hover):not(.is-disabled) { background: var(--color-surface-hover); }
+.k-tagfield:focus-within, .k-tagfield.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-tagfield[aria-invalid="true"] { border-color: var(--color-danger); }
+.k-tagfield.is-disabled { background: var(--color-disabled-fill); border-color: var(--color-border); cursor: not-allowed; transition: none; }
+.k-tagfield-input {
+  flex: 1 1 6rem;
+  min-width: 6rem;
+  height: 26px;
+  padding: 0 var(--space-1);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+.k-tagfield-input:disabled { color: var(--color-text-muted); cursor: not-allowed; }
+.k-chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding-left: var(--space-2);
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-sm);
+  background: var(--color-well);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+.k-chosen-x {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.k-chosen-x:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-chosen-x:where(:active, .is-active) { background: var(--color-border); }
+.k-chosen-x:focus-visible, .k-chosen-x.is-focus { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.k-chosen-x:disabled { color: var(--color-text-muted); cursor: not-allowed; transition: none; }
+.k-tagfield.is-disabled .k-chosen { background: var(--color-disabled-fill); border-color: var(--color-border); color: var(--color-text-muted); }
+
+/* ---- date, time and the calendar grid ----------------------------------------------- */
+/* The plain case is a styled native date or time input (.k-input). The calendar is a grid
+   (role="grid") with a roving tabindex: arrows move by a day or a week, Page Up and Page Down
+   by a month, Home and End to the start and end of the week. Today has a full outline and
+   aria-current="date", the chosen day a fill and aria-selected, a day out of range is struck
+   through and aria-disabled. */
+.k-calendar {
+  --k-cal-cell: max(32px, var(--k-hit));
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+.k-cal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.k-cal-title { font-size: var(--text-sm); font-weight: 600; }
+.k-cal-nav { display: flex; gap: var(--space-1); }
+.k-cal-nav .k-icon-btn { height: max(var(--control-h), var(--k-hit)); width: max(var(--control-h), var(--k-hit)); }
+.k-cal-grid { border-collapse: separate; border-spacing: 2px; table-layout: fixed; }
+.k-cal-grid th { width: var(--k-cal-cell); height: 28px; padding: 0; font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); text-align: center; }
+.k-cal-day {
+  width: var(--k-cal-cell);
+  height: var(--k-cal-cell);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--color-text);
+  text-align: center;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.k-cal-day.is-outside { color: var(--color-text-muted); }
+.k-cal-day:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-cal-day:where(:active, .is-active) { background: var(--color-well); }
+.k-cal-day[aria-current="date"] { border-color: currentColor; }
+.k-cal-day[aria-selected="true"] { background: var(--color-accent); color: var(--color-on-accent); font-weight: 700; }
+.k-cal-day[aria-selected="true"]:where(:hover, .is-hover) { background: var(--color-accent-hover); }
+.k-cal-day[aria-selected="true"]:where(:active, .is-active) { background: var(--color-accent-active); }
+.k-cal-day:focus-visible, .k-cal-day.is-focus { outline: 2px solid var(--color-focus); outline-offset: -3px; }
+.k-cal-day[aria-selected="true"]:focus-visible, .k-cal-day[aria-selected="true"].is-focus { outline-color: var(--color-on-accent); }
+.k-cal-day[aria-disabled="true"] { color: var(--color-text-muted); text-decoration: line-through; background: transparent; cursor: not-allowed; transition: none; }
+
+/* ---- file input and drop zone ------------------------------------------------------- */
+/* A real input type="file" lies over the whole zone and is invisible, so a click, the
+   keyboard and a drop all reach the native input. The zone shows the drag-over state. The
+   demo reads names and sizes only and uploads nothing. */
+.k-drop { display: grid; gap: var(--space-2); }
+.k-drop-zone {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--color-control);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  text-align: center;
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-drop-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.k-drop-title { font-weight: 600; }
+.k-drop-hint { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-drop-over { display: none; }
+.k-drop-zone:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-drop-zone:where(:active, .is-active) { background: var(--color-well); }
+.k-drop-zone:has(.k-drop-input:focus-visible), .k-drop-zone.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-drop-zone.is-dragover { border-style: solid; border-color: var(--color-accent); background: var(--color-surface-selected); }
+.k-drop-zone.is-dragover .k-drop-hint { color: var(--color-text); }
+.k-drop-zone.is-dragover .k-drop-idle { display: none; }
+.k-drop-zone.is-dragover .k-drop-over { display: inline; }
+.k-drop-zone.is-error { border-color: var(--color-danger); }
+.k-drop-zone:has(.k-drop-input:disabled) { background: var(--color-disabled-fill); border-color: var(--color-border); color: var(--color-text-muted); transition: none; }
+.k-drop-zone:has(.k-drop-input:disabled) .k-drop-input { cursor: not-allowed; }
+.k-file-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.k-file { display: flex; align-items: center; gap: var(--space-3); min-height: max(var(--control-h), var(--k-hit)); padding: 0 var(--space-2); border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+.k-file-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-file-size { flex: none; color: var(--color-text-muted); }
+.k-file .k-btn { width: auto; flex: none; height: max(28px, var(--k-hit)); padding: 0 var(--space-3); }
+
+/* ---- tree view ------------------------------------------------------------------------ */
+/* role="tree" with a roving tabindex. Right opens a closed branch or goes to its first
+   child, Left closes an open branch or goes to the parent, Home and End jump, a typed
+   letter finds the next label. The chevron turns (120 ms) and the children appear in one
+   step (display, no height). The selected row is a fill, a bold label and a square mark. */
+.k-tree, .k-tree ul { margin: 0; padding: 0; list-style: none; }
+.k-tree { font-size: var(--text-sm); }
+.k-tree [role="treeitem"] { outline: none; }
+.k-tree [role="group"] { display: none; }
+.k-tree [aria-expanded="true"] > [role="group"] { display: block; }
+.k-tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: max(28px, var(--k-hit));
+  padding: 0 var(--space-3) 0 calc(var(--k-level, 0) * 20px + var(--space-2));
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.k-tree-row::after { content: ""; flex: none; width: 8px; height: 8px; margin-left: auto; background: var(--color-accent); opacity: 0; }
+.k-tree-row:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-tree-row:where(:active, .is-active) { background: var(--color-well); }
+.k-tree-chevron { flex: none; transform: rotate(-90deg); transition: transform var(--motion-base) var(--ease-standard); }
+.k-tree [aria-expanded="true"] > .k-tree-row > .k-tree-chevron { transform: none; }
+.k-tree-spacer { flex: none; width: 12px; }
+.k-tree [aria-selected="true"] > .k-tree-row { background: var(--color-surface-selected); font-weight: 700; }
+.k-tree [aria-selected="true"] > .k-tree-row::after { opacity: 1; }
+.k-tree [role="treeitem"]:focus-visible > .k-tree-row, .k-tree-row.is-focus { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+/* ---- wizard steps ---------------------------------------------------------------------- */
+/* An ordered list with aria-current="step" on the current one. Done, current and upcoming
+   differ by the mark (a filled square with a check, a thick ring with the number, a thin
+   ring with the number) and by a state word, never by colour alone. */
+.k-steps { display: flex; align-items: flex-start; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.k-step { display: flex; flex: 1 1 0; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.k-step + .k-step::before { content: ""; flex: 0 0 var(--space-4); align-self: flex-start; height: 1px; margin: 12px 0 0 calc(-1 * var(--space-2)); background: var(--color-border-strong); }
+.k-step-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.k-step-check { display: none; }
+.k-step.is-done .k-step-mark { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
+.k-step.is-done .k-step-num { display: none; }
+.k-step.is-done .k-step-check { display: block; }
+.k-step.is-current .k-step-mark { border-width: 2px; border-color: var(--color-accent); color: var(--color-text); }
+.k-step-text { display: flex; flex-direction: column; min-width: 0; }
+.k-step-name { font-size: var(--text-sm); font-weight: 600; color: var(--color-text-muted); }
+.k-step.is-current .k-step-name, .k-step.is-done .k-step-name { color: var(--color-text); }
+.k-step-state { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+/* ---- side sheet and drawer -------------------------------------------------------------- */
+/* Modal, from the right, and from the bottom on a phone. Only transform and the scrim
+   opacity move: 200 ms in, 80 ms out. The script sets inert on the page behind, traps the
+   Tab key, closes on Escape and returns the focus to the trigger. A .k-drawer-root without
+   data-k-drawer is a static, always visible specimen. */
+.k-drawer-root { position: fixed; inset: 0; z-index: 50; }
+.k-drawer-root[data-k-drawer] { visibility: hidden; transition: visibility 0s linear var(--motion-fast); }
+.k-drawer-root[data-k-drawer].is-open { visibility: visible; transition: visibility 0s; }
+.k-drawer-root[data-k-drawer] .k-scrim { opacity: 0; transition: opacity var(--motion-fast) var(--ease-standard); }
+.k-drawer-root[data-k-drawer].is-open .k-scrim { opacity: 1; transition: opacity var(--motion-slow) var(--ease-standard); }
+.k-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(24rem, 100%);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+}
+.k-drawer-root[data-k-drawer] .k-drawer { transform: translateX(100%); transition: transform var(--motion-fast) var(--ease-standard); }
+.k-drawer-root[data-k-drawer].is-open .k-drawer { transform: none; transition: transform var(--motion-slow) var(--ease-standard); }
+.k-drawer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.k-drawer-head .k-dialog-title { margin: 0; }
+.k-drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-drawer-foot { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); }
+.k-drawer-foot .k-btn { width: auto; padding: 0 var(--space-4); }
+.k-x-btn { appearance: none; display: grid; place-items: center; flex: none; width: max(24px, var(--k-hit)); height: max(24px, var(--k-hit)); padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); cursor: pointer; transition: background-color var(--motion-fast) var(--ease-standard); }
+.k-x-btn:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-x-btn:where(:active, .is-active) { background: var(--color-well); }
+.k-x-btn:focus-visible, .k-x-btn.is-focus { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+/* ---- skeleton ----------------------------------------------------------------------------- */
+/* Static tone blocks: no shimmer and no pulse (SLOP-MOTION-04). They show only while a
+   process runs, and the region says so with aria-busy and a polite local status. */
+.k-skeleton { display: block; height: 12px; border-radius: var(--radius-sm); background: var(--color-border); }
+.k-skeleton--title { width: 40%; height: 16px; }
+.k-skeleton--short { width: 60%; }
+.k-skeleton--block { height: 6rem; }
+.k-skeleton--square { flex: none; width: 40px; height: 40px; }
+.k-skeleton-card { display: flex; align-items: flex-start; gap: var(--space-3); }
+.k-skeleton-lines { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--space-2); }
+.k-skeleton-region[hidden], .k-skeleton-real[hidden] { display: none; }
+
+/* ---- inline alert and banner --------------------------------------------------------------- */
+/* An icon and a text label per kind (Info, Success, Warning, Error): the shape of the icon
+   and the word carry the kind, colour only supports it. One full hairline frame, no edge
+   stripe and no tinted pill (SLOP-DECOR-01). An optional dismiss button. */
+.k-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+.k-alert[hidden] { display: none; }
+.k-alert-icon { flex: none; margin-top: 2px; }
+.k-alert--info .k-alert-icon { color: var(--color-accent); }
+.k-alert--success .k-alert-icon { color: var(--color-success); }
+.k-alert--warning .k-alert-icon { color: var(--color-warning); }
+.k-alert--error .k-alert-icon { color: var(--color-danger); }
+.k-alert-body { flex: 1 1 auto; min-width: 0; }
+.k-alert-label { font-weight: 700; }
+.k-alert-label::after { content: ". "; content: ". " / ""; }
+.k-alert-close { align-self: center; margin: -6px 0; }
+.k-alert--banner { border-width: 1px 0; border-radius: 0; }
+.k-alert-stack { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* ---- avatar ------------------------------------------------------------------------------- */
+/* A square with small corners, not a circle in a pill. Initials are the fallback under an
+   image: if the image fails, the script hides it. A group ends with an overflow count as
+   text. It is not interactive, so only the default state applies. */
+.k-avatar {
+  --k-avatar: 32px;
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--k-avatar);
+  height: var(--k-avatar);
+  overflow: hidden;
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-well);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+.k-avatar--sm { --k-avatar: 24px; font-size: var(--text-xs); }
+.k-avatar--lg { --k-avatar: 40px; font-size: var(--text-md); }
+.k-avatar--xl { --k-avatar: 56px; font-size: var(--text-lg); }
+.k-avatar-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.k-avatar-img[hidden] { display: none; }
+.k-avatar--count { background: var(--color-surface-raised); color: var(--color-text); font-variant-numeric: tabular-nums lining-nums; }
+.k-avatar-group { display: inline-flex; align-items: center; gap: var(--space-1); }
+
+/* ---- resizable panels -------------------------------------------------------------------------- */
+/* A separator (role="separator", focusable, aria-valuenow) between two panels. The keys:
+   arrows step 2 percent, Page Up and Page Down 10, Home and End the limits. Dragging sets the
+   size at once with no transition: it is direct manipulation, not animation. */
+.k-panels {
+  display: grid;
+  grid-template-columns: var(--k-panel-a, 50%) var(--k-hit) minmax(0, 1fr);
+  height: 12rem;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+.k-panel { min-width: 0; overflow: auto; padding: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-panel-a { border-right: 1px solid var(--color-border); }
+.k-panel-b { border-left: 1px solid var(--color-border); }
+.k-panel-title { margin-bottom: var(--space-1); font-weight: 600; color: var(--color-text); }
+.k-panel-handle { display: grid; place-items: center; background: var(--color-well); color: var(--color-text-muted); cursor: col-resize; touch-action: none; outline: none; transition: background-color var(--motion-fast) var(--ease-standard); }
+.k-panel-handle:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-panel-handle:where(:active, .is-active, .is-dragging) { background: var(--color-surface-selected); color: var(--color-text); transition: none; }
+.k-panel-handle:focus-visible, .k-panel-handle.is-focus { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+.k-panel-grip { pointer-events: none; }
+.k-panels.is-dragging { user-select: none; }
+
+/* ---- context menu --------------------------------------------------------------------------------- */
+/* The menu look and motion of the K2 menu, opened at the pointer (right click) or at the
+   target (Shift+F10 and the menu key). It is never the only way to an action: the same
+   actions have a visible button. */
+.k-context-target { padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-raised); font-size: var(--text-sm); }
+.k-context-target:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-menu-list--context { position: fixed; top: 0; left: 0; }
+
+/* ---- command palette --------------------------------------------------------------------------------- */
+/* A dialog (the dialog motion) with a combobox and a grouped listbox that stays open. Ctrl+K
+   opens it in the gallery demo; Escape closes it and the focus returns. */
+.k-palette-root { align-items: flex-start; padding: 12vh var(--space-4) 0; }
+.k-palette { display: flex; flex-direction: column; width: min(34rem, 100%); max-height: min(30rem, 80vh); padding: 0; overflow: hidden; }
+.k-palette-bar { padding: var(--space-3); border-bottom: 1px solid var(--color-border); }
+.k-palette-bar .k-input { width: 100%; }
+.k-palette-list { flex: 1 1 auto; min-height: 0; margin: 0; padding: var(--space-1); overflow-y: auto; list-style: none; }
+.k-palette-group { margin: 0; padding: 0; list-style: none; }
+.k-palette-group-label { padding: var(--space-2) var(--space-3) var(--space-1); font-size: var(--text-xs); font-weight: 600; color: var(--color-text-muted); }
+.k-palette-foot { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--color-border); font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-palette-group[hidden] { display: none; }
+.k-palette-none { display: none; margin: 0; padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-palette-list.is-empty ~ .k-palette-none { display: block; }
+.k-palette-list.is-empty { display: none; }
+
+/* ---- rating -------------------------------------------------------------------------------------------- */
+/* A radio group underneath: the arrow keys move the choice. A star is drawn as an outline
+   when empty and filled when chosen, so the value reads without colour, and the value is
+   also text ("3 of 5"). The pointer previews the value under it. */
+.k-rating { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; padding: 0; border: 0; }
+.k-rating-items { display: inline-flex; }
+.k-rating-item { position: relative; display: grid; place-items: center; width: max(28px, var(--k-hit)); height: max(28px, var(--k-hit)); border-radius: var(--radius-sm); color: var(--color-control); cursor: pointer; outline: 2px solid transparent; outline-offset: calc(2px + var(--motion-offset-focus)); transition: outline-color var(--motion-fast) var(--ease-standard), outline-offset var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+.k-rating-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.k-rating-star { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: miter; pointer-events: none; transition: fill var(--motion-fast) var(--ease-standard); }
+.k-rating-item .k-sr-only { color: var(--color-text); }
+.k-rating-item.is-filled { color: var(--color-accent); }
+.k-rating-item.is-filled .k-rating-star, .k-rating-item.is-preview .k-rating-star { fill: currentColor; }
+.k-rating-item.is-preview { color: var(--color-accent-hover); }
+.k-rating-item:where(:active, .is-active):not(.is-disabled) { color: var(--color-accent-active); }
+.k-rating-item:has(.k-rating-input:focus-visible), .k-rating-item.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-rating-item.is-disabled { color: var(--color-text-muted); cursor: not-allowed; transition: none; }
+.k-rating-item.is-disabled .k-rating-input { cursor: not-allowed; }
+.k-rating-item.is-disabled.is-filled { color: var(--color-text-muted); }
+.k-rating-text { min-width: 5.5rem; font-size: var(--text-sm); font-weight: 600; }
+.k-rating--static .k-rating-item { cursor: default; }
+
+/* ---- colour picker ----------------------------------------------------------------------------------------- */
+/* A styled native input type="color", a swatch grid that is a radio group with a name for
+   each colour, and a hex field with validation (an error says Error and shows a mark). The
+   chosen swatch has a full frame and a check mark, not only its colour. */
+.k-color { display: flex; flex-direction: column; gap: var(--space-3); }
+.k-color-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); }
+.k-color-native { appearance: none; width: max(var(--control-h), var(--k-hit)); height: max(var(--control-h), var(--k-hit)); padding: 2px; border: 1px solid var(--color-control); border-radius: var(--radius-md); background: var(--color-surface-raised); cursor: pointer; outline: 2px solid transparent; outline-offset: calc(2px + var(--motion-offset-focus)); transition: background-color var(--motion-fast) var(--ease-standard), outline-color var(--motion-fast) var(--ease-standard), outline-offset var(--motion-fast) var(--ease-standard); }
+.k-color-native::-webkit-color-swatch-wrapper { padding: 0; }
+.k-color-native::-webkit-color-swatch { border: 0; border-radius: var(--radius-sm); }
+.k-color-native::-moz-color-swatch { border: 0; border-radius: var(--radius-sm); }
+.k-color-native:where(:hover, .is-hover):not(:disabled) { background: var(--color-surface-hover); }
+.k-color-native:focus-visible, .k-color-native.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-color-native:disabled { border-color: var(--color-border); cursor: not-allowed; transition: none; }
+.k-color-hex { width: 8rem; }
+.k-picks { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; border: 0; }
+.k-pick-opt { position: relative; display: grid; place-items: center; width: max(32px, var(--k-hit)); height: max(32px, var(--k-hit)); border: 2px solid transparent; border-radius: var(--radius-md); cursor: pointer; outline: 2px solid transparent; outline-offset: calc(2px + var(--motion-offset-focus)); transition: border-color var(--motion-fast) var(--ease-standard), outline-color var(--motion-fast) var(--ease-standard), outline-offset var(--motion-fast) var(--ease-standard); }
+.k-pick-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.k-pick-chip { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid var(--color-control); border-radius: var(--radius-sm); background: var(--k-chip, var(--color-well)); color: var(--k-on-chip, var(--color-text)); pointer-events: none; }
+.k-pick-check { display: none; }
+.k-pick-opt:where(:hover, .is-hover):not(.is-disabled) { border-color: var(--color-control); }
+.k-pick-opt:where(:active, .is-active):not(.is-disabled) { border-color: var(--color-text-muted); }
+.k-pick-opt.is-checked { border-color: var(--color-text); }
+.k-pick-opt.is-checked .k-pick-check { display: block; }
+.k-pick-opt:has(.k-pick-input:focus-visible), .k-pick-opt.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-pick-opt.is-disabled { cursor: not-allowed; opacity: 0.5; transition: none; }
+.k-pick-opt.is-disabled .k-pick-input { cursor: not-allowed; }
+.k-color-preview { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
+.k-color-preview-chip { width: 24px; height: 24px; border: 1px solid var(--color-control); border-radius: var(--radius-sm); background: var(--k-chip, var(--color-well)); }
+
+/* ---- carousel kinds (lane K5) ---------------------------------------------------------------------------------------- */
+/* Six kinds on the parts of the K4 carousel (viewport, track, slide, bar, marks). All move
+   on a user action only: buttons, marks, arrow keys, Home and End, or a swipe. None plays by
+   itself and none loops. Each writes its position as text and one polite announcement into
+   its own live region. The wrapping kind is the single-slide one whose previous button on the
+   first slide goes to the last, and its position text says so. */
+.k-carousel.is-still .k-carousel-track { transition: none; }
+.k-carousel--multi { --k-per: 3; --k-gap: var(--space-3); --k-peek: 40px; }
+.k-carousel--multi .k-carousel-viewport { border: 0; border-radius: 0; background: none; }
+.k-carousel--multi .k-carousel-track { transform: translateX(calc(var(--k-slide, 0) * -1 * (100% - var(--k-peek) + var(--k-gap)))); }
+.k-carousel--multi .k-carousel-slide {
+  flex: 0 0 calc((100% - (var(--k-per) - 1) * var(--k-gap) - var(--k-peek)) / var(--k-per));
+  margin-right: var(--k-gap);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+.k-carousel--fade .k-carousel-track { display: grid; transform: none; transition: none; }
+.k-carousel--fade .k-carousel-slide { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity var(--motion-fast) var(--ease-standard), visibility 0s linear var(--motion-fast); }
+.k-carousel--fade .k-carousel-slide.is-current { opacity: 1; visibility: visible; transition: opacity var(--motion-slow) var(--ease-standard), visibility 0s; }
+.k-carousel--vertical { flex-direction: row; align-items: stretch; }
+.k-carousel--vertical .k-carousel-viewport { flex: 1 1 auto; height: 11rem; touch-action: pan-x; }
+.k-carousel--vertical .k-carousel-track { flex-direction: column; height: 100%; transform: translateY(calc(var(--k-slide, 0) * -100%)); }
+.k-carousel--vertical .k-carousel-slide { flex: 0 0 100%; }
+.k-carousel--vertical .k-carousel-bar { flex: none; flex-direction: column; flex-wrap: nowrap; justify-content: space-between; }
+.k-carousel--vertical .k-carousel-marks { flex-direction: column; }
+.k-carousel--vertical .k-carousel-status { margin: 0; }
+.k-arrow--up { transform: rotate(180deg); }
+.k-carousel-thumbs { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: var(--space-2); }
+.k-carousel-thumb {
+  appearance: none;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  min-height: max(2.75rem, var(--k-hit));
+  padding: var(--space-2);
+  border: 1px solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: calc(2px + var(--motion-offset-focus));
+  transition: background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    outline-color var(--motion-fast) var(--ease-standard),
+    outline-offset var(--motion-fast) var(--ease-standard);
+}
+.k-thumb-name { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: 600; }
+.k-thumb-name::before { content: ""; flex: none; width: 8px; height: 8px; border: 1px solid var(--color-control); background: transparent; }
+.k-thumb-meta { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-carousel-thumb:where(:hover, .is-hover) { background: var(--color-surface-hover); }
+.k-carousel-thumb[aria-current="true"] { background: var(--color-surface-selected); border-color: var(--color-accent); }
+.k-carousel-thumb[aria-current="true"] .k-thumb-name::before { background: var(--color-accent); border-color: var(--color-accent); }
+.k-carousel-thumb[aria-current="true"] .k-thumb-meta { color: var(--color-text); }
+.k-carousel-thumb:where(:active, .is-active) { background: var(--color-well); }
+.k-carousel-thumb:focus-visible, .k-carousel-thumb.is-focus { outline-color: var(--color-focus); outline-offset: 2px; }
+.k-carousel--free .k-carousel-scroller { display: flex; gap: var(--space-3); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding: 2px; scrollbar-width: thin; padding: 2px; }
+.k-carousel--free .k-carousel-item { flex: 0 0 min(16rem, 80%); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-raised); scroll-snap-align: start; }
+
+/* ==== register motion set (plan 094 revision 3, lane K6) ============================ */
+/* Spec R17 and R18. A Kaliber motion records a change, it does not perform one: the frame
+   (header, rules, column heads) stays still and only the entry that changed reacts. Two
+   gestures: ink (a changed cell takes the accent soft tone, holds for --motion-ink-hold,
+   then dries back to the row tone) and the needle (a small mark travels or turns by
+   transform). Numbers never roll, count or tween. kaliber-motion.js flips the classes and
+   attributes below; every duration here is a token. Reduced motion (the media query or
+   <html data-k-motion="reduce">) makes all of it instant, colour and opacity too. */
+
+/* ---- F1 receipt label: the label swaps to the result ("Saved") and back after the hold.
+   Both labels share one grid cell, so the button keeps its width. */
+.k-btn-receipt { display: inline-grid; place-items: center; }
+.k-btn-receipt > .k-btn-label, .k-btn-receipt > .k-btn-done { grid-area: 1 / 1; transition: opacity var(--motion-fast) var(--ease-standard); }
+.k-btn-receipt > .k-btn-done { opacity: 0; }
+.k-btn-receipt.is-done > .k-btn-label { opacity: 0; }
+.k-btn-receipt.is-done > .k-btn-done { opacity: 1; }
+
+/* ---- F2 entry ink: on at once, back over slow. A fill, never an edge bar (SLOP-DECOR-01),
+   never a glow or a pulse. The script removes .is-inked after --motion-ink-hold. */
+.k-ink { transition: background-color var(--motion-slow) var(--ease-standard); }
+.k-ink.is-inked { background-color: var(--color-accent-soft); transition: none; }
+/* D1: the muted delta beside a changed value appears with the ink and leaves with it. */
+.k-delta { display: inline-block; min-width: 4ch; margin-left: var(--space-2); color: var(--color-text-muted); font-weight: 400; opacity: 0; transition: opacity var(--motion-slow) var(--ease-standard); }
+.is-inked .k-delta { opacity: 1; transition: none; }
+/* The note that says what changed when the many-changes cap holds the ink back. */
+.k-ink-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+/* ---- F3 refusal ring: the focus ring of a refused field redraws in the danger colour with
+   the existing draw-in (outline colour and offset). No shake, no elastic. */
+.k-input[aria-invalid="true"]:focus-visible, .k-input[aria-invalid="true"].is-focus { outline-color: var(--color-danger); }
+
+/* ---- N1 sheet change and N2 key carry: a same-document View Transition on the sheet
+   ([data-k-sheet], the app's main) only. During the turn the header, the footer and every
+   table head keep their own name and class k-still, so they do not move; the sheet
+   cross-fades by opacity. A key with the same box in both views carries over by transform. */
+html.k-sheet-turn [data-k-sheet] { view-transition-name: k-sheet; }
+html.k-sheet-turn .k-header { view-transition-name: k-header; view-transition-class: k-still; }
+html.k-sheet-turn .k-footer { view-transition-name: k-footer; view-transition-class: k-still; }
+html.k-sheet-turn thead[data-k-thead] { view-transition-class: k-still; }
+html.k-sheet-turn::view-transition-group(*),
+html.k-sheet-turn::view-transition-old(*),
+html.k-sheet-turn::view-transition-new(*) { animation-duration: var(--motion-base); animation-timing-function: var(--ease-standard); }
+html.k-sheet-turn::view-transition-group(k-sheet),
+html.k-sheet-turn::view-transition-group(*.k-still) { animation: none; }
+html.k-sheet-turn::view-transition-group(k-key),
+html.k-sheet-turn::view-transition-old(k-key),
+html.k-sheet-turn::view-transition-new(k-key) { animation-duration: var(--motion-slow); }
+.k-key { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); font-weight: 600; line-height: 1.5; font-variant-numeric: tabular-nums lining-nums; color: var(--color-text); }
+.k-key-mark { flex: none; width: 8px; height: 8px; background: var(--color-accent); }
+/* A key that opens its row: a bare button around the key, so the key box is the same box. */
+.k-key-link { padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; }
+.k-key-link:hover .k-key { text-decoration: underline; }
+
+/* ---- D2 row insert and sort: rows take their places at once (no FLIP, no height). New rows
+   take ink; out of view, the table foot says how many are below. The sort mark turns. */
+.k-sort { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: inherit; font: inherit; cursor: pointer; transition: color var(--motion-fast) var(--ease-standard); }
+.k-sort:hover { color: var(--color-text); }
+.k-sort-mark { display: block; flex: none; transition: transform var(--motion-base) var(--ease-standard); }
+th[aria-sort="none"] .k-sort-mark, th:not([aria-sort]) .k-sort-mark { visibility: hidden; }
+th[aria-sort="descending"] .k-sort-mark { transform: rotate(180deg); }
+.k-table-foot { margin: 0; padding: var(--space-1) 0; border-top: 1px solid var(--color-border); font-size: var(--text-xs); }
+
+/* ---- D3 gauge tick travel: a zero-width needle moves by translateX of --k-at (0 to 1)
+   of the track width (the gauge is its container, 100cqi is the track); the 2px tick rides
+   on it. A zero width keeps the moved box from widening the page. */
+.k-gauge:has(> .k-gauge-needle) { container-type: inline-size; }
+.k-gauge-needle { position: absolute; top: 0; bottom: 0; left: 0; width: 0; transform: translateX(calc(var(--k-at, 0) * 100cqi)); transition: transform var(--motion-base) var(--ease-standard); }
+.k-gauge-needle > .k-gauge-tick { left: -1px; }
+
+/* ---- D4 series extend: only the new segment draws in (pathLength="1" on the segment). A
+   scale change redraws the whole chart at once, with no tween between scales. */
+svg .k-series-extend { stroke-dasharray: 1; stroke-dashoffset: 0; transition: stroke-dashoffset var(--motion-base) var(--ease-standard); }
+svg .k-series-extend.is-pending { stroke-dashoffset: 1; transition: none; }
+
+/* ---- P1 line resolves: once the total is known, the indeterminate header line (d) becomes
+   a determinate fill by scaleX and the loop stops; at the end it goes display none and the
+   footer keeps a dated receipt. */
+html .k-header.is-busy.is-determinate .k-activity-bar { width: 100%; transform-origin: 0 50%; transform: scaleX(var(--k-progress, 0)); animation: none; transition: transform var(--motion-base) var(--ease-standard); }
+/* ==== end of the register motion set ================================================= */
+
+/* ---- tablet: the multi-item carousel shows two cards ------------------------------ */
+@media (max-width: 899px) {
+  .k-carousel--multi { --k-per: 2; }
+}
+
+/* ---- phone: the control set. Every hit target grows to the touch height, 44px. -- */
+@media (max-width: 599px) {
+  :root { --k-hit: var(--control-h-touch); }
+  .k-listbox-trigger { min-width: 0; width: 100%; }
+  .k-listbox { display: block; }
+  .k-select-wrap { display: grid; }
+  .k-combobox, .k-multi { min-width: 0; }
+  .k-carousel--multi { --k-per: 1; --k-peek: 24px; }
+  .k-carousel-thumbs { grid-auto-flow: row; grid-auto-columns: auto; }
+  .k-steps { flex-direction: column; gap: var(--space-3); }
+  .k-step + .k-step::before { display: none; }
+  .k-drawer { top: auto; right: 0; left: 0; width: auto; max-height: 85%; }
+  .k-drawer-root[data-k-drawer] .k-drawer { transform: translateY(100%); }
+  .k-drawer-root[data-k-drawer].is-open .k-drawer { transform: none; }
+  .k-file { flex-wrap: wrap; row-gap: var(--space-1); padding-top: var(--space-1); padding-bottom: var(--space-1); }
+  .k-palette-root { padding-top: var(--space-4); }
+}
+
+/* ---- phone: the header wraps, the section nav gets its own row ------------------- */
+@media (max-width: 599px) {
+  .k-shell { padding: 0 var(--space-4); }
+  .k-header .k-shell { flex-wrap: wrap; align-content: flex-start; column-gap: var(--space-4); min-height: 0; padding-top: var(--space-2); }
+  .k-header-name { display: inline-flex; align-items: center; min-width: var(--k-hit); min-height: var(--k-hit); padding: 0; }
+  .k-header .k-tabs { order: 3; flex: 1 0 100%; overflow-x: auto; scrollbar-width: thin; }
+  .k-header-tools .k-status { display: none; }
+  .k-header-sticky { position: static; }
+  .k-toast-region { left: var(--space-4); right: var(--space-4); bottom: var(--space-4); align-items: stretch; }
+  /* Spec R31 (fix round k14): links in a navigation are 44px high, and nothing hides
+     under a fixed bottom navigation at the end of the page. */
+  .k-footer-links .k-link { display: inline-flex; align-items: center; min-height: var(--k-hit); }
+  body:has(> .k-bottom-nav) { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ---- app shell: the shared core of every Kaliber app (plan 094 revision 3, lane K7b, spec R12) ---- */
+/* .k-appshell is the app window: header, body and footer in a column. It is a size container,
+   so the navigation follows the width of the window and not of the viewport: a navigation pane
+   (.k-nav) is full from 1008px, icons only from 641px, and on a phone (640px or less) a row of
+   at most 5 tabs whose last tab is "More". Settings is the last navigation item, pinned at the
+   end (.k-nav-last). The selected item has three cues and no edge stripe: the selected fill, a
+   bold label and the accent glyph. The page head (.k-pagehead) is the screen title with the one
+   primary action and the labelled "More" menu at the end of the same row. */
+.k-appshell { display: flex; flex-direction: column; container: appshell / inline-size; background: var(--color-background); color: var(--color-text); --k-shell-max: none; }
+.k-appshell > .k-header { position: relative; }
+.k-appshell-body { flex: 1 1 auto; display: flex; min-height: 0; }
+.k-appshell-main { flex: 1 1 auto; min-width: 0; padding: var(--space-4) var(--space-6) var(--space-6); }
+.k-appshell > .k-footer .k-shell { font-size: var(--text-xs); }
+
+.k-nav { flex: none; display: flex; flex-direction: column; gap: 2px; width: 13rem; padding: var(--space-3) var(--space-2); border-right: 1px solid var(--color-border); background: var(--color-surface-raised); }
+.k-nav-item {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: max(var(--control-h), var(--k-hit));
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+.k-nav-item:hover { background: var(--color-surface-hover); color: var(--color-text); }
+.k-nav-item[aria-current="page"] { background: var(--color-surface-selected); color: var(--color-text); font-weight: 700; }
+.k-nav-glyph { flex: none; width: 16px; height: 16px; }
+.k-nav-item[aria-current="page"] .k-nav-glyph { color: var(--color-accent); }
+.k-nav-last { margin-top: auto; }
+/* The phone "More" tab only exists on a phone. */
+.k-nav-more { display: none; }
+
+.k-pagehead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-4); }
+.k-pagehead-title { margin-right: auto; min-width: 0; font-size: var(--text-lg); font-weight: 700; }
+
+.k-settings-section { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) 0; border-top: 1px solid var(--color-border); }
+.k-settings-section > h3 { font-size: var(--text-md); font-weight: 700; }
+
+/* A link that runs an action is a button that looks like .k-link (Help in the footer). The
+   update line is the quiet info line of a found update: small muted text in the header tools,
+   never a warning colour (R20). */
+button.k-link, .k-update-line { appearance: none; background: none; border: 0; padding: 0; font: inherit; color: var(--color-text-muted); cursor: pointer; min-height: var(--k-hit); }
+button.k-link:hover, .k-update-line:hover { color: var(--color-text); text-decoration: underline; }
+.k-update-line { font-size: var(--text-xs); }
+
+/* The Undo (or any action) of a toast. */
+.k-toast-action { margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) var(--space-1); }
+
+/* Icons only (641px to 1007px): the label stays in the markup as the accessible name. */
+@container appshell (max-width: 1007px) {
+  .k-nav { width: auto; align-items: center; }
+  .k-nav-item { justify-content: center; width: max(var(--control-h), var(--k-hit)); padding: 0; }
+  .k-nav-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+
+/* Phone (640px or less): the same rules as the header of a phone, taken from the window width. */
+@container appshell (max-width: 640px) {
+  .k-appshell-main { padding: var(--space-4); }
+  .k-appshell .k-shell { padding: 0 var(--space-4); }
+  .k-appshell .k-header .k-shell { flex-wrap: wrap; align-content: flex-start; column-gap: var(--space-4); min-height: 0; padding-top: var(--space-2); }
+  .k-appshell .k-header-name { padding: var(--space-2) 0; }
+  .k-appshell .k-header .k-tabs { order: 3; flex: 1 0 100%; overflow-x: auto; scrollbar-width: thin; }
+  .k-appshell .k-header-tools .k-status { display: none; }
+  .k-appshell-body { flex-direction: column; }
+  .k-nav { flex-direction: row; align-items: stretch; width: auto; padding: 0 var(--space-2); border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .k-nav-item { flex: 1 1 0; width: auto; min-width: 0; justify-content: center; padding: 0 var(--space-1); }
+  .k-nav-glyph { display: none; }
+  .k-nav-label { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip-path: none; white-space: nowrap; }
+  .k-nav-last, .k-nav-item[data-k-phone-more] { display: none; }
+  .k-nav-more { display: block; flex: 1 1 0; min-width: 0; }
+  /* The primary action wraps under the title; the "More" menu stays at the end of the title row. */
+  .k-pagehead .k-menu { order: 2; }
+  .k-pagehead > .k-btn-primary { order: 3; flex: 1 0 100%; width: 100%; }
+}
+
+/* ---- keyboard: selection in a table or a list, inline edit, discard question (lane K9) -- */
+/* Focus and selection are separate. The focused row has the focus ring inside its box; a
+   selected row has the selected fill and a bold name (the same cues as .k-list-item, no edge
+   stripe). kaliber-controls.js ([data-k-select]) sets aria-selected and the checkboxes. */
+.k-select-tools { gap: var(--space-3); align-items: center; flex-wrap: wrap; margin-bottom: var(--space-3); }
+.k-select-filter { width: 14rem; max-width: 100%; }
+.k-select-col { width: 2.75rem; }
+.k-select-table td, .k-select-table th { vertical-align: middle; }
+[data-k-select] [data-k-item] { cursor: default; }
+[data-k-select] [data-k-item]:focus-visible { outline-offset: -2px; }
+[data-k-select] [data-k-item]:hover { background: var(--color-surface-hover); }
+[data-k-select] [data-k-item][aria-selected="true"] { background: var(--color-surface-selected); }
+[data-k-select] [data-k-item][aria-selected="true"] [data-k-edit] { font-weight: 700; }
+.k-select-list { max-width: 28rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-raised); }
+.k-select-list > [data-k-item] { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+.k-select-list > [data-k-item]:last-child { border-bottom: 0; }
+.k-cell-input { height: calc(var(--control-h) - 4px); width: 100%; min-width: 8rem; }
+.k-keys-form { display: grid; gap: var(--space-3); }
+.k-keys-discard { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
+.k-keys-label { white-space: nowrap; }
+
+/* ==== Kaliber revision 4: one style for every surface (plan 125, R23 to R35) ======== */
+/* App, web, shop and phone use these pieces with the same limits. The content picks
+   them (spec R26, R34): a data screen keeps its title at the top text step and its
+   lead number at most 40px; an article, a product or a landing title may use a
+   display step. Paper is --color-background, the sheet is --color-surface-raised.
+   Fixed geometry named here (1px rules, the 2px gap of the double rule, 1.5px
+   drawing strokes, 6px and 10px marks, 16rem sidenotes, the 1200px sidenote
+   breakpoint, 56px bottom navigation) is documented in components.md. */
+
+/* ---- lead element and page head (R24, R34 a) ---------------------------------------- */
+/* One lead per screen and per section. Page title >= 1.33x a section title (32/24),
+   a section title >= 1.5x a subsection title (24/16). Metadata is small and muted. */
+.k-page-head { display: grid; gap: var(--space-2); margin-bottom: var(--space-6); }
+.k-page-title { font-size: var(--text-3xl); font-weight: 700; line-height: 1.15; text-wrap: balance; }
+.k-page-meta { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-section-title { font-size: var(--text-xl); font-weight: 700; line-height: 1.2; }
+.k-subsection-title { font-size: var(--text-md); font-weight: 600; line-height: 1.3; }
+.k-display-1, .k-display-2, .k-display-3 {
+  font-weight: 700;
+  line-height: var(--leading-display);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.k-display-1 { font-size: var(--text-display-1); }
+.k-display-2 { font-size: var(--text-display-2); }
+.k-display-3 { font-size: var(--text-display-3); }
+
+/* ---- materials: sheet, field, ink (R25, R26, R34) -------------------------------------- */
+/* The sheet is the one raised work surface: a tone step and a hairline, no shadow. */
+.k-sheet-surface { background: var(--color-surface-raised); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); }
+/* A tinted section field: a band of the page, not a card. At most two per page, and
+   never a light tinted field for an app hue from 20 to 70 (SLOP-COLOR-06 risk).
+   .k-tint-field--accent2 uses the optional second hue (R35) instead of the accent. */
+.k-tint-field { background: var(--color-accent-soft); border-radius: var(--radius-md); padding: var(--space-6); }
+.k-tint-field--accent2 { background: var(--color-accent2-field, var(--color-accent-soft)); }
+/* Up to four key facts of a page head, on a field: a muted term over a value. */
+.k-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: var(--space-4) var(--space-6); margin: 0; }
+.k-facts > div { display: grid; gap: var(--space-1); }
+.k-facts dt { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-facts dd { margin: 0; font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums lining-nums; }
+/* The ink row: one per page at most, near the top, inside the content. It carries one
+   task or one alert with its action. Never a bottom band, never a summary, never
+   around a price, a total or a data table (R34 d). Dark in both themes. */
+.k-ink-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+  border-radius: var(--radius-md);
+}
+.k-ink-row-text { font-weight: 600; }
+.k-ink-row-note { color: var(--color-on-ink-muted); font-size: var(--text-sm); font-weight: 400; }
+.k-ink-action {
+  height: max(var(--control-h), var(--k-hit));
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-ink-action);
+  color: var(--color-on-ink-action);
+  font: 600 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.k-ink-action:hover { background: color-mix(in oklch, var(--color-ink-action) 88%, var(--color-on-ink-action)); }
+.k-ink-action:focus-visible { outline-color: var(--color-on-ink); }
+
+/* ---- ledger: subtotal rule, double rule under the total (R27, R34 c) -------------------- */
+/* A grid of rows (subgrid), so the double rule is one element across the full width and
+   can draw. Rules are horizontal, full width and neutral: never an edge stripe. The
+   total sits on the page or the sheet, never in a box; .k-ledger-total--lead gives the
+   accent fill only when the total is the lead of the screen. --k-ledger-cols sets the
+   columns (default: a label and an amount). */
+.k-ledger { display: grid; grid-template-columns: var(--k-ledger-cols, minmax(0, 1fr) auto); font-size: var(--text-sm); }
+.k-ledger-row, .k-ledger-subtotal, .k-ledger-total {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: var(--space-4);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3);
+}
+.k-ledger-row { border-bottom: 1px solid var(--color-border); }
+.k-ledger-subtotal { border-top: 1px solid var(--color-border-strong); font-weight: 600; }
+.k-ledger-total { position: relative; padding-bottom: calc(var(--space-2) + 4px); font-weight: 700; font-size: var(--text-md); }
+.k-ledger-total::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  border-top: 1px solid var(--color-border-strong);
+  border-bottom: 1px solid var(--color-border-strong);
+  transform-origin: left center;
+}
+.k-ledger-total--lead { background: var(--color-accent); color: var(--color-on-accent); }
+.k-ledger-amount { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; }
+/* R32: a confirmed change of the total draws its double rule once (scaleX, base). */
+.k-ledger-total.is-changed::after { animation: k-rule-draw var(--motion-base) var(--ease-standard) both; }
+@keyframes k-rule-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---- state marks and text (R28) ---------------------------------------------------- */
+/* Shape carries the state, text names it, colour only supplements: empty square
+   (Nezaradené, open), half square (Odhad), full square (Potvrdené), square with a
+   mark in danger (error). Action and state sit in separate columns or 8 to 12px apart. */
+.k-state-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); }
+.k-mark { position: relative; width: 10px; height: 10px; flex: none; border: 1px solid var(--color-text); }
+.k-mark--half::after { content: ""; position: absolute; inset: 0 50% 0 0; background: var(--color-text); }
+.k-mark--full { background: var(--color-text); }
+.k-mark--error { border-color: var(--color-danger); }
+.k-mark--error::after { content: ""; position: absolute; inset: 2px; background: var(--color-danger); }
+/* A select keeps a permanent label above it (the chevron is .k-select-chevron). */
+.k-select-field { display: inline-grid; gap: var(--space-1); }
+.k-select-field > label { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
+
+/* ---- imagery: figure with caption, missing image, drawings (R29) --------------------- */
+/* A real photo keeps its true colour: no filter, no duotone, no overlay. */
+.k-figure { display: grid; gap: var(--space-2); margin: 0; }
+.k-figure img { display: block; width: 100%; height: auto; background: var(--color-well); }
+.k-figcaption { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-figcaption-source { white-space: nowrap; }
+/* A missing image is a well with a text "Obrázok chýba: <name>", never a placeholder
+   illustration. --k-ratio keeps the space of the image. */
+.k-image-missing {
+  display: grid;
+  place-items: center;
+  aspect-ratio: var(--k-ratio, 4 / 3);
+  padding: var(--space-4);
+  background: var(--color-well);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+/* A technical drawing (inline SVG) with dimension lines for real measures only. The
+   object is drawn in the text colour, dimension lines and ticks in the app hue, both
+   1.5px; the measure is text in tabular figures. */
+.k-drawing { display: block; max-width: 100%; height: auto; color: var(--color-text); }
+.k-draw-object { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.k-draw-hidden { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.k-dim-line, .k-dim-tick { fill: none; stroke: var(--color-accent); stroke-width: 1.5; }
+.k-dim-label { fill: var(--color-text); font: 400 var(--text-xs) var(--font-sans); font-variant-numeric: tabular-nums lining-nums; }
+
+/* ---- reading column and sidenotes (R26) -------------------------------------------- */
+/* Running text: 17px at 1.55 in a 66ch column. Sidenotes sit in the margin from
+   1200px of width and inline (after their paragraph) below that. */
+.k-reading { max-width: var(--measure-read); font-size: var(--text-read); line-height: var(--leading-read); }
+.k-reading > * + * { margin-top: 1em; }
+.k-sidenote { display: block; font-size: var(--text-sm); line-height: 1.45; color: var(--color-text-muted); }
+@media (min-width: 1200px) {
+  .k-reading--notes { margin-right: calc(16rem + var(--space-8)); }
+  .k-reading--notes .k-sidenote { float: right; clear: right; width: 16rem; margin: 0 calc(-16rem - var(--space-8)) var(--space-3) 0; }
+}
+
+/* ---- shop: catalogue, product, price, cart, checkout (R30) ------------------------- */
+/* The catalogue is a grid of real photos with name, price and availability: no card
+   wrappers, no border, no shadow. Related items may take unequal widths when the
+   width carries meaning (.k-related-item--wide). */
+.k-catalogue { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: var(--space-8) var(--space-6); }
+.k-catalogue-item { display: grid; gap: var(--space-2); align-content: start; color: inherit; text-decoration: none; }
+.k-catalogue-media { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--color-well); }
+.k-catalogue-name { font-size: var(--text-md); font-weight: 600; }
+.k-catalogue-price { font-size: var(--text-md); font-weight: 700; font-variant-numeric: tabular-nums lining-nums; }
+.k-catalogue-stock { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-catalogue-item:hover .k-catalogue-name { text-decoration: underline; text-underline-offset: 3px; }
+.k-related { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--space-6); }
+.k-related > * { grid-column: span 2; }
+.k-related > .k-related-item--wide { grid-column: span 3; }
+/* Product page: a large image, a display title, a parameter list, a dimensioned
+   drawing in a field, and the price as the lead number in plain type beside the
+   quantity and the primary button. No ink block around the price. */
+.k-product { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--space-8); align-items: start; }
+.k-price { font-size: var(--text-display-1); font-weight: 700; line-height: var(--leading-display); font-variant-numeric: tabular-nums lining-nums; }
+.k-price-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-buy-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); }
+.k-stepper--qty .k-input { width: 3.25rem; }
+.k-params { display: grid; grid-template-columns: minmax(0, 1fr) auto; margin: 0; font-size: var(--text-sm); }
+.k-params dt, .k-params dd { margin: 0; padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
+.k-params dt { color: var(--color-text-muted); }
+.k-params dd { text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+/* Cart: rows with image, name, code, quantity and line total on the page surface; the
+   totals are a .k-ledger after the rows; one primary action. */
+.k-cart-row {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto minmax(6rem, auto);
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.k-cart-media { width: 4.5rem; aspect-ratio: 1; object-fit: contain; background: var(--color-well); }
+.k-cart-name { font-weight: 600; }
+.k-cart-code { display: block; font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums lining-nums; }
+.k-cart-total { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }
+.k-delivery { display: grid; }
+.k-delivery-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+/* Checkout: one column, labels above fields, the error at its field. Step numbers
+   only because the steps are a real sequence. */
+.k-checkout { display: grid; gap: var(--space-8); max-width: 40rem; }
+.k-checkout-step { display: grid; gap: var(--space-4); }
+.k-checkout-step-title { display: flex; align-items: baseline; gap: var(--space-2); font-size: var(--text-xl); font-weight: 700; }
+.k-checkout-step-number { color: var(--color-text-muted); font-variant-numeric: tabular-nums lining-nums; }
+.k-form-field { display: grid; gap: var(--space-1); }
+.k-form-field > label { font-size: var(--text-sm); font-weight: 600; }
+.k-field-error { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--color-danger); }
+
+/* ---- phone: bottom navigation and the opaque bottom sheet (R31) ---------------------- */
+/* 3 to 5 targets, icon and text always visible. The active target is a fill step,
+   bold text and a square mark: never a pill, never an edge bar. */
+.k-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  background: var(--color-surface-raised);
+  border-top: 1px solid var(--color-border-strong);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.k-bottom-nav-item {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 56px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-decoration: none;
+}
+.k-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); color: var(--color-text); font-weight: 700; }
+.k-bottom-nav-item[aria-current="page"] .k-bottom-nav-label::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 4px; vertical-align: 0.15em; background: var(--color-accent); }
+/* The bottom sheet is opaque: a title, Zavrieť, the main action and defined stops
+   (data-stop="half" or "full"). Every gesture on it has a visible button. */
+.k-bottom-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: 50dvh;
+  background: var(--color-surface-raised);
+  border-top: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  transform: translateY(100%);
+  transition: transform var(--motion-slow) var(--ease-standard);
+}
+.k-bottom-sheet[data-stop="full"] { max-height: 92dvh; }
+.k-bottom-sheet.is-open { transform: none; }
+.k-bottom-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+.k-bottom-sheet-title { font-size: var(--text-md); font-weight: 700; }
+.k-bottom-sheet-body { overflow: auto; padding: var(--space-4); }
+.k-bottom-sheet-actions { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--color-border); }
+.k-bottom-sheet .k-btn, .k-bottom-sheet-actions .k-btn { min-height: var(--control-h-touch); }
+@media (max-width: 599px) {
+  /* Form text at least 16px on a phone (no zoom on focus), touch targets 44px. */
+  .k-input, .k-select, .k-textarea { font-size: var(--text-md); }
+  .k-product { grid-template-columns: minmax(0, 1fr); }
+  .k-related > *, .k-related > .k-related-item--wide { grid-column: 1 / -1; }
+  .k-cart-row { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .k-cart-row > .k-stepper, .k-cart-row > .k-cart-total { grid-column: 2; justify-self: start; }
+}
+
+/* ---- motion: cause then effect, image carry (R32) ---------------------------------- */
+/* After one user action, at most three related moves (.k-seq-1 to .k-seq-3), each
+   --motion-sequence-step after the one before, transform and opacity only, no
+   overshoot, all inside --motion-sequence-max. Never on page load or scroll
+   (SLOP-MOTION-01): the page adds the end state after the real result. */
+.k-seq-move { transition: transform var(--motion-base) var(--ease-standard), opacity var(--motion-base) var(--ease-standard); }
+.k-seq-2 { transition-delay: var(--motion-sequence-step); }
+.k-seq-3 { transition-delay: calc(2 * var(--motion-sequence-step)); }
+/* A real image carries into its detail view (view transition on the image only, about
+   200ms). The page gives the one image .k-carry-image and sets data-k-vt="image" on
+   <html> for that transition, so the rest of the page does not cross-fade. */
+.k-carry-image { view-transition-name: k-carry-image; }
+::view-transition-group(k-carry-image) { animation-duration: var(--motion-slow); animation-timing-function: var(--ease-standard); }
+:root[data-k-vt="image"]::view-transition-group(root), :root[data-k-vt="image"]::view-transition-old(root), :root[data-k-vt="image"]::view-transition-new(root) { animation: none; }
+
+/* ==== Revision 4 components (plan 125, lane k11b; Senate sn-kaliber-r4-ui-20261013) ==== */
+/* Web, shop and app pieces the Senate selection added. Every duration is a token; every
+   motion answers a user action and has the instant form of the reduced-motion block
+   below. Fixed geometry named here (6px and 10px marks, 1px rules, the 4px panel offset,
+   56px website header row) is documented in components.md, "Revision 4 components". */
+
+/* ---- focus and scroll (Senate R39) ------------------------------------------------ */
+/* A jump target or a focused field never hides under a sticky header: kaliber-motion.js
+   sets --k-sticky-h to the real header height (0 when the header is static). No smooth
+   scroll anywhere: a jump is instant. */
+html { scroll-padding-top: calc(var(--k-sticky-h, 0px) + 8px); scroll-behavior: auto; }
+/* The hidden attribute wins over the display of the r4 pieces. */
+:is(.k-error-page, .k-empty, .k-catalogue-item, .k-summary, .k-field-error, .k-applied)[hidden] { display: none; }
+/* A link styled as a button keeps the button look: no underline. */
+a.k-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+/* A link inside running text is always underlined (colour is never the only sign). */
+.k-text-link { color: var(--color-text); text-decoration: underline; text-decoration-color: var(--color-border-strong); text-underline-offset: 3px; transition: text-decoration-color var(--motion-fast) var(--ease-standard); }
+.k-text-link:hover { text-decoration-color: currentColor; }
+
+/* ---- website header and navigation panel (Senate R26) ------------------------------ */
+/* Opaque, one row, no shrink on scroll. A skip link comes first. The active page is
+   bold text with the square mark (R31), never an underline bar. */
+.k-site-header { position: relative; z-index: 10; background: var(--color-surface-raised); border-bottom: 1px solid var(--color-border); }
+.k-site-header--sticky { position: sticky; top: 0; }
+.k-site-row { display: flex; align-items: stretch; gap: var(--space-6); min-height: 56px; max-width: var(--k-shell-max, none); margin: 0 auto; padding: 0 var(--space-6); }
+.k-site-name { align-self: center; font-size: var(--text-md); font-weight: 700; color: var(--color-text); text-decoration: none; }
+.k-site-row > nav { display: flex; }
+.k-site-nav { display: flex; align-items: stretch; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.k-site-nav > li { display: flex; }
+.k-site-link {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: max(var(--control-h), var(--k-hit));
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: 400 var(--text-sm) var(--font-sans);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard);
+}
+.k-site-link:hover { color: var(--color-text); background: var(--color-surface-hover); }
+.k-site-link[aria-current="page"] { color: var(--color-text); font-weight: 700; }
+.k-site-link[aria-current="page"]::before { content: ""; width: 6px; height: 6px; background: var(--color-accent); }
+.k-site-tools { margin-left: auto; display: flex; align-items: center; gap: var(--space-3); }
+.k-site-menu-btn { display: none; }
+.k-skip-link { position: absolute; left: var(--space-4); top: var(--space-2); z-index: 20; padding: var(--space-2) var(--space-3); background: var(--color-surface-raised); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.k-skip-link:not(:focus) { width: 1px; height: 1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* The wide panel opens under the header on a click: opacity and a 4px offset (--k-panel-
+   offset) in base (120ms), out in fast (80ms). No scrim, no blur, the content behind does
+   not move. Closed it is display none (out of the tab order), a discrete transition. */
+.k-navpanel {
+  --k-panel-offset: 4px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  display: none;
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--k-panel-offset)));
+  background: var(--color-surface-raised);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-strong);
+  transition: opacity var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard), display var(--motion-fast) allow-discrete;
+}
+.k-navpanel.is-open {
+  display: block;
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard), display var(--motion-base) allow-discrete;
+}
+@starting-style { .k-navpanel.is-open { opacity: 0; transform: translateY(calc(-1 * var(--k-panel-offset))); } }
+.k-navpanel-inner { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-2) var(--space-6); max-width: var(--k-shell-max, none); margin: 0 auto; padding: var(--space-6); }
+.k-navpanel-head { display: none; }
+.k-navpanel-lead { grid-column: 1 / -1; margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-navpanel-link { display: grid; align-content: start; gap: 2px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); color: var(--color-text); text-decoration: none; transition: background-color var(--motion-fast) var(--ease-standard); }
+.k-navpanel-link:hover { background: var(--color-surface-hover); }
+.k-navpanel-link > strong { font-size: var(--text-sm); font-weight: 600; }
+.k-navpanel-link > span { font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-navpanel-link[aria-current="page"] > strong::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 0.15em; background: var(--color-accent); }
+
+/* ---- website footer (Senate R28) ----------------------------------------------------- */
+/* Paper, one neutral rule on top, identity, link groups in sentence case, a legal line.
+   No wordmark, no dark block (R34), no entrance. Links are underlined. "Back to top" is
+   a plain jump: no smooth scroll, and the focus moves to the target. */
+.k-site-footer { background: var(--color-background); border-top: 1px solid var(--color-border); color: var(--color-text); }
+.k-site-footer-inner { display: grid; gap: var(--space-8); max-width: var(--k-shell-max, none); margin: 0 auto; padding: var(--space-8) var(--space-6) var(--space-6); }
+.k-site-footer-top { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr); gap: var(--space-8); }
+.k-site-footer-id { display: grid; align-content: start; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-site-footer-id > strong { font-size: var(--text-md); color: var(--color-text); }
+.k-site-footer-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-6); }
+.k-site-footer-heading { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: 600; }
+.k-site-footer ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.k-site-footer a { display: inline-flex; align-items: center; min-height: var(--k-hit); color: var(--color-text); font-size: var(--text-sm); text-decoration: underline; text-decoration-color: var(--color-border-strong); text-underline-offset: 3px; transition: text-decoration-color var(--motion-fast) var(--ease-standard); }
+.k-site-footer a:hover { text-decoration-color: currentColor; }
+.k-site-footer-legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2) var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--color-border); font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-site-footer-legal a { font-size: var(--text-xs); color: var(--color-text-muted); }
+
+/* ---- consent notice (Senate R40, equal buttons from R41) ----------------------------- */
+/* Non-modal: no scrim, nothing behind is blocked. Three equal buttons. The settings step
+   has switches; the required group is locked with a visible reason. It enters only when a
+   person asks for it again (opacity and --motion-offset-enter, slow); it leaves by
+   opacity (fast). On first paint it stands still. */
+.k-consent { position: fixed; left: var(--space-6); bottom: var(--space-6); z-index: 35; display: grid; gap: var(--space-3); width: min(32rem, calc(100vw - 2 * var(--space-6))); padding: var(--space-4); background: var(--color-surface-raised); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); color: var(--color-text); }
+.k-consent--inline { position: static; width: auto; max-width: 32rem; }
+.k-consent[hidden] { display: none; }
+.k-consent-title { font-size: var(--text-md); font-weight: 700; }
+.k-consent-text { margin: 0; font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-consent-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+.k-consent-actions--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Equal weight also means equal room: a long label wraps inside its button. */
+.k-consent-actions > .k-btn { height: auto; min-height: max(var(--control-h), var(--k-hit)); padding-block: var(--space-1); white-space: normal; line-height: 1.25; }
+.k-consent-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-4); align-items: center; padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
+.k-consent-row-text { display: grid; gap: 2px; font-size: var(--text-sm); }
+.k-consent-row-text > span { color: var(--color-text-muted); font-size: var(--text-xs); }
+.k-consent.is-arriving { transition: opacity var(--motion-slow) var(--ease-standard), transform var(--motion-slow) var(--ease-standard); }
+@starting-style { .k-consent.is-arriving { opacity: 0; transform: translateY(var(--motion-offset-enter)); } }
+.k-consent.is-leaving { opacity: 0; transition: opacity var(--motion-fast) var(--ease-standard); }
+
+/* ---- faceted filter with live counts (Senate R3) ---------------------------------------- */
+/* Counts change at once with the selection; one polite region names the result count. A
+   value with zero results stays in place, disabled, with the word "nedostupné" beside its
+   count (not colour alone). Applied filters are tags with the square mark and a remove
+   button. */
+.k-facets { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: var(--space-8); align-items: start; }
+.k-facet { display: grid; margin: 0; padding: 0 0 var(--space-3); border: 0; border-bottom: 1px solid var(--color-border); }
+.k-facet + .k-facet { padding-top: var(--space-3); }
+.k-facet > legend { float: left; width: 100%; margin-bottom: var(--space-1); padding: 0; font-size: var(--text-sm); font-weight: 600; }
+.k-facet-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); clear: both; }
+.k-facet-count { font-size: var(--text-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums lining-nums; text-align: right; }
+.k-facet-zero { margin-left: 6px; font-size: var(--text-xs); color: var(--color-text-muted); }
+.k-applied { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-height: max(var(--control-h), var(--k-hit)); }
+.k-applied-tag {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: max(28px, var(--k-hit));
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font: 400 var(--text-sm) var(--font-sans);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.k-applied-tag::before { content: ""; width: 8px; height: 8px; flex: none; background: var(--color-accent); }
+.k-applied-tag:hover { background: var(--color-surface-hover); }
+.k-results-count { font-size: var(--text-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums lining-nums; }
+
+/* ---- chart read-out and legend toggles (Senate R20, R22) --------------------------------- */
+/* The crosshair is 1px, snaps to the nearest sample and follows the pointer without
+   easing (direct manipulation: no transition). The read-out is a sheet panel with the
+   time and one row per visible series (dash sample, name, value, unit). Keyboard: the plot
+   takes the focus; arrows, Home, End move the sample; Escape ends the reading. On touch a
+   tap pins the sample and the panel docks under the chart. Legend items are toggle
+   buttons; hiding a series is instant and the axes stay as they are. */
+.k-chart-plot { position: relative; }
+.k-chart-plot:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.k-chart-crosshair { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: var(--color-text-muted); transform: translateX(var(--k-x, 0px)); pointer-events: none; }
+.k-chart-dot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; background: var(--color-surface-raised); border: 1.5px solid var(--color-text); transform: translate(var(--k-x, 0px), var(--k-y, 0px)); pointer-events: none; }
+.k-chart-plot:not(.is-reading) .k-chart-crosshair, .k-chart-plot:not(.is-reading) .k-chart-dot { display: none; }
+.k-readout { position: absolute; top: var(--space-2); left: 0; z-index: 2; display: grid; gap: 2px; min-width: 13rem; padding: var(--space-2) var(--space-3); background: var(--color-surface-raised); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--color-text); transform: translateX(var(--k-rx, 0px)); pointer-events: none; }
+.k-readout[hidden] { display: none; }
+.k-readout.is-docked { position: static; transform: none; margin-top: var(--space-2); pointer-events: auto; }
+.k-readout-time { font-weight: 600; }
+.k-readout-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+.k-readout-row .k-legend-swatch { width: 28px; }
+.k-readout-value { text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+.k-legend-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: max(28px, var(--k-hit));
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: 400 var(--text-xs) var(--font-sans);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+.k-legend-toggle::before { content: ""; width: 10px; height: 10px; flex: none; border: 1px solid currentColor; background: currentColor; }
+.k-legend-toggle:hover { background: var(--color-surface-hover); }
+.k-legend-toggle[aria-pressed="false"] { color: var(--color-text-muted); }
+.k-legend-toggle[aria-pressed="false"]::before { background: transparent; }
+.k-chart-note { padding: var(--space-3) var(--space-4); background: var(--color-well); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.k-chart-note[hidden] { display: none; }
+
+/* ---- slider with an exact value (Senate R9) ------------------------------------------- */
+/* The range, a number field with its unit and a local preview are bound both ways and
+   change together, with no easing. A visible Default button names the default value. */
+.k-slider-exact { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: var(--space-2) var(--space-4); }
+.k-slider-track { display: grid; gap: var(--space-1); }
+.k-number-unit { display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-number-unit > .k-input { width: 6rem; text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+.k-preview { padding: var(--space-4); background: var(--color-well); border-radius: var(--radius-md); }
+.k-preview > .k-drawing { width: 100%; max-width: 40rem; }
+
+/* ---- empty states by cause (Senate R31) ------------------------------------------------- */
+/* The square mark in the control tone, a title, the reason and one action that fits the
+   cause. It appears at once; no filler illustration. */
+.k-empty { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-1) var(--space-3); align-items: start; padding: var(--space-4) 0; }
+.k-empty-mark { grid-row: 1 / span 3; width: 10px; height: 10px; margin-top: 6px; border: 1px solid var(--color-control); }
+.k-empty-title { font-size: var(--text-md); font-weight: 600; }
+.k-empty-text { margin: 0; max-width: 56ch; font-size: var(--text-sm); color: var(--color-text-muted); }
+.k-empty > .k-btn { justify-self: start; margin-top: var(--space-2); }
+
+/* ---- loading and refresh (Senate R33) ---------------------------------------------------- */
+/* The first load shows the static skeleton after 150ms and keeps it at least 300ms
+   (Kaliber.skeleton). A refresh keeps the confirmed data on the page with a note and the
+   time of the last good result; the one process line runs in the header or the button. */
+.k-refresh-note { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+/* ---- tables with row actions (Senate R18) ------------------------------------------------ */
+/* Native table semantics. A row with actions takes surface-hover on hover and on focus
+   inside; a selected row is surface-selected with bold key text. The actions column is
+   always visible (never hover-only) and holds a visible "Viac" button. */
+.k-table--rows tbody tr { transition: background-color var(--motion-fast) var(--ease-standard); }
+.k-table--rows tbody tr:hover, .k-table--rows tbody tr:focus-within { background: var(--color-surface-hover); }
+.k-table--rows tbody tr.is-selected { background: var(--color-surface-selected); }
+.k-table--rows tbody tr.is-selected > th { font-weight: 700; }
+.k-table-actions { width: 1%; white-space: nowrap; text-align: right; }
+
+/* ---- catalogue item actions (Senate R25) ------------------------------------------------- */
+/* Actions sit below the photo as their own targets. The photo never changes colour,
+   scale or position on hover; only the name underlines. */
+.k-catalogue-name a { color: inherit; text-decoration: none; }
+.k-catalogue-item:hover .k-catalogue-name a, .k-catalogue-name a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.k-catalogue-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
+
+/* ---- error pages (Senate R34) and the dimensioned drawing (R36) --------------------------- */
+/* One component for 404, 500, offline and no permission: the head and footer of the site
+   stay, one title takes the focus, the reason, one main action by cause, the code as
+   metadata. Nothing moves on load. */
+.k-error-page { display: grid; gap: var(--space-4); max-width: 40rem; padding: var(--space-8) 0; }
+.k-error-meta { font-size: var(--text-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums lining-nums; }
+.k-error-reason { margin: 0; max-width: var(--measure-read); font-size: var(--text-read); line-height: var(--leading-read); }
+.k-error-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+/* The drag handle of a real dimension: role slider, direct manipulation (no transition),
+   a 44px target over the drawn handle. */
+.k-dim-stage { position: relative; }
+.k-dim-handle { position: absolute; top: 0; left: 0; width: 44px; height: 44px; margin-left: -22px; transform: translate(var(--k-x, 0px), var(--k-y, 0px)); border-radius: var(--radius-sm); cursor: ew-resize; touch-action: none; }
+.k-dim-handle::after { content: ""; position: absolute; left: 17px; top: 17px; width: 10px; height: 10px; background: var(--color-surface-raised); border: 1.5px solid var(--color-accent); }
+.k-dim-handle:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+@media (max-width: 599px) {
+  .k-site-row { gap: var(--space-3); padding: 0 var(--space-4); }
+  .k-site-nav, .k-site-tools > .k-site-cta { display: none; }
+  .k-site-menu-btn { display: inline-flex; align-items: center; }
+  .k-navpanel { max-height: calc(100dvh - 56px); overflow: auto; }
+  .k-navpanel-inner { grid-template-columns: minmax(0, 1fr); padding: var(--space-4); }
+  .k-navpanel-head { display: flex; align-items: center; justify-content: space-between; grid-column: 1 / -1; }
+  .k-navpanel-link { min-height: var(--k-hit); }
+  .k-site-footer-top { grid-template-columns: minmax(0, 1fr); }
+  .k-consent-actions { grid-template-columns: minmax(0, 1fr); }
+  .k-facets { grid-template-columns: minmax(0, 1fr); }
+  .k-slider-exact { grid-template-columns: minmax(0, 1fr) auto; }
+  .k-slider-exact > .k-slider-track { grid-column: 1 / -1; }
+  /* Touch targets of the r4 pieces and of every tab: 44px (R31). */
+  .k-tab, .k-site-header .k-btn, .k-consent .k-btn, .k-error-actions .k-btn, .k-catalogue-actions .k-btn, .k-empty > .k-btn, .k-applied .k-btn { min-height: var(--k-hit); }
+}
+
+/* ---- reduced motion: one block for the whole sheet ------------------------------- */
+/* prefers-reduced-motion: reduce gives every motion its instant form: no
+   transition and no animation, so a state appears at once (a menu, a dialog,
+   a toast, the tab underline, the theme switch, a pressed button). A running
+   process stays visible as a still bar: the activity line and the button bar
+   show full width at half strength, and the status text still says what runs.
+   kaliber-motion.js switches the theme without a view transition and removes a
+   toast without waiting for its leave animation. Lane K6: colour and opacity fades are
+   instant too (spec R18, Michal): ink comes on and goes off at once after the same hold. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  /* The range thumb is a vendor pseudo-element that * does not reach. */
+  .k-slider::-webkit-slider-thumb { transition: none !important; }
+  .k-slider::-moz-range-thumb { transition: none !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .k-activity-bar, .k-btn-bar > span { width: 100%; opacity: 0.5; }
+}
+/* The same block for a page or app setting (lane K6): <html data-k-motion="reduce">, set by
+   an input[data-k-reduce-motion] switch through kaliber-motion.js. */
+html[data-k-motion="reduce"] *, html[data-k-motion="reduce"] *::before, html[data-k-motion="reduce"] *::after { animation: none !important; transition: none !important; }
+html[data-k-motion="reduce"] .k-slider::-webkit-slider-thumb { transition: none !important; }
+html[data-k-motion="reduce"] .k-slider::-moz-range-thumb { transition: none !important; }
+html[data-k-motion="reduce"]::view-transition-group(*), html[data-k-motion="reduce"]::view-transition-old(*), html[data-k-motion="reduce"]::view-transition-new(*) { animation: none !important; }
+html[data-k-motion="reduce"] .k-activity-bar, html[data-k-motion="reduce"] .k-btn-bar > span { width: 100%; opacity: 0.5; }

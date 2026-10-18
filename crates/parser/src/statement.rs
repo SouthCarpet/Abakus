@@ -96,10 +96,18 @@ fn trailing_amount(line: &str) -> Option<Cents> {
     parse_amount(&c[1])
 }
 
-/// A fee record (`Poplatok za účet`, `Poplatky za transakcie`): kind stays `Other` (a dedicated
-/// `Fee` kind is deferred, see `KNOWN_ISSUES.md`), but it is a recognized shape, so it does not
-/// warn as an unknown transaction type.
+/// A fee record (`Poplatok za účet`, `Poplatky za transakcie`) uses the
+/// existing confirmed bank wording predicate. A description that merely
+/// contains `poplat` later in the text is still unknown.
 fn is_fee(description: &str) -> bool { fold(description).starts_with("poplat") }
+
+/// True only when a stored raw block has a valid transaction first line and
+/// that line uses the recognized fee wording. Store migration uses the same
+/// parser boundary as a new import instead of guessing from merchant text.
+pub fn raw_block_is_fee(raw_block: &str) -> bool {
+    let block = Block { lines: raw_block.lines().map(str::to_string).collect() };
+    first_line(&block).is_some_and(|line| is_fee(&line.description))
+}
 
 fn absorb(st: &mut Statement, block: &Block) {
     if try_opening(st, block) { return; }
@@ -133,13 +141,14 @@ fn try_closing(st: &mut Statement, block: &Block) -> bool {
 
 fn push_transaction(st: &mut Statement, fl: &crate::fields::FirstLine, block: &Block) {
     let t = dispatch(fl, block);
-    if t.kind == TxKind::Other && !is_fee(&fl.description) { st.warnings.push(format!("Neznámy typ transakcie: {}", fl.description)); }
+    if t.kind == TxKind::Other { st.warnings.push(format!("Neznámy typ transakcie: {}", fl.description)); }
     st.transactions.push(t);
 }
 
 fn dispatch(fl: &crate::fields::FirstLine, block: &Block) -> Transaction {
     if is_card(&fl.description) { parse_card(fl, block) }
     else if is_transfer(&fl.description) { parse_transfer(fl, block) }
+    else if is_fee(&fl.description) { let mut t = Transaction::blank(fl.posted, fl.amount, TxKind::Fee, block.lines.join("\n")); t.merchant_raw = fl.description.clone(); t }
     else { let mut t = Transaction::blank(fl.posted, fl.amount, TxKind::Other, block.lines.join("\n")); t.merchant_raw = fl.description.clone(); t }
 }
 
@@ -247,7 +256,7 @@ mod tests {
         let st = parse_pages(&[page_a(), page_b()]).unwrap();
         assert_eq!(st.warnings, Vec::<String>::new(), "{:?}", st.warnings);
         assert_eq!(st.transactions.len(), 5, "{:?}", st.transactions);
-        assert_eq!(st.transactions.iter().map(|t| t.kind).collect::<Vec<_>>(), vec![TxKind::Card, TxKind::TransferIn, TxKind::Other, TxKind::Card, TxKind::Atm]);
+        assert_eq!(st.transactions.iter().map(|t| t.kind).collect::<Vec<_>>(), vec![TxKind::Card, TxKind::TransferIn, TxKind::Fee, TxKind::Card, TxKind::Atm]);
         assert_eq!(st.transactions[0].merchant_raw, "ALDI SUED");
         assert_eq!(st.transactions[2].merchant_raw, "Poplatky za transakcie");
         assert_eq!(st.transactions[3].merchant_raw, "SHOP ONLINE");

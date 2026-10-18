@@ -8,6 +8,7 @@ pub mod report;
 pub mod report_commands;
 pub mod secrets;
 pub mod state;
+pub mod statement_review_commands;
 pub mod update;
 pub mod update_install;
 
@@ -51,13 +52,18 @@ pub fn run() {
             commands::save_category,
             commands::archive_category,
             category_commands::category_update_preview,
+            category_commands::category_delete_preview,
+            category_commands::delete_category,
             category_commands::update_category,
             category_commands::seed_rule_for_transaction,
             category_commands::update_rule_category,
+            category_commands::rule_delete_preview,
             commands::list_rules,
             commands::delete_rule,
             commands::list_transactions,
             commands::assign,
+            commands::bulk_assign,
+            commands::undo_last_assignment,
             commands::confirm,
             commands::summary,
             commands::export_csv,
@@ -65,8 +71,11 @@ pub fn run() {
             commands::data_dir,
             commands::recent_statements,
             commands::statement_history,
+            statement_review_commands::statement_review,
             commands::save_transaction_note,
             commands::backup_database,
+            commands::restore_preview,
+            commands::restore_database,
             commands::statement_delete_preview,
             commands::delete_statement,
             commands::get_check_updates,

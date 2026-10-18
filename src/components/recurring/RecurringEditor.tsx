@@ -169,7 +169,7 @@ function EditorForm({
       <Field label="Kotva">
         <input className="k-input k-well" type="date" aria-label="Kotva" value={draft.anchor} disabled={busy} onChange={(e) => draft.setAnchor(e.target.value)} />
       </Field>
-      <label className="k-checkbox">
+      <label className="ab-checkbox">
         <input
           type="checkbox"
           checked={forceSelected || draft.useSelected}

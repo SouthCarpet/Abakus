@@ -69,14 +69,14 @@ impl Sums {
 }
 
 #[derive(Clone, Copy, Default)]
-struct Contribution {
-    income: i128,
-    expense: i128,
-    transfer_out: i128,
-    transfer_in: i128,
+pub(super) struct Contribution {
+    pub(super) income: i128,
+    pub(super) expense: i128,
+    pub(super) transfer_out: i128,
+    pub(super) transfer_in: i128,
 }
 
-fn contribution(row: &ReportTransaction) -> Contribution {
+pub(super) fn contribution(row: &ReportTransaction) -> Contribution {
     let tx = &row.transaction;
     let amount = i128::from(tx.amount_cents);
     if tx.status == Status::Transfer {
@@ -166,7 +166,7 @@ fn finish_categories(categories: BTreeMap<CategoryKey, i128>) -> Result<Vec<Repo
         .collect()
 }
 
-fn narrow(value: i128) -> Result<i64> {
+pub(super) fn narrow(value: i128) -> Result<i64> {
     i64::try_from(value).map_err(|_| overflow())
 }
 

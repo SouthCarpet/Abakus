@@ -14,18 +14,17 @@ fn d(y: i32, m: u32, day: u32) -> NaiveDate { NaiveDate::from_ymd_opt(y, m, day)
 }
 #[test] fn personal_has_eight_records_in_order() {
     let s = load("personal-2026-06.txt");
-    assert_eq!(s.transactions.iter().map(|t| t.kind).collect::<Vec<_>>(), vec![TxKind::Card, TxKind::TransferIn, TxKind::Refund, TxKind::TransferOut, TxKind::Atm, TxKind::StandingOrder, TxKind::CardForeign, TxKind::Other]);
+    assert_eq!(s.transactions.iter().map(|t| t.kind).collect::<Vec<_>>(), vec![TxKind::Card, TxKind::TransferIn, TxKind::Refund, TxKind::TransferOut, TxKind::Atm, TxKind::StandingOrder, TxKind::CardForeign, TxKind::Fee]);
     assert_eq!(s.transactions.iter().map(|t| t.amount_cents).collect::<Vec<_>>(), vec![-199, 1000, 4300, -4000, -18_000, -8000, -1369, -700]);
 }
 // A "Poplatok ..." description used to warn as an unknown transaction type; the 2026-09-09
-// continuation fix (parser::statement::is_fee) recognizes the "poplat" prefix as a fee record
-// (kind Other, deferred dedicated Fee kind, see KNOWN_ISSUES.md) and no longer warns on it.
+// continuation fix (parser::statement::is_fee) recognizes the "poplat" prefix as a fee record.
 #[test] fn personal_checksum_is_ok_and_the_known_fee_produces_no_warning() {
     let s = load("personal-2026-06.txt");
     assert_eq!(s.checksum(), Checksum::Ok);
     assert_eq!(s.warnings.len(), 0, "{:?}", s.warnings);
 }
-#[test] fn other_block_keeps_its_description_as_merchant() {
+#[test] fn fee_block_keeps_its_description_as_merchant() {
     assert_eq!(load("personal-2026-06.txt").transactions[7].merchant_raw, "Poplatok za vedenie účtu");
 }
 #[test] fn standing_order_targets_the_business_account() {

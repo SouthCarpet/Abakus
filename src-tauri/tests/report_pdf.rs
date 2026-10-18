@@ -192,6 +192,16 @@ fn assert_ordinary_windows_leaves_are_allowed(
 }
 
 #[test]
+fn producer_names_the_crate_version() {
+    let mut bytes = Vec::new();
+    render_pdf_to(&snapshot(Vec::new()), PdfReportLimits::default(), &mut bytes).unwrap();
+    let text = String::from_utf8_lossy(&bytes);
+    let producer = format!("(Abakus {})", env!("CARGO_PKG_VERSION"));
+    assert!(text.contains(&producer), "Producer must be {producer}");
+    assert!(!text.contains("(Abakus 0.1.2)"));
+}
+
+#[test]
 fn p06_empty_report_has_real_pages_and_no_invalid_numeric_text() {
     let mut report = snapshot(Vec::new());
     report.preview.accounts_without_statements = 1;

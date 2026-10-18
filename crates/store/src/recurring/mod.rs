@@ -13,6 +13,9 @@ pub mod types;
 
 pub use types::*;
 
+/// The Prehľad totals for a row list, shared with the summary PDF.
+pub(crate) use amounts::aggregate as aggregate_rows;
+
 use detect::Evidence;
 use persist::DecisionRow;
 use std::collections::{BTreeSet, HashMap};

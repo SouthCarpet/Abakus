@@ -56,6 +56,10 @@ table. All three read existing backend endpoints only (`statement_history`,
   selected window, or every statement for Všetko. Closing balance and
   checksum are passed through exactly as the statement reported them: never
   summed, interpolated or replaced with a live total.
+  Plan 091 later made `transaction_count` and `total_cents` required on the
+  shared `StatementHistoryRow` DTO. This 0.1.2 view does not display or use
+  either field; its typed test fixtures include them only to stay aligned
+  with the backend contract.
 - `src/components/insights/CoverageCard.tsx`,
   `CategoryComparisonCard.tsx`, `BalanceHistoryCard.tsx`: plain
   `k-table`/`k-well` tables, no new design system, no chart. The balance
@@ -126,9 +130,10 @@ table. All three read existing backend endpoints only (`statement_history`,
   drilldown target (there is no real category id for it); the rest of the
   comparison rows are a plain table, not clickable, matching the "simple
   contained table" scope of this change.
-- No new backend field, no new IPC command, no new npm dependency. Internal
-  transfers are excluded upstream by `Summary.by_category` already; nothing
-  here re-implements that exclusion.
+- The original 0.1.2 lane added no backend field, IPC command or npm
+  dependency. Plan 091 later extended the existing statement-history DTO
+  without a new command. Internal transfers are excluded upstream by
+  `Summary.by_category` already; nothing here re-implements that exclusion.
 
 ## Tests (080-repair, 2026-09-07)
 

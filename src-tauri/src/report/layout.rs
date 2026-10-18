@@ -1,3 +1,6 @@
+mod summary;
+mod summary_detail;
+
 use super::font::{self, FontKind};
 use rules::Status;
 use std::cmp::Ordering;
@@ -77,7 +80,12 @@ pub(crate) struct Page {
 #[derive(Debug)]
 pub(crate) struct RenderedReport {
     pub pages: Vec<Page>,
+    pub title: &'static str,
 }
+
+pub(crate) use summary::layout_summary;
+
+pub(crate) const FULL_TITLE: &str = "Abakus · Prehľad transakcií";
 
 pub(crate) fn layout(
     snapshot: &ReportSnapshot,
@@ -91,6 +99,7 @@ pub(crate) fn layout(
     document.footers()?;
     Ok(RenderedReport {
         pages: document.pages,
+        title: FULL_TITLE,
     })
 }
 
@@ -383,7 +392,7 @@ impl Layout {
                 MUTED,
             );
         }
-        let grouped = grouped_categories(categories)?;
+        let grouped = grouped_categories(categories, 10)?;
         let maximum = grouped
             .iter()
             .map(|item| item.cents.unsigned_abs())
@@ -1096,18 +1105,21 @@ struct GroupedCategory {
     cents: i64,
 }
 
-fn grouped_categories(categories: &[ReportCategoryTotal]) -> Result<Vec<GroupedCategory>, String> {
+fn grouped_categories(
+    categories: &[ReportCategoryTotal],
+    visible: usize,
+) -> Result<Vec<GroupedCategory>, String> {
     let mut sorted = categories.iter().collect::<Vec<_>>();
     sorted.sort_by(|left, right| compare_category(left, right));
     let mut result = sorted
         .iter()
-        .take(10)
+        .take(visible)
         .map(|item| GroupedCategory {
             label: item.label.clone(),
             cents: item.cents,
         })
         .collect::<Vec<_>>();
-    let hidden = sorted.iter().skip(10).collect::<Vec<_>>();
+    let hidden = sorted.iter().skip(visible).collect::<Vec<_>>();
     if !hidden.is_empty() {
         let sum = hidden
             .iter()

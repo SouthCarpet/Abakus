@@ -12,12 +12,12 @@ export function Card({
   footer?: ReactNode
 }) {
   return (
-    <section className="k-section k-milled k-section-body">
+    <section className="ab-section k-milled ab-section-body">
       <div className="k-card-header">
         <span className="k-card-title">{title}</span>
         {badge ? <span className="k-card-badge">{badge}</span> : null}
       </div>
-      <div className="k-card-body">{children}</div>
+      <div className="k-card-body ab-card-body">{children}</div>
       {footer ? <div className="k-card-footer">{footer}</div> : null}
     </section>
   )

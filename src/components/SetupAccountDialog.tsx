@@ -93,7 +93,7 @@ export function SetupAccountDialog({
         <PasswordInput value={password} onChange={setPassword} />
       </Field>
       <p>Heslo sa uloží do Správcu poverení systému Windows. Nechajte prázdne, ak výpisy nemajú heslo.</p>
-      {action.error ? <p role="alert" className="k-text-danger">{action.error}</p> : null}
+      {action.error ? <p role="alert" className="ab-text-danger">{action.error}</p> : null}
     </Dialog>
   )
 }

@@ -8,6 +8,10 @@
   textu, 2 000 strán a 100 MiB výsledného súboru. Prekročenie ukončí export
   chybou, nie skráteným výpisom. Nepodporovaný znak má viditeľný zápis
   `[U+...]`. PDF používa vlastný výber účtov a obdobia, nie filtre tabuľky.
+  Sumáre (1 a 3 strany) majú pevný strop riadkov v každej tabuľke a napíšu
+  „a ďalších N“. Porovnanie používa predchádzajúce obdobie rovnakého počtu dní,
+  nie kalendárny mesiac, a pre Celé obdobie nie je. 10 najväčších transakcií
+  vynecháva prevody. Pravidelné platby v sumári sú odhady z importov.
 - **Detail pravidelnej platby s veľmi dlhým názvom obchodníka rozšíri stránku.**
   Tabuľka obchodníkov v detaile (Prehľad) nemá vlastné vodorovné posúvanie.
   Názov obchodníka s niekoľkými stovkami znakov (nameraný syntetický prípad:
@@ -20,8 +24,21 @@
   možno zmeniť v detaile ním zaradenej transakcie.
 
 - **Záloha je nešifrovaný súbor SQLite.** Obsahuje bankové údaje a poznámky.
-  Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Obnova nemá ovládanie
-  v appke; zálohovanie nemá plánovač.
+  Pôvodné PDF a heslá zo Správcu poverení do nej nepatria. Zálohovanie ani
+  obnova nemajú plánovač, obe treba spustiť ručne.
+- **Obnova nahradí celú databázu naraz.** Nedá sa vybrať len časť zálohy ani
+  zlúčiť zálohu so súčasnými dátami. Bezpečnostné kópie (pred obnovou aj
+  odložený pôvodný súbor pri zámene, prípadne súbor
+  `abakus-obnova-zlyhala-*` po zlyhanom opätovnom otvorení) appka nikdy sama
+  nezmaže, takže sa v priečinku s dátami postupne hromadia a treba ich
+  mazať ručne.
+- **Obnova nerieši sidecar súbory WAL/SHM.** Táto appka zatiaľ nenastavuje
+  `journal_mode=WAL`, takže bežne žiadne `-wal`/`-shm` súbory nevznikajú.
+  Ak by sa vedľa `abakus.db` objavili (napríklad skopírované z inej appky
+  alebo po budúcej zmene na WAL), obnova ich pri premenovaní neprenesie ani
+  neodstráni; mohli by sa pripojiť k novej databáze s neplatným obsahom.
+  Vonkajšie zámky súboru (antivírus, indexovanie) môžu zhodiť premenovanie
+  a vtedy sa spustí rovnaký rollback ako pri zlyhaní zámeny.
 - **Pokrytie sa vzťahuje na obdobia výpisov.** Úplné pokrytie nie je dôkazom,
   že existujú všetky transakcie pre daný rozsah dátumov. Transakcia sa môže
   objaviť až vo výpise za neskorší mesiac. Historický zostatok je stav ku dňu
@@ -94,7 +111,7 @@
 - **Audit-write failures exist only in the current process.** Nastavenia shows
   them until the application closes.
 - **Two chips share the label "Všetko".** On Prehľad the period cluster and the account-type cluster each end with a chip named "Všetko" (`src/screens/Overview.tsx`). Position tells them apart, wording does not. Reported by the closing visual verification (2026-09-01) as a SHOULD, left as a residual rather than reopening the round.
-- **Poznámky k vydaniu v karte Stav vykresľujú iba nadpisy a odrážky.** Vnorený
+- **Poznámky k vydaniu v sekcii O aplikácii vykresľujú iba nadpisy a odrážky.** Vnorený
   Markdown (`**tučné**`, odkazy, spätné apostrofy) sa zobrazí doslovne, nie
   naformátovaný.
 - **Stav "Overujem podpis súboru…" sa nikdy nevykreslí.** Overenie beží v tom
@@ -112,10 +129,42 @@
   `abakus-cli geometry` diagnostic. Other pages from the same generator are
   not covered by an automated fixture; they are verified only by Michal's
   own `abakus-cli check` runs on his real statements.
-- **Fee records (`Poplatok za účet`, `Poplatky za transakcie`, and any
-  description folding to start with `poplat`) use `TxKind::Other`, not a
-  dedicated `Fee` kind.** A dedicated kind is deferred; today they only stop
-  warning as an unknown transaction type (`parser::statement::is_fee`,
-  2026-09-09 continuation fix). The UI cannot filter or chart them apart
-  from other unclassified transactions yet.
-
+- **Fee detection is prefix-based.** The parser and store use `TxKind::Fee`,
+  the Transactions **Druh** filter offers **Poplatok**, and Overview shows the
+  **Poplatky** tile and chart series. A description that does not fold to
+  start with `poplat` remains `Other` and reports the existing unknown-type
+  warning.
+- **Kaliber r3 (0.2.0): čo appka zámerne nemá.** Nemá paletu príkazov
+  (Ctrl+K) ani globálne hľadanie v hlavičke; Ctrl+F zameria pole Hľadať
+  v Transakciách. Nemá jednoznakové skratky, preto ani ich prepínač
+  v Nastaveniach. Nemá úvodnú prehliadku, preto Pomocník neponúka
+  „Zobraziť prehliadku znova“. Del na zozname len otvorí potvrdenie,
+  lebo všetky mazania sú nevratné.
+- **Čiara činnosti pri importe je neurčitá.** Backend nehlási priebeh
+  po súboroch, takže čiara v hlavičke nemá percentá. Na konci ostane
+  v pätičke datovaná poznámka „Import dokončený, súbory: N.“.
+- **Zvýraznenie zmenených riadkov porovnáva stav a kategóriu.** Riadok,
+  ktorý zápis presunie mimo aktuálny filter, sa nepodfarbí, lebo v tabuľke
+  už nie je. Riadky, ktoré pribudnú len zmenou filtra, sa nepodfarbia nikdy.
+- **Miesto hlásení vpravo dole nemá primárny zdroj.** Kaliber ho vedie ako
+  `unverified`. Na úzkom okne (do 599 px) sa hlásenie roztiahne cez celú
+  šírku dole.
+- **Úzke okno (390 px) posúva široké tabuľky vo vlastnej oblasti.** Kontrola
+  pri 390 px (svetlý aj tmavý vzhľad, syntetické dáta namiesto backendu) nenašla vodorovné
+  posúvanie celej stránky. Tabuľky Transakcie a Účty a zoznam výpisov
+  v Importe sa posúvajú vo svojej oblasti, takže stĺpce Kategória, Stav
+  a akcie sú vpravo mimo prvého pohľadu. Hlavičky týchto tabuliek sa
+  nezalamujú, oblasť sa posúva. Popisy hodnotovej osi v grafoch majú
+  skrátený text (napríklad `1,5 tis. €`) a nezalamujú sa pri žiadnej šírke.
+  Kľúč pravidla v Kategóriách sa pri 390 px zalomí uprostred slova.
+- **Pod 600 px majú ovládacie prvky zásah 44 px.** Tlačidlá a ikony
+  riadkov (archivovať, zmazať) sú vtedy vysoké 44 px, na širšom okne 32 px.
+  Zmazanie pravidla, výpisu a kategórie je v riadku tichá ikona s názvom
+  (napríklad „Zmazať pravidlo penny“). Červené tlačidlo je až v potvrdení.
+- **Kontrola aktualizácií má tri cesty a vypínač.** Zapnutá kontrola sa
+  pozrie na GitHub pri spustení (ticho), pri otvorení **O aplikácii** a na
+  tlačidlo **Skontrolovať aktualizácie**. Samotné zapnutie prepínača nič
+  neposiela. Pri vypnutej kontrole neodíde nič a tlačidlo je neaktívne.
+- **Vzhľad má jeden kľúč `kaliber-theme`.** Voľba z verzie 0.1.x
+  (`abakus.theme`) sa pri prvom spustení prenesie do nového kľúča a starý
+  sa zmaže. Pri nedostupnom úložisku platí systémový režim.

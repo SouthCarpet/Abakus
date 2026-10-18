@@ -76,13 +76,41 @@ impl Store {
         let bytes = self.run_backup(&temp)?;
 
         match temp.persist_noclobber(dest) {
-            Ok(()) => Ok(BackupOutcome { path: dest.display().to_string(), bytes }),
+            Ok(()) => {
+                Self::sync_persisted_file(dest);
+                Ok(BackupOutcome { path: dest.display().to_string(), bytes })
+            }
             // `e.path`, the still-owned temp file, is dropped (and deleted)
             // at the end of this match arm; `dest` itself was never opened.
             Err(e) if e.error.kind() == ErrorKind::AlreadyExists => {
                 Err(StoreError::BackupTargetExists { path: dest.display().to_string() })
             }
             Err(e) => Err(StoreError::Db(e.error.to_string())),
+        }
+    }
+
+    /// Best-effort durability for the just-published file: `persist_noclobber`'s
+    /// rename lands it on disk, but the bytes (and on some filesystems the
+    /// rename's directory entry itself) can still sit in a volatile write
+    /// cache until something calls fsync. Syncing the file handle
+    /// (`File::sync_all`, `FlushFileBuffers` on Windows) is the one step
+    /// that helps on every platform this app ships for; syncing the
+    /// containing directory is additionally needed on POSIX filesystems
+    /// (ext4, xfs, …) where the rename's directory entry is only guaranteed
+    /// durable after an fsync of the directory itself, but Windows has no
+    /// equivalent directory handle to sync, so that half is `cfg(unix)`
+    /// only. Never fails the backup: this is a durability improvement on
+    /// top of an already-complete, already-visible file, not a correctness
+    /// requirement.
+    fn sync_persisted_file(dest: &Path) {
+        if let Ok(file) = std::fs::File::open(dest) {
+            let _ = file.sync_all();
+        }
+        #[cfg(unix)]
+        if let Some(dir) = dest.parent() {
+            if let Ok(dir_file) = std::fs::File::open(dir) {
+                let _ = dir_file.sync_all();
+            }
         }
     }
 

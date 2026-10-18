@@ -9,14 +9,14 @@ export function BalanceHistoryCard({ statements }: { statements: StatementHistor
   return (
     <Card title="Zostatky z výpisov">
       <p>Zostatok podľa výpisu k dátumu jeho uzavretia. Nejde o aktuálny zostatok účtu.</p>
-      <div className="k-table-scroll">
+      <div className="ab-table-scroll">
         <table className="k-table">
           <thead>
             <tr>
               <th>Účet</th>
               <th>Výpis č.</th>
               <th>Uzavretý k</th>
-              <th className="k-num">Zostatok</th>
+              <th className="k-num k-cell-number">Zostatok</th>
               <th>Kontrolný súčet</th>
             </tr>
           </thead>
@@ -26,7 +26,7 @@ export function BalanceHistoryCard({ statements }: { statements: StatementHistor
                 <td>{s.account_label}</td>
                 <td>{s.number}</td>
                 <td>{formatDate(s.period_end)}</td>
-                <td className="k-num">{s.closing_cents === null ? 'Nedostupný' : formatEur(s.closing_cents)}</td>
+                <td className="k-num k-cell-number">{s.closing_cents === null ? 'Nedostupný' : formatEur(s.closing_cents)}</td>
                 <td>{checksumLabel(s.checksum)}</td>
               </tr>
             ))}

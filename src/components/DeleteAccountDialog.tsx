@@ -42,7 +42,7 @@ export function DeleteAccountDialog({ account, onClose, onDeleted }: {
   function close() { if (!action.busy) onClose() }
 
   return <Dialog open title={`Zmazať účet ${account.label}?`} onClose={close} actions={<>
-    <Button variant="secondary" disabled={action.busy} onClick={close}>Zrušiť</Button>
+    <Button variant="secondary" data-k-autofocus="" disabled={action.busy} onClick={close}>Zrušiť</Button>
     {deleted
       ? <Button onClick={() => void action.run(refreshDeleted)} disabled={action.busy}>Obnoviť údaje</Button>
       : <Button variant="danger" disabled={action.busy || !preview || confirmation !== preview.label} onClick={() => void action.run(remove)}>Natrvalo zmazať účet</Button>}

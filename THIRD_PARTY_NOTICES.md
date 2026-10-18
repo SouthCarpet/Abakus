@@ -68,6 +68,24 @@ Abakus embeds `NotoSans-Regular.ttf` and `NotoSans-Bold.ttf`
 Open Font License 1.1. The full license is
 [`src-tauri/assets/report-fonts/OFL.txt`](src-tauri/assets/report-fonts/OFL.txt).
 
+## Fira Sans (user interface)
+
+The user interface uses the static `FiraSans-*.ttf` files, the typeface of
+the Kaliber design language. They are licensed under the SIL Open Font
+License 1.1. The full license is
+[`assets/fonts/fira-sans/OFL.txt`](assets/fonts/fira-sans/OFL.txt).
+
+## Lucide icons (user interface)
+
+`src/kaliber/icons.tsx` draws six Lucide outlines inline: sun, moon,
+chevron-down, x, archive and trash-2. Lucide is licensed under the ISC
+License: Copyright (c) for portions of Lucide are held by Cole Bemis
+2013-2022 as part of Feather (MIT). All other copyright (c) for Lucide
+are held by Lucide Contributors 2022. Permission to use, copy, modify,
+and/or distribute this software for any purpose with or without fee is
+hereby granted, provided that the above copyright notice and this
+permission notice appear in all copies.
+
 ## Rust crates
 
 | Name | Version | License |

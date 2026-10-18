@@ -8,7 +8,7 @@ pub enum AccountKind { Personal, Business }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TxKind { Card, CardForeign, Refund, Atm, TransferIn, TransferOut, StandingOrder, Other }
+pub enum TxKind { Card, CardForeign, Refund, Atm, TransferIn, TransferOut, StandingOrder, Fee, Other }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Transaction {

@@ -9,7 +9,7 @@ use crate::{CategoryKind, Result, Store, StoreError, TxRow};
 use chrono::{Datelike, NaiveDate};
 use parser::AccountKind;
 use rules::Status;
-use rusqlite::{params_from_iter, Transaction};
+use rusqlite::{params_from_iter, Connection};
 use std::collections::HashMap;
 
 const JS_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
@@ -66,8 +66,8 @@ impl Store {
     }
 }
 
-fn capture<F>(
-    tx: &Transaction,
+pub(super) fn capture<F>(
+    tx: &Connection,
     request: &ReportRequest,
     clock: &ReportClock,
     limits: ReportCaptureLimits,
@@ -108,7 +108,7 @@ where
     })
 }
 
-fn read_accounts(tx: &Transaction) -> Result<Vec<StoredAccount>> {
+fn read_accounts(tx: &Connection) -> Result<Vec<StoredAccount>> {
     let mut statement = tx.prepare("SELECT id, iban, kind, label FROM accounts ORDER BY id")?;
     let rows = statement.query_map([], |row| {
         let kind: String = row.get(2)?;
@@ -186,8 +186,8 @@ fn validate_account_ids(accounts: &[ReportAccount]) -> Result<()> {
     Ok(())
 }
 
-fn read_transactions(
-    tx: &Transaction,
+pub(super) fn read_transactions(
+    tx: &Connection,
     accounts: &[ReportAccount],
     range: Option<ReportDateRange>,
     limits: ReportCaptureLimits,
@@ -451,7 +451,10 @@ fn checked_text_total(current: usize, added: usize, maximum: usize) -> Result<us
     Ok(total)
 }
 
-fn read_statements(tx: &Transaction, accounts: &[ReportAccount]) -> Result<Vec<StatementRange>> {
+pub(super) fn read_statements(
+    tx: &Connection,
+    accounts: &[ReportAccount],
+) -> Result<Vec<StatementRange>> {
     if accounts.is_empty() {
         return Ok(Vec::new());
     }

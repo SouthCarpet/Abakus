@@ -33,3 +33,27 @@ describe('reportApi: native report boundary', () => {
     expect(invoke).toHaveBeenCalledWith('export_pdf_report', { request, path: 'C:/reports/2024.pdf' })
   })
 })
+
+describe('reportApi: document scope', () => {
+  const request: ReportRequest = { period: { kind: 'month', month: '2026-09' }, scope: { kind: 'all' } }
+
+  it('keeps the payload exactly { request } and { request, path } when no scope is given', async () => {
+    vi.mocked(invoke).mockResolvedValue({})
+    await reportApi.preview(request)
+    await reportApi.export(request, 'C:/r.pdf')
+    expect(vi.mocked(invoke).mock.calls).toEqual([
+      ['preview_pdf_report', { request }],
+      ['export_pdf_report', { request, path: 'C:/r.pdf' }],
+    ])
+  })
+
+  it.each(['full', 'summary_one_page', 'summary_three_pages'] as const)('sends the wire value %s to both commands', async (scope) => {
+    vi.mocked(invoke).mockResolvedValue({})
+    await reportApi.preview(request, scope)
+    await reportApi.export(request, 'C:/r.pdf', scope)
+    expect(vi.mocked(invoke).mock.calls).toEqual([
+      ['preview_pdf_report', { request, scope }],
+      ['export_pdf_report', { request, path: 'C:/r.pdf', scope }],
+    ])
+  })
+})

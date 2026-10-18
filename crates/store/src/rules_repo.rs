@@ -1,11 +1,12 @@
 use crate::{Result, Store, StoreError};
-use rules::{Rule, RuleKind};
+use rules::{Rule, RuleKind, Status};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Deserialize)] struct SeedFile { rule: Vec<SeedRule> }
 #[derive(Deserialize)] struct SeedRule { key: String, category: String }
 
-fn kind_str(k: RuleKind) -> &'static str { match k { RuleKind::Exact => "exact", RuleKind::Merchant => "merchant", RuleKind::CounterpartyAccount => "counterparty_account", RuleKind::Seed => "seed" } }
+pub(crate) fn kind_str(k: RuleKind) -> &'static str { match k { RuleKind::Exact => "exact", RuleKind::Merchant => "merchant", RuleKind::CounterpartyAccount => "counterparty_account", RuleKind::Seed => "seed" } }
 fn kind_parse(s: &str) -> RuleKind { match s { "exact" => RuleKind::Exact, "merchant" => RuleKind::Merchant, "counterparty_account" => RuleKind::CounterpartyAccount, _ => RuleKind::Seed } }
 
 impl Store {
@@ -47,10 +48,48 @@ impl Store {
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
-    /// Reopens any row that was pointing at this rule: nulls `rule_id`, deletes
-    /// the rule, then reclassifies every open row (so a suggestion whose rule
-    /// just vanished returns to `unassigned` without a caller having to ask).
+    /// Counts current open references and visible open-row changes if `id`
+    /// were deleted. `open_classification_changes` compares status and
+    /// category only. A fallback rule that keeps both values is not a visible
+    /// change even though its `rule_id` or source provenance can differ.
+    pub fn rule_delete_preview(&self, id: i64) -> Result<RuleDeletePreview> {
+        let rules = self.list_rules()?;
+        if !rules.iter().any(|rule| rule.id == id) { return Err(StoreError::UnknownRule { id }); }
+        let remaining: Vec<Rule> = rules.into_iter().filter(|rule| rule.id != id).collect();
+        let own: HashSet<String> = self.list_accounts()?.into_iter().map(|account| account.iban).collect();
+        let cash = self.cash_category_id()?;
+        let open = self.open_rule_states()?;
+        let mut open_rule_references = 0;
+        let mut open_classification_changes = 0;
+        for state in open {
+            if state.rule_id == Some(id) { open_rule_references += 1; }
+            let after = self.classify_with_rules(state.id, &own, &remaining, cash)?;
+            if after.status != state.status || after.category_id != state.category_id { open_classification_changes += 1; }
+        }
+        Ok(RuleDeletePreview { rule_id: id, open_rule_references, open_classification_changes })
+    }
+
+    /// Detaches every foreign-key reference, deletes the rule and reclassifies
+    /// open rows in one transaction. Confirmed and transfer rows keep their
+    /// category, status and source. Their `rule_id` is cleared because its
+    /// referenced rule no longer exists.
     pub fn delete_rule(&mut self, id: i64) -> Result<()> {
+        self.conn.execute_batch("BEGIN IMMEDIATE")?;
+        match self.delete_rule_tx(id) {
+            Ok(()) => {
+                if let Err(error) = self.conn.execute_batch("COMMIT") {
+                    let _ = self.conn.execute_batch("ROLLBACK");
+                    return Err(error.into());
+                }
+                Ok(())
+            }
+            Err(error) => { let _ = self.conn.execute_batch("ROLLBACK"); Err(error) }
+        }
+    }
+
+    fn delete_rule_tx(&mut self, id: i64) -> Result<()> {
+        let exists = self.conn.prepare("SELECT 1 FROM rules WHERE id = ?1")?.exists([id])?;
+        if !exists { return Err(StoreError::UnknownRule { id }); }
         self.conn.execute("UPDATE transactions SET rule_id = NULL WHERE rule_id = ?1", [id])?;
         self.conn.execute("DELETE FROM rules WHERE id = ?1", [id])?;
         self.reclassify_open()?;
@@ -76,15 +115,14 @@ impl Store {
         })
     }
 
-    /// Section 9 redirect, limited to seed rules this release. Atomic:
+    /// Redirects seed and learned rules. Atomic:
     /// invalid target or a mid-write failure rolls back the rule AND every
     /// row it would have touched. Reclassifies only open (`suggested`,
     /// `unassigned`) rows through the existing rule-precedence classifier, so
-    /// confirmed and transfer rows are left byte-for-byte unchanged and a
-    /// higher-priority learned rule still wins where it already did.
+    /// confirmed and transfer assignments are preserved and a higher-priority
+    /// rule still wins where it applies.
     pub fn update_rule_category(&mut self, rule_id: i64, category_id: i64) -> Result<RuleRedirectOutcome> {
-        let rule = self.list_rules()?.into_iter().find(|r| r.id == rule_id).ok_or(StoreError::UnknownRule { id: rule_id })?;
-        if rule.kind != RuleKind::Seed { return Err(StoreError::Parse("Presmerovanie je dostupné len pre pravidlá slovníka.".into())); }
+        self.list_rules()?.into_iter().find(|rule| rule.id == rule_id).ok_or(StoreError::UnknownRule { id: rule_id })?;
         self.check_redirect_target(category_id)?;
         self.conn.execute_batch("BEGIN IMMEDIATE")?;
         match self.update_rule_category_tx(rule_id, category_id) {
@@ -111,11 +149,20 @@ impl Store {
     }
 
     fn update_rule_category_tx(&mut self, rule_id: i64, category_id: i64) -> Result<usize> {
-        let n = self.conn.execute("UPDATE rules SET category_id = ?2 WHERE id = ?1 AND match_kind = 'seed'", rusqlite::params![rule_id, category_id])?;
+        let n = self.conn.execute("UPDATE rules SET category_id = ?2 WHERE id = ?1 AND match_kind IN ('seed', 'exact', 'merchant', 'counterparty_account')", rusqlite::params![rule_id, category_id])?;
         if n == 0 { return Err(StoreError::UnknownRule { id: rule_id }); }
         self.reclassify_open()?;
         let updated: i64 = self.conn.query_row("SELECT COUNT(*) FROM transactions WHERE rule_id = ?1 AND status = 'suggested'", [rule_id], |r| r.get(0))?;
         Ok(updated as usize)
+    }
+
+    fn open_rule_states(&self) -> Result<Vec<OpenRuleState>> {
+        let mut statement = self.conn.prepare("SELECT id, status, category_id, rule_id FROM transactions WHERE status IN ('suggested', 'unassigned')")?;
+        let rows = statement.query_map([], |row| {
+            let status: String = row.get(1)?;
+            Ok(OpenRuleState { id: row.get(0)?, status: crate::import::status_parse(&status), category_id: row.get(2)?, rule_id: row.get(3)? })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
     /// Rules joined with their category (and its parent) for the rules-list screen.
@@ -134,3 +181,8 @@ pub struct RuleView { pub id: i64, pub kind: RuleKind, pub key: String, pub plac
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RuleRedirectOutcome { pub rule_id: i64, pub category_id: i64, pub updated: usize }
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct RuleDeletePreview { pub rule_id: i64, pub open_rule_references: usize, pub open_classification_changes: usize }
+
+struct OpenRuleState { id: i64, status: Status, category_id: Option<i64>, rule_id: Option<i64> }

@@ -68,7 +68,7 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
   free. Creation (`id: None`) goes through the same name validation and
   duplicate check via a small dedicated `create_category` path.
 
-### Seed rule provenance and redirect (`crates/store/src/rules_repo.rs`)
+### Rule provenance, redirect and delete preview (`crates/store/src/rules_repo.rs`)
 
 - `Store::seed_rule_for_transaction(transaction_id) -> Result<Option<RuleView>>`:
   the actual `transactions.rule_id` joined to a `match_kind = 'seed'` rule,
@@ -76,16 +76,81 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
   an error; a transaction with no seed pointer (learned rule, or none at all)
   is `Ok(None)`.
 - `Store::update_rule_category(rule_id, category_id) -> Result<RuleRedirectOutcome>`:
-  limited to seed rules this release (refused for any other rule kind). The
-  target must be a usable, non-system, non-archived category: a leaf, or a
-  root with no *active* children (an archived child does not block it).
+  supports seed, exact, merchant and counterparty-account rules. The target
+  must be a usable, non-system, non-archived category: a leaf, or a root with
+  no *active* children (an archived child does not block it).
   Atomic: the whole operation, including a mid-write failure, rolls back.
   Reclassifies through the existing `reclassify_open` (which already
   implements full rule precedence), so it only ever touches `suggested`/
-  `unassigned` rows for which the redirected rule genuinely wins; confirmed
-  and transfer rows are left byte-for-byte unchanged. A higher-priority
-  learned rule that already shadowed the seed rule for some row keeps
-  shadowing it.
+  `unassigned` rows. Confirmed and transfer assignments keep their category,
+  status and source. A higher-priority rule keeps winning where it applies.
+- `Store::rule_delete_preview(rule_id) -> Result<RuleDeletePreview>` returns
+  `open_rule_references` and `open_classification_changes`. The first count is
+  the number of open rows whose current `rule_id` points to the selected rule.
+  The second simulates the existing classifier without that rule and counts
+  rows whose status or category would change. A fallback that keeps both
+  values does not count as a visible classification change, even if its rule
+  pointer or source differs.
+- `Store::delete_rule` now rejects an unknown rule and performs reference
+  detachment, deletion and open-row reclassification in one transaction.
+  Confirmed and transfer rows keep category, status and source. A confirmed
+  row that referred to the deleted rule loses `rule_id`, because the foreign
+  key target no longer exists.
+
+### Plan 091 category deletion (`crates/store/src/category_delete.rs`)
+
+- `category_delete_preview(category_id)` returns the exact root and descendant
+  rows plus transaction, confirmed, rule, rule-source and recurring-member
+  counts. Archived categories are valid deletion targets. System categories
+  and the protected subtree below a system category are refused.
+- `delete_category(CategoryDeleteRequest { preview })` recomputes the full
+  preview inside `BEGIN IMMEDIATE` and requires exact equality. A new category,
+  transaction, rule, provenance row or recurring membership makes the preview
+  stale and prevents every write.
+- Every affected non-transfer transaction, including `confirmed`, becomes the
+  existing unassigned representation (`category_id = NULL`, `status =
+  'unassigned'`, `rule_id = NULL`, `source = 'none'`). Rules that target the
+  subtree are deleted and their `rule_sources` rows follow the existing
+  cascade.
+- Recurring decisions and memberships are retained. They have no category
+  foreign key; the displayed category is derived again from the now-unassigned
+  transactions.
+- A transfer with an invalid category reference, or a transaction outside the
+  subtree that refers to a rule targeted into the subtree, stops preview and
+  apply. The backend does not silently mutate either row.
+- Any SQL failure rolls back transaction changes, rules, provenance and
+  categories. The same Store connection remains usable for a corrected retry.
+- The complete additive field and command inventory is in
+  `docs/plan-091-category-delete.md`. This batch was backend-only; the delete
+  icon and confirmation dialog shipped in a later UI lane
+  (`src/screens/Categories.tsx`, plan 091 UI batch K).
+
+### Atomic bulk confirmation (`crates/store/src/assign.rs`)
+
+- `Store::confirm(ids, apply_to_matching) -> Result<AssignOutcome>` confirms
+  every unique selected suggestion in one SQLite transaction. An unknown id or
+  SQL failure rolls back transaction rows, learned rules and `rule_sources`.
+- Selected confirmed and unassigned rows are no-ops. Selected transfer ids are
+  never changed and appear once in `skipped_transfers`, even when the request
+  repeats an id.
+- Optional matching reads one stable pre-write snapshot. Card-like rows match
+  only the same non-empty normalized merchant and the same normalized place.
+  `NULL` and a concrete place are different. Transfer-in, transfer-out and
+  standing-order rows match only the same non-empty counterparty IBAN.
+- Matching can confirm only `suggested` or `unassigned` rows. A row with a
+  different concrete category, any confirmed row and any transfer row stays
+  unchanged. Conflicting selected categories do not create a broad merchant
+  rule and cannot make the result depend on selection order.
+- `AssignOutcome.updated` now includes unique matching rows changed by both
+  `assign` and `confirm`. `rules_created` and `skipped_transfers` retain their
+  existing meanings. The Tauri `confirm` response changed from a number to
+  this existing object shape.
+- Existing `assign(..., apply_to_matching: true)` remains merchant-wide for
+  compatibility. The new exact merchant-place or account match applies only
+  to `confirm(..., apply_to_matching: true)`.
+- The optional Tauri argument `applyToMatching` defaults to `false`. An older
+  request containing only `ids` therefore keeps its previous narrow behavior.
+  The bulk-confirmation UI is pending.
 
 ### Spotify fresh seed and legacy repair
 
@@ -125,7 +190,9 @@ files, B's recurring UI, `src/api.ts`, `TxFilter`/`TxRow`, or version numbers.
 ### Frontend seam (`src/lib/category-api.ts`, `src/components/CategoryDialog.tsx`, `src/components/CategoryPicker.tsx`)
 
 - `categoryApi` (new): `preview`, `update`, `seedRuleForTransaction`,
-  `redirectRule`, wired to the four new Tauri commands
+  `redirectRule`, `previewDelete`, and `deleteCategory`, wired to the existing
+  category workflow commands plus `category_delete_preview` and
+  `delete_category`
   (`category_update_preview`, `update_category`, `seed_rule_for_transaction`,
   `update_rule_category`).
 - `CategoryDialog` (new, shared seam): `{open, initialParentId?, initialKind?,
@@ -198,7 +265,7 @@ persistence. No production command changed.
 - `crates/store/tests/spotify_repair.rs` (3 cases): the public-boundary half.
   A fresh `Store::open_in_memory()` already has `Predplatné/Spotify` and
   the `spotify` seed rule pointing at it, through nothing but the public API.
-- `crates/store/tests/category_workflows.rs` (15 cases, mapped to acceptance
+- `crates/store/tests/category_workflows.rs` (23 cases, mapped to acceptance
   IDs C01/C02/C03/C05): move, promote-to-root, refuse-reparent-with-children,
   self/descendant/missing/archived/system parent refusals, the protected
   Hotovosť subtree, kind-change preview/ack/propagation with exact counts,
@@ -206,14 +273,27 @@ persistence. No production command changed.
   edit (via a real file-backed fixture, same `rusqlite::Connection` pattern as
   `tests/migration.rs`, since the validated create path can no longer
   construct one), seed rule provenance, and redirect (including the
-  active-vs-archived-children target rule and the seed-only restriction).
+  active-vs-archived-children target rule, learned-rule redirects, precedence,
+  rollback, delete preview and confirmed/transfer preservation).
   Fixtures go through the real parser/import/classify path
   (`import_statement`, `assign`, `confirm`) wherever possible, per the local
   acceptance rule against calling production logic to compute expected
   values.
-- `src-tauri/tests/category_json.rs` (8 cases): the wire-contract drift gate
-  for the four new commands and their request/response shapes, same pattern
+- `src-tauri/tests/category_json.rs` (10 cases): the wire-contract drift gate
+  for the five category workflow commands and their request/response shapes, same pattern
   as `commands_json.rs`.
+- `crates/store/tests/category_delete.rs` (8 cases): public Store deletion
+  contract, including the exact-preview gate, confirmed rows, descendants,
+  archived/empty and unknown categories, system/transfer/reference protection,
+  rule provenance, retained recurring membership, rollback and retry.
+- `src-tauri/tests/category_json.rs` adds four deletion wire cases for command
+  arguments, required/unknown fields and the complete serialized preview.
+- `crates/store/tests/bulk_confirmation.rs` (10 cases): public `Store` tests
+  for duplicate ids, merchant/place and counterparty matching, protected
+  rows, category conflicts, selection order, rollback, retry and persistence.
+- `src-tauri/tests/commands_json.rs`: the `confirm` request covers the new
+  optional field and the omitted-field default. `AssignOutcome` pins the new
+  response shape.
 - `src/components/CategoryDialog.test.tsx` (5 cases), `CategoryPicker.test.tsx`
   (+3 cases for `onCreate`), `screens/Categories.test.tsx` (+3 cases for the
   edit/preview/confirm flow).
@@ -222,7 +302,7 @@ persistence. No production command changed.
 
 ```
 cargo test --jobs 4 -p store --lib                     # 36 passed (incl. 10 seed_repair)
-cargo test --jobs 4 -p store --test category_workflows # 14 passed
+cargo test --jobs 4 -p store --test category_workflows # 23 passed
 cargo test --jobs 4 -p store --test spotify_repair     # 3 passed
 cargo test --jobs 4 --workspace                        # all green, see lane report
 cargo clippy --jobs 4 --workspace --all-targets -- -D warnings

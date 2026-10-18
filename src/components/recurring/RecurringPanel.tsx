@@ -203,7 +203,7 @@ function OverviewBody({
           <RecurringTable caption="Ignorované" rows={parts.ignored} busy={busy} onDetail={onDetail} onConfirm={onConfirm} onEdit={onEdit} onIgnore={onIgnore} onReset={onReset} />
         </details>
       ) : null}
-      <p className="k-field-label">Obdobie {query.from ?? 'začiatok histórie'} až {query.to ?? 'bez konca'}, dnes {query.today}.</p>
+      <p className="ab-field-label">Obdobie {query.from ?? 'začiatok histórie'} až {query.to ?? 'bez konca'}, dnes {query.today}.</p>
     </>
   )
 }
