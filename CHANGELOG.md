@@ -2,7 +2,7 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
-## 0.2.0 (2026-09-14)
+## 0.2.0 (2026-10-18)
 
 - Nový vzhľad podľa jazyka dizajnu Kaliber, revízia 4: písmo Fira Sans, plochý register s linkami, súhrnná tabuľka namiesto dlaždíc v Prehľade a päť záložiek v hlavičke. Appka sa otvorí na **Transakciách**.
 - Transakcie ukazujú v popise obdobie a účet, register začína vyššie (len krátka nápoveda ku klávesom, podrobnosti a postup Zaradiť podľa obchodníka sú v **Pomocníkovi**), políčka v riadkoch majú na telefóne plochu 44 × 44 px a výber kategórie má šípku rozbalenia. Potvrdenia mazania skloňujú správne (1 pravidlo, 2 pravidlá, 5 pravidiel; Odstránia sa 2 transakcie). Grafy majú jeden rámik.
