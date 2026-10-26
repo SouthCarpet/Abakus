@@ -579,10 +579,13 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
           <input className="k-input k-well" value={label} onChange={(e) => setLabel(e.target.value)} />
         </Field>
         <Field label="Druh účtu">
-          <select className="k-select k-well" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
-            <option value="personal">Osobný</option>
-            <option value="business">Firemný</option>
-          </select>
+          <span className="k-select-wrap">
+            <select className="k-select k-well" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
+              <option value="personal">Osobný</option>
+              <option value="business">Firemný</option>
+            </select>
+            <Icon name="chevron-down" small className="k-select-chevron" />
+          </span>
         </Field>
         {error ? <InlineAlert>{error}</InlineAlert> : null}
       </Dialog>
@@ -608,10 +611,13 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
           <input className="k-input k-well" value={editTarget ? maskIban(editTarget.iban) : ''} disabled readOnly />
         </Field>
         <Field label="Typ účtu">
-          <select className="k-select k-well" value={editKind} onChange={(e) => changeEditKind(e.target.value as AccountKind)}>
-            <option value="personal">Osobný</option>
-            <option value="business">Firemný</option>
-          </select>
+          <span className="k-select-wrap">
+            <select className="k-select k-well" value={editKind} onChange={(e) => changeEditKind(e.target.value as AccountKind)}>
+              <option value="personal">Osobný</option>
+              <option value="business">Firemný</option>
+            </select>
+            <Icon name="chevron-down" small className="k-select-chevron" />
+          </span>
         </Field>
         {editError ? <InlineAlert>{editError}</InlineAlert> : null}
         {editError && editTarget && editKind !== editTarget.kind ? (

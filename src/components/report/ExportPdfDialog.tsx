@@ -1,3 +1,4 @@
+import { Icon } from '../../kaliber/icons'
 import { InlineAlert } from '../InlineAlert'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, type Account } from '../../api'
@@ -168,21 +169,27 @@ function ExportDialogContent(props: ExportDialogContentProps) {
     <p>Vyberte obdobie, účty a rozsah dokumentu. Filtre tabuľky sa nepoužijú.</p>
     <fieldset className="ab-section" disabled={busy}>
       <Field label="Obdobie">
-        <select className="k-select k-well" value={draft.period} onChange={(event) => updateDraft({ period: event.target.value as PeriodChoice })}>
-          <option value="month">Mesiac</option>
-          <option value="six_months">Šesť mesiacov</option>
-          <option value="year">Rok</option>
-          <option value="all_time">Celé obdobie</option>
-        </select>
+        <span className="k-select-wrap">
+          <select className="k-select k-well" value={draft.period} onChange={(event) => updateDraft({ period: event.target.value as PeriodChoice })}>
+            <option value="month">Mesiac</option>
+            <option value="six_months">Šesť mesiacov</option>
+            <option value="year">Rok</option>
+            <option value="all_time">Celé obdobie</option>
+          </select>
+          <Icon name="chevron-down" small className="k-select-chevron" />
+        </span>
       </Field>
       <PeriodInputs draft={draft} updateDraft={updateDraft} />
       <Field label="Účty">
-        <select className="k-select k-well" value={draft.scope} onChange={(event) => updateDraft({ scope: event.target.value as ScopeChoice })}>
-          <option value="all">Všetky účty</option>
-          <option value="personal">Osobné účty</option>
-          <option value="business">Firemné účty</option>
-          {accounts.map((account) => <option key={account.id} value={accountScope(account)}>{account.label} ({account.kind === 'personal' ? 'osobný' : 'firemný'})</option>)}
-        </select>
+        <span className="k-select-wrap">
+          <select className="k-select k-well" value={draft.scope} onChange={(event) => updateDraft({ scope: event.target.value as ScopeChoice })}>
+            <option value="all">Všetky účty</option>
+            <option value="personal">Osobné účty</option>
+            <option value="business">Firemné účty</option>
+            {accounts.map((account) => <option key={account.id} value={accountScope(account)}>{account.label} ({account.kind === 'personal' ? 'osobný' : 'firemný'})</option>)}
+          </select>
+          <Icon name="chevron-down" small className="k-select-chevron" />
+        </span>
       </Field>
     </fieldset>
     <DocumentScopeChoice busy={busy} draft={draft} updateDraft={updateDraft} />

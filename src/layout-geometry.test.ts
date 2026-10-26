@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 
-// Real geometry of the Transakcie screen (plan 091 r4, fix round a4). jsdom has no layout, so
+// Real geometry of the Transakcie and Import screens (plan 091 r4, fix round a4). jsdom has no layout, so
 // scripts/layout-probe.mjs opens the Vite dev server in Chromium and measures. It reports
 // "skipped" when no Playwright or Chromium is at hand (CI has none); this machine has both.
 interface Probe {
+  imports: Record<string, { rowCount: number; deleteInside: boolean[] }>
   minimum: Record<string, { closed: { overflow: number; scrollLeft: number; amountVisible: boolean; detailVisible: boolean; pageOverflow: number }; open: { overflow: number; scrollLeft: number; amountVisible: boolean; detailVisible: boolean; pageOverflow: number } }>
   skipped?: string
   firstRowTop: Record<string, number>
@@ -66,5 +67,11 @@ run('fix1 fits the amount column and open detail at 1024 and keeps 1280 clear', 
     for (const state of ['closed', 'open'] as const) {
       expect(probe.minimum[width][state], `${width} ${state}`).toEqual({ overflow: 0, scrollLeft: 0, amountVisible: true, detailVisible: true, pageOverflow: 0 })
     }
+  }
+})
+
+run('fix2 keeps every Import delete button inside its card with a checksum mismatch at 1024 and 1280', () => {
+  for (const width of ['1024', '1280']) {
+    expect(probe.imports[width], width).toEqual({ rowCount: 3, deleteInside: [true, true, true] })
   }
 })

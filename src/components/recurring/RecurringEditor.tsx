@@ -1,3 +1,4 @@
+import { Icon } from '../../kaliber/icons'
 import { InlineAlert } from '../InlineAlert'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import type { Category, TxRow } from '../../api'
@@ -161,11 +162,14 @@ function EditorForm({
       <RecurringWideDialogStyle />
       <EditorStatus loadError={loadError} busy={busy} error={error} refreshError={refreshError} />
       <Field label="Interval">
-        <select className="k-select k-well" aria-label="Interval" value={draft.cadence} disabled={busy} onChange={(e) => draft.setCadence(e.target.value as Cadence)}>
-          {CADENCES.map((item) => (
-            <option key={item} value={item}>{CADENCE_OPTION[item]}</option>
-          ))}
-        </select>
+        <span className="k-select-wrap">
+          <select className="k-select k-well" aria-label="Interval" value={draft.cadence} disabled={busy} onChange={(e) => draft.setCadence(e.target.value as Cadence)}>
+            {CADENCES.map((item) => (
+              <option key={item} value={item}>{CADENCE_OPTION[item]}</option>
+            ))}
+          </select>
+          <Icon name="chevron-down" small className="k-select-chevron" />
+        </span>
       </Field>
       <Field label="Kotva">
         <input className="k-input k-well" type="date" aria-label="Kotva" value={draft.anchor} disabled={busy} onChange={(e) => draft.setAnchor(e.target.value)} />

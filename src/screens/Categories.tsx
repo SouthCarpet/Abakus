@@ -317,31 +317,37 @@ function CategoryEditDialog({
             <input className="k-input k-well" aria-label="Upraviť názov kategórie" value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Nadradená kategória">
-            <select
-              aria-label="Upraviť nadradenú kategóriu"
-              className="k-select k-well"
-              value={parentId ?? ''}
-              onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">Hlavná kategória</option>
-              {parentOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <span className="k-select-wrap">
+              <select
+                aria-label="Upraviť nadradenú kategóriu"
+                className="k-select k-well"
+                value={parentId ?? ''}
+                onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Hlavná kategória</option>
+                {parentOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <Icon name="chevron-down" small className="k-select-chevron" />
+            </span>
           </Field>
           <Field label="Druh">
-            <select
-              aria-label="Upraviť druh kategórie"
-              className="k-select k-well"
-              value={effectiveKind}
-              disabled={selectedParent !== null}
-              onChange={(e) => setKind(e.target.value as CategoryKind)}
-            >
-              <option value="expense">{CATEGORY_KIND_LABELS_SHORT.expense}</option>
-              <option value="income">{CATEGORY_KIND_LABELS_SHORT.income}</option>
-            </select>
+            <span className="k-select-wrap">
+              <select
+                aria-label="Upraviť druh kategórie"
+                className="k-select k-well"
+                value={effectiveKind}
+                disabled={selectedParent !== null}
+                onChange={(e) => setKind(e.target.value as CategoryKind)}
+              >
+                <option value="expense">{CATEGORY_KIND_LABELS_SHORT.expense}</option>
+                <option value="income">{CATEGORY_KIND_LABELS_SHORT.income}</option>
+              </select>
+              <Icon name="chevron-down" small className="k-select-chevron" />
+            </span>
           </Field>
         </>
       )}
@@ -646,10 +652,13 @@ export function Categories() {
           <input className="k-input k-well" value={newName} onChange={(e) => setNewName(e.target.value)} />
         </Field>
         <Field label="Druh">
-          <select className="k-select k-well" value={newKind} onChange={(e) => setNewKind(e.target.value as CategoryKind)}>
-            <option value="expense">{CATEGORY_KIND_LABELS.expense}</option>
-            <option value="income">{CATEGORY_KIND_LABELS.income}</option>
-          </select>
+          <span className="k-select-wrap">
+            <select className="k-select k-well" value={newKind} onChange={(e) => setNewKind(e.target.value as CategoryKind)}>
+              <option value="expense">{CATEGORY_KIND_LABELS.expense}</option>
+              <option value="income">{CATEGORY_KIND_LABELS.income}</option>
+            </select>
+            <Icon name="chevron-down" small className="k-select-chevron" />
+          </span>
         </Field>
       </Dialog>
 

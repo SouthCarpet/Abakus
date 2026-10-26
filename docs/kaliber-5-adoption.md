@@ -78,7 +78,15 @@ Funkcie, klávesy a ukladanie dát sa nemenia. Opravy úzkeho registra sú uvede
 - Odznaky kontroly výpisu zobrazia `danger` pri chybe načítania a pri stave `needs_attention`. Odznak kontrolného súčtu ju zobrazí pri `off_by`. Správny súčet si ponechá bodku.
 - Ďalší problémový odznak je `RecurringTable`, stav `missing` (Chýba platba). Stav `active` ostáva s bodkou. Zmeny ceny, odhad ukončenia a neznáme údaje sú informácie, nie potvrdené chyby.
 - Karta nesediaceho súčtu v Prehľade má statický `InlineAlert` typu `error` bez novej živej roly. Názov chýb zápisu auditu ostáva odsekom a dostane malú skrytú ikonu `danger` cez `.ab-notice-title`.
-- Oba výbery v dialógu kategórie používajú `k-select-wrap` a `k-select-chevron`. O aplikácii používa priamu ikonu `k-chevron` v súhrne, ktorú spoločný Kaliber pri otvorení otočí.
+- Dialóg `CategoryDialog` používa pre oba výbery `k-select-wrap` a `k-select-chevron`. O aplikácii používa priamu ikonu `k-chevron` v súhrne, ktorú spoločný Kaliber pri otvorení otočí.
 - Pri šírke 600 až 1100 px má `.ab-register` pevnú tabuľkovú mriežku. Text a akcie sa môžu zalomiť; suma, výber kategórie a poznámka ostávajú v regióne. Detailný zdrojový text používa zalomenie. Pri 1280 px zostáva automatická šírka stĺpcov.
 - Varovania v porovnaní kategórií tvoria jeden statický `InlineAlert` so zoznamom `.ab-warning-list`. Pri úplných dátach a uzavretom období sa nezobrazí.
 - Regresné testy `fix1` overujú odznaky, obe chybové správy, šípky a zoznam varovaní. `layout-probe.mjs` meria pri 1024 × 680 a 1280 × 820 sumu, otvorený detail, posun regiónu aj presah stránky.
+
+## Opravy po druhej vizuálnej kontrole (fix2)
+
+- Všetky natívne výbery v appke používajú existujúci vzor `k-select-wrap` a malú skrytú ikonu `k-select-chevron`. Zahŕňa aj samostatné formuláre vytvorenia a úpravy na obrazovke Kategórie, vytvorenie a úpravu účtu v Nastaveniach, nastavenie neznámeho účtu po importe, oba výbery PDF exportu a interval pravidelnej platby. Výber kategórie `CategoryPicker` je vlastné tlačidlo s existujúcou šípkou, nie natívny select.
+- Import pri šírke 600 až 1100 px používa pre riadky výpisov mriežku s pevným miestom pre zmazanie. Texty účtu, kontrolného súčtu a akcie sa zalomia. Tlačidlo zmazania ostáva v karte aj pri `off_by`. Pri 1280 px zostáva pôvodný riadok.
+- Tabuľka Zostatky z výpisov v Prehľade používa pri `off_by` existujúci `DangerBadge`. Ostatné stavy ostávajú textom.
+- Nepribudol žiadny token, verejný parameter ani nová trieda. Tri kópie Kaliber ostávajú nezmenené.
+- Testy `fix2` otvárajú formuláre z Kategórií, Nastavení, Importu, Prehľadu a panelu pravidelných platieb. Spoločná kontrola overí všetky natívne výbery na otvorenej obrazovke alebo vo formulári vrátane budúcich doplnení. Geometrická sonda otvorí Import pri 1024 × 680 a 1280 × 820 s jedným `off_by` a dvoma správnymi súčtami a overí polohu všetkých tlačidiel zmazania.

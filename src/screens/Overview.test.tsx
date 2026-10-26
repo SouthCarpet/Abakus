@@ -1,8 +1,12 @@
+import { expectSelectChevrons } from '../select-affordance.test-helper'
+import { reportApi } from '../lib/report-api'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BadChecksum, Summary } from '../api'
 import { api } from '../api'
 import { ChecksumBanner, Overview } from './Overview'
+
+vi.mock('../lib/report-api', () => ({ reportApi: { preview: vi.fn() } }))
 
 afterEach(() => cleanup())
 
@@ -371,4 +375,29 @@ it('fix1 shows the checksum mismatch in a static danger alert', () => {
   expect(alert).not.toBeNull()
   expect(alert?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
   expect(alert).not.toHaveAttribute('role')
+})
+
+it('fix2 shows the checksum danger icon and colour in the balance table on Overview', async () => {
+  vi.mocked(api.summary).mockResolvedValue(nonEmptySummary)
+  vi.mocked(api.statementHistory).mockResolvedValueOnce([
+    { statement_id: 1, account_id: 1, account_label: 'Osobný', account_kind: 'personal', number: 1, period_start: '2026-01-01', period_end: '2026-01-31', opening_cents: 0, closing_cents: 0, transaction_count: 1, total_cents: 0, checksum: { status: 'off_by', off_by: 150 } },
+  ])
+  render(<Overview onNavigateToImport={vi.fn()} onNavigateToTransactions={vi.fn()} />)
+  fireEvent.click(within(screen.getByRole('group', { name: 'Obdobie' })).getByRole('button', { name: 'Všetko' }))
+  const badge = await screen.findByText('Kontrolný súčet nesedí o 1,50 €')
+  expect(badge).toHaveClass('ab-badge-danger')
+  expect(badge.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+})
+
+it('fix2 shows both export select arrows after opening PDF export from Overview', async () => {
+  vi.mocked(reportApi.preview).mockResolvedValue({ range: null, scope_label: 'Všetky účty', accounts: [], transaction_count: 0, latest_transaction_date: null, captured_at: '2026-10-26T20:00:00Z', unfinished_period: false, accounts_without_statements: 0, accounts_with_gaps: 0, unverified_statement_count: 0, invalid_statement_range_count: 0 })
+  render(<Overview onNavigateToImport={vi.fn()} onNavigateToTransactions={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Exportovať PDF' }))
+  const dialog = await screen.findByRole('dialog', { name: 'Exportovať PDF' })
+  const selects = within(dialog).getAllByRole('combobox')
+  expect(selects).toHaveLength(2)
+  for (const select of selects) {
+    expect(select.closest('.k-select-wrap')?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  }
+  expectSelectChevrons()
 })

@@ -1,3 +1,4 @@
+import { expectSelectChevrons } from '../select-affordance.test-helper'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api'
@@ -7,6 +8,8 @@ import { Toasts } from '../components/Toasts'
 import { resetToasts } from '../kaliber/toast'
 
 // Toasts render in the app's one region (Kaliber R12); the screen tests mount it beside the screen.
+afterEach(() => cleanup())
+
 beforeEach(() => { resetToasts(); render(<Toasts />) })
 
 describe('RulesTable', () => {
@@ -295,4 +298,26 @@ describe('Categories rule editing (point 14)', () => {
 
     await waitFor(() => expect(api.deleteRule).toHaveBeenCalledWith(4))
   })
+})
+
+// fix2: open the form from the screen where the defect was reported.
+it('fix2 shows a chevron for Druh after opening Nova kategoria from Categories', async () => {
+  vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+  vi.mocked(api.listRules).mockResolvedValue([])
+  render(<Categories />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Nová kategória' }))
+  const select = within(screen.getByRole('dialog')).getByLabelText('Druh')
+  expect(select.closest('.k-select-wrap')?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  expectSelectChevrons()
+})
+
+it('fix2 shows chevrons for both selects after opening the category edit form', async () => {
+  vi.mocked(api.listCategories).mockResolvedValue([JEDLO])
+  vi.mocked(api.listRules).mockResolvedValue([])
+  render(<Categories />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
+  for (const select of within(screen.getByRole('dialog')).getAllByRole('combobox')) {
+    expect(select.closest('.k-select-wrap')?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  }
+  expectSelectChevrons()
 })

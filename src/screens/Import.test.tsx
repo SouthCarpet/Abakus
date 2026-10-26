@@ -1,3 +1,4 @@
+import { expectSelectChevrons } from '../select-affordance.test-helper'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImportReport, StatementDeletePreview, StatementHistoryRow } from '../api'
@@ -96,6 +97,13 @@ describe('Import: set up an unknown account automatically', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Vybrať PDF' }))
     return screen.findByRole('dialog', { name: 'Účet nie je nastavený' })
   }
+
+  it('fix2 shows the account kind chevron after importing an unknown account', async () => {
+    const dialog = await dropUnknown()
+    const select = within(dialog).getByRole('combobox')
+    expect(select.closest('.k-select-wrap')?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+    expectSelectChevrons()
+  })
 
   it('opens by itself with the masked IBAN in the text and the kind preselected', async () => {
     const dialog = await dropUnknown()

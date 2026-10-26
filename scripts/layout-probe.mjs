@@ -1,4 +1,4 @@
-// Layout probe (plan 091 r4): measures the Transakcie screen in a real Chromium against the
+// Layout probe (plan 091 r4): measures the Transakcie and Import screens in a real Chromium against the
 // Vite dev server, with a mocked Tauri invoke. Prints one JSON object on stdout.
 // Used by src/layout-geometry.test.ts. Prints {"skipped": "<reason>"} when no browser is at hand.
 // Browser: ABAKUS_CHROMIUM (path to the executable) or the Playwright cache of this machine.
@@ -52,7 +52,7 @@ const mock = (scenario) => {
   const accounts = [{ id: 1, iban: 'SK3112000000198742637541', kind: 'personal', label: 'Bežný účet', has_password: false }]
   const handlers = {
     list_accounts: accounts, list_categories: cats, list_rules: [], list_transactions: tx,
-    statement_history: [], recent_statements: [], bad_checksums: [], get_check_updates: false, net_log: [], net_audit_failures: [],
+    statement_history: [0, 1, 2].map((i) => ({ statement_id: i + 1, account_id: 1, account_label: 'Bežný účet (demo)', account_kind: 'personal', number: 10 - i, period_start: '2026-10-01', period_end: '2026-10-31', opening_cents: 0, closing_cents: 10000, transaction_count: 48, total_cents: -65000, checksum: i === 0 ? { status: 'off_by', off_by: 150 } : { status: 'ok' } })), statement_review: { checksum: { status: 'ok' }, parser_warnings: [], unassigned_count: 2, suggested_count: 1, status: 'needs_attention' }, recent_statements: [], bad_checksums: [], get_check_updates: false, net_log: [], net_audit_failures: [],
     data_dir: 'C:\\Users\\demo\\AppData\\Roaming\\Abakus',
   }
   window.__TAURI_INTERNALS__ = {
@@ -104,6 +104,31 @@ async function measureOpenDetail(page, width) {
   return { closed, open }
 }
 
+async function importFit(browser, url, width) {
+  const { ctx, page } = await openRegister(browser, width, 'base')
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 170000 })
+    await page.locator('nav[aria-label="Sekcie"]').getByRole('button', { name: 'Import', exact: true }).click()
+    const card = page.getByRole('region', { name: 'Všetky výpisy', exact: true })
+    await card.getByText('Kontrolný súčet nesedí o 1,50 €', { exact: true }).waitFor()
+    await card.getByText('Vyžaduje pozornosť', { exact: true }).first().waitFor()
+    return await card.evaluate(el => {
+      const bounds = el.getBoundingClientRect()
+      const buttons = [...el.querySelectorAll('button[aria-label^="Zmazať výpis"]')]
+      return { rowCount: buttons.length, deleteInside: buttons.map(button => {
+        const rect = button.getBoundingClientRect()
+        return rect.left >= bounds.left && rect.right <= bounds.right
+      }) }
+    })
+  } finally { await ctx.close() }
+}
+
+async function importSizes(browser, url) {
+  const sizes = {}
+  for (const width of [1024, 1280]) sizes[width] = await importFit(browser, url, width)
+  return sizes
+}
+
 async function main() {
   const playwright = loadPlaywright()
   const executablePath = findBrowser()
@@ -115,7 +140,7 @@ async function main() {
   await server.listen()
   const url = `http://127.0.0.1:${server.httpServer.address().port}/`
   const browser = await playwright.chromium.launch({ headless: true, executablePath })
-  const out = { firstRowTop: {}, overflowX: {}, hit: {}, minimum: {} }
+  const out = { firstRowTop: {}, overflowX: {}, hit: {}, minimum: {}, imports: {} }
   try {
     for (const width of [1440, 1280, 1024]) {
       const { ctx, page } = await openRegister(browser, width, 'base')
@@ -144,6 +169,7 @@ async function main() {
       out.overflowX[width] = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
       await ctx.close()
     }
+    out.imports = await importSizes(browser, url)
     for (const scenario of ['long', 'empty']) {
       const { ctx, page } = await openRegister(browser, 1440, scenario)
       await goToRegister(page, url, scenario)
