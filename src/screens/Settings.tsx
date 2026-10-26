@@ -136,7 +136,6 @@ function About({ checkUpdates, preferenceLoaded, checking, release, onToggle, on
         <span className="k-switch-track" aria-hidden="true">
           <span className="k-switch-bg" />
           <span className="k-switch-mark k-switch-mark--on" />
-          <span className="k-switch-mark k-switch-mark--off" />
           <span className="k-switch-thumb" />
         </span>
         <span className="k-switch-text">Kontrolovať aktualizácie (GitHub)</span>

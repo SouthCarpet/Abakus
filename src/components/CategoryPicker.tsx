@@ -100,7 +100,7 @@ export function CategoryPicker({
       <button
         ref={triggerRef}
         type="button"
-        className="k-select k-well category-picker__trigger"
+        className="k-select k-well category-picker__trigger ab-filter-select"
         role="combobox"
         aria-label={label}
         aria-expanded={open}

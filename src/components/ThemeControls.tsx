@@ -43,7 +43,7 @@ export function ThemeMode() {
   return (
     <fieldset className="k-radio-group ab-theme-mode">
       <legend className="k-group-legend k-sr-only">Vzhľad</legend>
-      <div className="k-segmented">
+      <div className="k-segmented ab-theme-segmented">
         {MODES.map((mode) => (
           <label key={mode.value} className="k-segmented-item">
             <input

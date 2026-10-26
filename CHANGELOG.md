@@ -2,6 +2,11 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
+## Unreleased
+
+- Základ vzhľadu Kaliber 5.0.1: aktívna záložka má zvýraznenú linku, malé stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Obnovené tokeny pridávajú prekrytie vypnutých ovládačov a rozmery ikon.
+- Pripravený súbor ikon `public/kaliber-icons.svg`. Výmena ikon nasleduje samostatne.
+
 ## 0.2.0 (2026-10-18)
 
 - Nový vzhľad podľa jazyka dizajnu Kaliber, revízia 4: písmo Fira Sans, plochý register s linkami, súhrnná tabuľka namiesto dlaždíc v Prehľade a päť záložiek v hlavičke. Appka sa otvorí na **Transakciách**.

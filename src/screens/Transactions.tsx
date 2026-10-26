@@ -198,7 +198,7 @@ function FilterBar({
           ref={searchRef}
           type="search"
           data-k-search=""
-          className="k-input"
+          className="k-input ab-filter-input"
           aria-label="Hľadať obchodníka alebo poznámku"
           aria-keyshortcuts="Control+F"
           title={withKey('Hľadať', 'find')}
@@ -216,8 +216,8 @@ function SelectField({ id, label, value, onChange, children }: { id: string; lab
   return (
     <div className="k-select-field ab-filter-field">
       <label htmlFor={id}>{label}</label>
-      <span className="k-select-wrap">
-        <select id={id} className="k-select k-well" value={value} onChange={(e) => onChange(e.target.value)}>
+      <span className="k-select-wrap ab-filter-select-wrap">
+        <select id={id} className="k-select k-well ab-filter-select" value={value} onChange={(e) => onChange(e.target.value)}>
           {children}
         </select>
         <svg className="k-select-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
@@ -956,7 +956,7 @@ function ScreenHead({ meta, onNavigateToImport, menu }: {
 }) {
   return (
     <div className="ab-head">
-      <div className="k-page-head">
+      <div className="k-page-head ab-page-head">
         <h2 className="k-page-title">Transakcie</h2>
         {meta ? <p className="k-page-meta">{meta}</p> : null}
       </div>

@@ -1,2 +1,4 @@
-src/kaliber.css text eol=lf
+# Preserve the exact bytes of the shared Kaliber files.
+src/kaliber.css -text whitespace=cr-at-eol
+public/kaliber-icons.svg -text whitespace=cr-at-eol
 src/tokens.css text eol=lf

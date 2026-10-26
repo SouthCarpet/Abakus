@@ -30,8 +30,8 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
-// Audit 7: "Zelené podčiarknutie aktívnej záložky Transakcie je príliš tenké a málo kontrastné."
-// R7 (revision 4): the active tab is a fill step, bold text and a square mark; there is no underline.
+// Oracle: Kaliber 5.0.0, Tabs (owner variant A): active tabs have a 2 px accent
+// line, a selected tone and bold text. Only unsaved changes have a static dot.
 function rulesOf(css: string, selector: string): string[] {
   const out: string[] = []
   const re = /([^{}]+)\{([^{}]*)\}/g
@@ -42,20 +42,32 @@ function rulesOf(css: string, selector: string): string[] {
   return out
 }
 
-describe('active tab in r4 (R7)', () => {
+describe('active tab in Kaliber 5', () => {
   const css = readFileSync('src/kaliber.css', 'utf8')
 
-  it('marks the active tab by a tone step and a mark, with no underline or edge', () => {
+  it('marks the active tab with a selected tone, bold text and the accent line', () => {
     const active = rulesOf(css, '.k-tab.is-active').join(';')
     expect(active).toContain('background: var(--color-surface-selected)')
-    expect(active).not.toMatch(/border|box-shadow|text-decoration|outline|var\(--color-accent\)/)
-    expect(rulesOf(css, '.k-tab.is-active::before').join(';')).toContain('background: var(--color-accent)')
-    expect(rulesOf(css, '.k-tab::before').join(';')).toContain('width: 6px')
+    expect(active).toContain('font-weight: 700')
+    expect(active).toContain('border-bottom-color: var(--color-accent)')
+    expect(active).not.toMatch(/box-shadow|text-decoration|outline/)
+    expect(rulesOf(css, '.k-tab.is-active::before')).toEqual([])
+    expect(rulesOf(css, '.k-tab::before')).toEqual([])
   })
 
-  it('never underlines a tab at rest, on hover or in the header', () => {
-    const all = [rulesOf(css, '.k-tab'), rulesOf(css, '.k-tab:hover'), rulesOf(css, '.k-header .k-tab')].flat().join(';')
+  it('reserves the bottom border at rest and keeps hover and header free of extra lines', () => {
+    expect(rulesOf(css, '.k-tab').join(';')).toContain('border-bottom: 2px solid transparent')
+    const all = [rulesOf(css, '.k-tab:hover'), rulesOf(css, '.k-header .k-tab')].flat().join(';')
     expect(all).not.toMatch(/border-bottom|text-decoration:\s*underline|box-shadow/)
+  })
+
+  it('shows a static round dot only for unsaved changes', () => {
+    const dirty = rulesOf(css, '.k-tab.is-dirty::before').join(';')
+    expect(dirty).toContain('width: 6px')
+    expect(dirty).toContain('height: 6px')
+    expect(dirty).toContain('border-radius: var(--radius-pill)')
+    expect(dirty).toContain('background: var(--color-accent)')
+    expect(dirty).not.toMatch(/animation|transition/)
   })
 
   it('reserves the bold width of every tab name, so the selection moves no name', () => {

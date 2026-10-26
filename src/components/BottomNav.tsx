@@ -2,7 +2,7 @@ import type { Screen } from '../App'
 import { usePhone } from '../kaliber/usePhone'
 
 // Kaliber R31: on a phone the sections are the bottom navigation, icon and text always
-// visible. The current target has the fill step, bold text and the square mark.
+// visible. The current target has the fill step, bold text and the dot.
 const ICONS: Record<Screen, string> = {
   transactions: 'M4 6h16M4 12h16M4 18h10',
   overview: 'M6 20V11M12 20V4M18 20v-6',
@@ -24,7 +24,7 @@ export function BottomNav({ tabs, current, onSelect }: {
         <button
           key={tab.id}
           type="button"
-          className="k-bottom-nav-item"
+          className="k-bottom-nav-item ab-bottom-nav-item"
           aria-current={tab.id === current ? 'page' : undefined}
           onClick={() => onSelect(tab.id)}
         >

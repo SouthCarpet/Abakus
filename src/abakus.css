@@ -18,8 +18,8 @@ html, body, #root { height: 100%; }
 /* R31: on a phone the five sections sit in the bottom navigation; the page reserves its 56 px. */
 .ab-app:has(.ab-bottom-nav) { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 .ab-bottom-nav { z-index: 10; }
-.ab-bottom-nav .k-bottom-nav-item { border: 0; background: transparent; font: inherit; font-size: var(--text-xs); cursor: pointer; min-width: 0; padding: 0 var(--space-1); }
-.ab-bottom-nav .k-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); }
+.ab-bottom-nav .ab-bottom-nav-item { border: 0; background: transparent; font: inherit; font-size: var(--text-xs); cursor: pointer; min-width: 0; padding: 0 var(--space-1); }
+.ab-bottom-nav .ab-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); }
 .ab-nav-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: square; }
 
 /* ---- layout helpers ---------------------------------------------------------- */
@@ -31,8 +31,8 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-text-success { color: var(--color-success); }
 .ab-card-body { display: flex; flex-direction: column; gap: var(--space-2); }
 /* A command button keeps its own width; it never stretches over the whole sheet. */
-.ab-card-body > .k-btn, .ab-section > .k-btn { align-self: flex-start; width: auto; padding: 0 var(--space-4); }
-.ab-theme-mode .k-segmented { max-width: 28rem; }
+.ab-card-body > .ab-btn, .ab-section > .ab-btn { align-self: flex-start; width: auto; padding: 0 var(--space-4); }
+.ab-theme-mode .ab-theme-segmented { max-width: 28rem; }
 
 /* ---- fields ------------------------------------------------------------------- */
 .ab-field { display: flex; flex-direction: column; gap: var(--space-1); }
@@ -61,7 +61,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-category-name { flex: 1 1 0; min-width: 0; }
 /* ---- the register screen (Transakcie, r4 gallery screen abakus-transakcie) ------------ */
 .ab-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
-.ab-head > .k-page-head { margin-bottom: 0; }
+.ab-head > .ab-page-head { margin-bottom: 0; }
 .ab-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .ab-flush { padding: 0; overflow: hidden; }
 .ab-pad { padding: var(--space-4); }
@@ -69,9 +69,9 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-filters { display: grid; gap: var(--space-4); padding: var(--space-4); }
 .ab-filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
 .ab-filter-field { flex: 1 1 9.5rem; min-width: 0; }
-.ab-filter-field .k-select-wrap { display: grid; min-width: 0; }
-.ab-filter-field .k-input { width: 100%; }
-.ab-filter-field .k-select { min-width: 0; width: 100%; }
+.ab-filter-field .ab-filter-select-wrap { display: grid; min-width: 0; }
+.ab-filter-field .ab-filter-input { width: 100%; }
+.ab-filter-field .ab-filter-select { min-width: 0; width: 100%; }
 /* The register search shows its whole placeholder: it takes the rest of the filter row. */
 .ab-filter-search { flex: 3 1 13rem; }
 .ab-filter-clear { margin-left: auto; min-height: var(--k-hit); font: inherit; font-size: var(--text-sm); background: transparent; border: 0; padding: 0 var(--space-2); cursor: pointer; }
@@ -92,7 +92,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-act { white-space: nowrap; }
 .ab-act > * + * { margin-left: var(--space-3); }
 .ab-narrow-only { display: none !important; }
-/* R28: a transfer (outside the totals) is a square with a line through it. */
+/* R28: a transfer (outside the totals) is a dot with a line through it. */
 .ab-mark--transfer::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--color-text); }
 .ab-ledger-end { max-width: 26rem; margin-left: auto; }
 .ab-ledger-cap { margin: 0 0 var(--space-2); }

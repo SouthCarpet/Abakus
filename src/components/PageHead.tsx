@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 export function PageHead({ title, meta, primary, more }: { title: string; meta?: string; primary?: ReactNode; more?: ReactNode }) {
   return (
     <div className="ab-head">
-      <div className="k-page-head">
+      <div className="k-page-head ab-page-head">
         <h2 className="k-page-title">{title}</h2>
         {meta ? <p className="k-page-meta">{meta}</p> : null}
       </div>
