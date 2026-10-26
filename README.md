@@ -29,7 +29,7 @@ Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľad
 
 Pribudol aj tichý riadok **Nová verzia** v hlavičke appky, viditeľný na každej obrazovke; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) nájde novšie vydanie, a vedie do sekcie **O aplikácii**. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
 
-Pracovná vetva používa základ Kaliber 5.0.1: aktívna záložka má linku, stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Výmena ikon nasleduje samostatne. Pozri [poznámky k prevzatiu](docs/kaliber-5-adoption.md).
+Pracovná vetva používa základ Kaliber 5.0.1: aktívna záložka má linku, stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Ikony berie zo sady ikon Kaliber. Chybové stavy majú ikonu chyby a upozornenia ikonu podľa svojho významu. Pozri [poznámky k prevzatiu](docs/kaliber-5-adoption.md).
 
 Verzia 0.2.0 tiež preberá jazyk dizajnu Kaliber, revíziu 4: písmo Fira Sans, plochý register bez tieňov, súhrnnú tabuľku namiesto dlaždíc a rovnaké miesto pre navigáciu, Pomocníka, vzhľad a O aplikácii ako v ostatných appkách rodiny. Opis je v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy). Plán a kontrolný zoznam sú v [docs/plan-091-kaliber-r3.md](docs/plan-091-kaliber-r3.md).
 
