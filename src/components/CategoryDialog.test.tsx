@@ -90,3 +90,14 @@ describe('CategoryDialog', () => {
     await waitFor(() => expect(api.saveCategory).toHaveBeenCalledTimes(1))
   })
 })
+
+
+// Oracle: fix1 requires the Kind select to use the Kaliber chevron pattern.
+it('fix1 shows a hidden chevron next to the Kind select', async () => {
+  render(<CategoryDialog open onClose={vi.fn()} onCreated={vi.fn()} />)
+  await screen.findByRole('option', { name: 'Jedlo' })
+  const wrap = screen.getByLabelText('Druh kategórie').closest('.k-select-wrap')
+  expect(wrap).not.toBeNull()
+  expect(wrap?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  expect(wrap?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+})

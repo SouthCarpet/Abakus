@@ -63,7 +63,7 @@ const mock = (scenario) => {
 }
 
 async function openRegister(browser, width, scenario) {
-  const ctx = await browser.newContext({ viewport: { width, height: 900 } })
+  const ctx = await browser.newContext({ viewport: { width, height: width === 1024 ? 680 : width === 1280 ? 820 : 900 } })
   await ctx.addInitScript(mock, scenario)
   await ctx.addInitScript(() => { try { localStorage.setItem('kaliber-theme', 'light'); localStorage.setItem('abakus.period', JSON.stringify({ kind: 'all' })) } catch { /* private mode */ } })
   const page = await ctx.newPage()
@@ -80,6 +80,30 @@ async function goToRegister(page, url, scenario) {
 // The click area of a checkbox: its wrapping label when it has one, else the box itself.
 const size = (input) => input.evaluate((el) => { const r = (el.closest('label') ?? el).getBoundingClientRect(); return { width: Math.round(r.width * 10) / 10, height: Math.round(r.height * 10) / 10 } })
 
+async function registerFit(page) {
+  return page.evaluate(() => {
+    const region = document.querySelector('[aria-label="Transakcie"][role="region"]')
+    const table = region.querySelector('table')
+    const amount = table.querySelector('tbody tr[data-row-id] .ab-money').getBoundingClientRect()
+    const bounds = region.getBoundingClientRect()
+    const note = table.querySelector('textarea')?.getBoundingClientRect()
+    return { overflow: region.scrollWidth - region.clientWidth, scrollLeft: region.scrollLeft,
+      amountVisible: amount.left >= bounds.left && amount.right <= bounds.right,
+      detailVisible: !note || (note.left >= bounds.left && note.right <= bounds.right),
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }
+  })
+}
+
+async function measureOpenDetail(page, width) {
+  const closed = await registerFit(page)
+  await page.locator('tbody tr[data-row-id="1"] input[type=checkbox]').check()
+  await page.locator('tbody tr[data-row-id="1"]').getByRole('button', { name: /detail/i }).click()
+  await page.locator('textarea').waitFor()
+  const open = await registerFit(page)
+  if (process.env.ABAKUS_SHOT_DIR) await page.screenshot({ path: join(process.env.ABAKUS_SHOT_DIR, `detail-${width}.png`), fullPage: true })
+  return { closed, open }
+}
+
 async function main() {
   const playwright = loadPlaywright()
   const executablePath = findBrowser()
@@ -91,13 +115,13 @@ async function main() {
   await server.listen()
   const url = `http://127.0.0.1:${server.httpServer.address().port}/`
   const browser = await playwright.chromium.launch({ headless: true, executablePath })
-  const out = { firstRowTop: {}, overflowX: {}, hit: {} }
+  const out = { firstRowTop: {}, overflowX: {}, hit: {}, minimum: {} }
   try {
-    for (const width of [1440, 1024]) {
+    for (const width of [1440, 1280, 1024]) {
       const { ctx, page } = await openRegister(browser, width, 'base')
       await goToRegister(page, url, 'base')
       out.firstRowTop[width] = await page.evaluate(() => Math.round(document.querySelector('tbody tr[data-row-id]').getBoundingClientRect().top + window.scrollY))
-      if (process.env.ABAKUS_SHOT_DIR) await page.screenshot({ path: join(process.env.ABAKUS_SHOT_DIR, `register-${width}.png`), clip: { x: 0, y: 0, width, height: 760 } })
+      if (process.env.ABAKUS_SHOT_DIR) await page.screenshot({ path: join(process.env.ABAKUS_SHOT_DIR, `register-${width}.png`), fullPage: true })
       // The search field shows its whole placeholder: text width against the room inside the field.
       out.search = out.search ?? {}
       out.search[width] = await page.evaluate(() => {
@@ -114,6 +138,9 @@ async function main() {
         const r = document.querySelector(sel)?.getBoundingClientRect()
         return [sel, r ? [Math.round(r.top + window.scrollY), Math.round(r.bottom + window.scrollY)] : null]
       })))
+      if (width === 1024 || width === 1280) {
+        out.minimum[width] = await measureOpenDetail(page, width)
+      }
       out.overflowX[width] = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
       await ctx.close()
     }

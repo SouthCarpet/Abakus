@@ -362,3 +362,13 @@ describe('Overview in Kaliber r4', () => {
     expect(screen.getByText(/Súčty za vybrané obdobie/)).toHaveClass('k-page-meta')
   })
 })
+
+
+// Oracle: fix1 F1 makes the checksum failure visible by shape as well as colour.
+it('fix1 shows the checksum mismatch in a static danger alert', () => {
+  render(<ChecksumBanner row={{ statement_id: 9, number: 4, account_label: 'Osobný', off_by_cents: -150 }} onNavigate={vi.fn()} />)
+  const alert = screen.getByText('Výpis č. 4 (účet Osobný) nesedí o 1,50 €').closest('.k-alert--error')
+  expect(alert).not.toBeNull()
+  expect(alert?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+  expect(alert).not.toHaveAttribute('role')
+})

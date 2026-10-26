@@ -590,3 +590,22 @@ describe('Settings: restore refetches the account list', () => {
     expect(screen.queryByText('Účet A')).not.toBeInTheDocument()
   })
 })
+
+
+// Oracle: fix1 requires the audit-failure notice and the gallery disclosure chevron.
+it('fix1 gives audit failures a danger icon', async () => {
+  mockApi()
+  vi.mocked(api.netAuditFailures).mockResolvedValueOnce([auditFailure])
+  render(<Settings />)
+  const title = await screen.findByText('Neúspešné zápisy auditu')
+  expect(title.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+  expect(title.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+})
+it('fix1 gives About a chevron and still opens through the summary', async () => {
+  mockApi()
+  render(<Settings />)
+  const summary = screen.getByText('O aplikácii').closest('summary')!
+  expect(summary.querySelector('.k-chevron use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  fireEvent.click(summary)
+  await waitFor(() => expect(summary.parentElement).toHaveAttribute('open'))
+})

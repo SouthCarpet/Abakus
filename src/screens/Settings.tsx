@@ -1,3 +1,4 @@
+import { Icon } from '../kaliber/icons'
 import { InlineAlert } from '../components/InlineAlert'
 import { useEffect, useRef, useState } from 'react'
 import { files } from '../lib/files'
@@ -168,7 +169,7 @@ function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
   if (failures.length === 0) return null
   return (
     <div className="ab-section">
-      <p className="k-card-title ab-text-danger">Neúspešné zápisy auditu</p>
+      <p className="k-card-title ab-text-danger ab-notice-title"><Icon name="danger" small />Neúspešné zápisy auditu</p>
       <table className="k-table">
         <thead>
           <tr>
@@ -539,6 +540,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
             <summary className="k-disclosure-summary">
               <h3 id="ab-settings-about">O aplikácii</h3>
               <FoundBadge release={release} />
+              <Icon name="chevron-down" small className="k-chevron" />
             </summary>
             <div className="k-disclosure-body ab-section">
               <About

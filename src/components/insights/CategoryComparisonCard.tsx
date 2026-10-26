@@ -17,15 +17,20 @@ export function CategoryComparisonCard({
   currentCoverageIncomplete: boolean
   previousCoverageIncomplete: boolean
 }) {
+  const warnings = [
+    comparison.incomplete && 'Vybrané obdobie ešte nie je uzavreté. Porovnanie je predbežné.',
+    currentCoverageIncomplete && 'Aktuálnemu obdobiu chýbajú výpisy aspoň pre jeden účet.',
+    previousCoverageIncomplete && 'Predchádzajúcemu obdobiu chýbajú výpisy aspoň pre jeden účet.',
+  ].filter(Boolean)
   return (
     <Card title="Porovnanie výdavkov podľa kategórií">
       <p>
         {`Aktuálne obdobie: ${formatDate(comparison.currentRange.from)}–${formatDate(comparison.currentRange.to)}. `}
         {`Predchádzajúce (rovnaký počet dní): ${formatDate(comparison.previousRange.from)}–${formatDate(comparison.previousRange.to)}.`}
       </p>
-      {comparison.incomplete ? <InlineAlert kind="warning" announce={false}>Vybrané obdobie ešte nie je uzavreté. Porovnanie je predbežné.</InlineAlert> : null}
-      {currentCoverageIncomplete ? <InlineAlert kind="warning" announce={false}>Aktuálnemu obdobiu chýbajú výpisy aspoň pre jeden účet.</InlineAlert> : null}
-      {previousCoverageIncomplete ? <InlineAlert kind="warning" announce={false}>Predchádzajúcemu obdobiu chýbajú výpisy aspoň pre jeden účet.</InlineAlert> : null}
+      {warnings.length > 0 ? <InlineAlert kind="warning" announce={false}>
+        <ul className="ab-warning-list">{warnings.map((warning) => <li key={String(warning)}>{warning}</li>)}</ul>
+      </InlineAlert> : null}
       <div className="ab-table-scroll">
         <table className="k-table">
           <thead>

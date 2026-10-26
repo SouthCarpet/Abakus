@@ -12,6 +12,7 @@ import { ariaKeys, withKey } from '../kaliber/bindings'
 import { startActivity } from '../kaliber/activity'
 import { useDeleteKey } from '../kaliber/deleteKey'
 import { Icon } from '../kaliber/icons'
+import { DangerBadge } from '../components/DangerBadge'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
@@ -144,6 +145,7 @@ export function ImportResultCard({
     <Card
       title={fileName(report.path)}
       badge={importStatusLabel(report.status)}
+      badgeDanger={report.status === 'error'}
       footer={
         canContinue ? (
           <Button variant="primary" onClick={() => onContinue?.(report.statementId ?? undefined)}>
@@ -231,7 +233,7 @@ function StatementReviewChip({ statementId }: { statementId: number }) {
     return () => { active = false }
   }, [statementId])
 
-  if (error) return <span className="k-card-badge ab-text-danger">Kontrola sa nenačítala</span>
+  if (error) return <DangerBadge>Kontrola sa nenačítala</DangerBadge>
   if (!review) return <span className="k-card-badge">Načítava sa kontrola…</span>
 
   const items = reviewOpenItems(review)
@@ -240,11 +242,11 @@ function StatementReviewChip({ statementId }: { statementId: number }) {
     <span className="ab-review-chip">
       <Button
         variant="ghost"
-        className={danger ? 'k-card-badge ab-text-danger' : 'k-card-badge'}
+        className={danger ? 'k-card-badge ab-badge-danger' : 'k-card-badge'}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {REVIEW_STATUS_LABEL[review.status]}
+        {danger ? <Icon name="danger" small /> : null}{REVIEW_STATUS_LABEL[review.status]}
       </Button>
       {open ? (
         <span className="ab-review-detail">
@@ -283,7 +285,7 @@ function StatementRow({
       <span className="k-num">č. {statement.number}</span>
       <span className="k-num">{countPhrase(statement.transaction_count, tx.transakcia)}</span>
       <span className="k-num">{formatEur(statement.total_cents)}</span>
-      <span className={danger ? 'k-card-badge ab-text-danger' : 'k-card-badge'}>{checksumLabel(statement.checksum)}</span>
+      <span className={danger ? 'k-card-badge ab-badge-danger' : 'k-card-badge'}>{danger ? <Icon name="danger" small /> : null}{checksumLabel(statement.checksum)}</span>
       <StatementReviewChip statementId={statement.statement_id} />
       <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
         Zobraziť transakcie

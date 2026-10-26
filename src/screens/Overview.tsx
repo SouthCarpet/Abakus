@@ -34,9 +34,9 @@ export function ChecksumBanner({ row, onNavigate }: { row: BadChecksum; onNaviga
         </Button>
       }
     >
-      <p className="ab-text-danger">
-        {`Výpis č. ${row.number} (účet ${row.account_label}) nesedí o ${formatEur(Math.abs(row.off_by_cents))}`}
-      </p>
+      <InlineAlert announce={false}>
+        <p className="ab-text-danger">{`Výpis č. ${row.number} (účet ${row.account_label}) nesedí o ${formatEur(Math.abs(row.off_by_cents))}`}</p>
+      </InlineAlert>
     </Card>
   )
 }

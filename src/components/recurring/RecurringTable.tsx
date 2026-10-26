@@ -1,3 +1,4 @@
+import { DangerBadge } from '../DangerBadge'
 import { formatDate } from '../../lib/format'
 import {
   actualChargeLabel,
@@ -106,7 +107,7 @@ function RecurringTableRow({
       <td>{row.last_paid ? formatDate(row.last_paid) : 'chýba'}</td>
       <td>{row.next_due ? formatDate(row.next_due) : 'chýba'}</td>
       <td>
-        <span className="k-card-badge">{stateLabel(row)}</span>
+        {row.state === 'missing' ? <DangerBadge>{stateLabel(row)}</DangerBadge> : <span className="k-card-badge">{stateLabel(row)}</span>}
         {ended ? <div className="ab-field-label">{ended}</div> : null}
       </td>
       <td>

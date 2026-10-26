@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 // scripts/layout-probe.mjs opens the Vite dev server in Chromium and measures. It reports
 // "skipped" when no Playwright or Chromium is at hand (CI has none); this machine has both.
 interface Probe {
+  minimum: Record<string, { closed: { overflow: number; scrollLeft: number; amountVisible: boolean; detailVisible: boolean; pageOverflow: number }; open: { overflow: number; scrollLeft: number; amountVisible: boolean; detailVisible: boolean; pageOverflow: number } }>
   skipped?: string
   firstRowTop: Record<string, number>
   overflowX: Record<string, number>
@@ -43,7 +44,7 @@ describe('Transakcie geometry in a real browser', () => {
     for (const width of ['1440', '1024']) expect(probe.search[width].room, `room at ${width}`).toBeGreaterThanOrEqual(probe.search[width].need)
   })
   run('keeps the page free of sideways scroll, also with a long category name and an empty register', () => {
-    expect(probe.overflowX).toEqual({ '390': 0, '1024': 0, '1440': 0, long: 0, empty: 0 })
+    expect(probe.overflowX).toEqual({ '390': 0, '1024': 0, '1280': 0, '1440': 0, long: 0, empty: 0 })
     expect(probe.emptyTop).toBeLessThanOrEqual(LIMIT_TOP[1440])
   })
   run('gives the row checkbox and the confirm-similar control a 44 px click area on a phone', () => {
@@ -57,4 +58,13 @@ describe('Transakcie geometry in a real browser', () => {
     expect(probe.hit.transferCheckbox.width).toBeGreaterThanOrEqual(TOUCH)
     expect(probe.hit.transferCheckbox.height).toBeGreaterThanOrEqual(TOUCH)
   })
+})
+
+// Oracle: fix1 item 5, minimum 1024 x 680 must show amounts and details without sideways scroll.
+run('fix1 fits the amount column and open detail at 1024 and keeps 1280 clear', () => {
+  for (const width of ['1024', '1280']) {
+    for (const state of ['closed', 'open'] as const) {
+      expect(probe.minimum[width][state], `${width} ${state}`).toEqual({ overflow: 0, scrollLeft: 0, amountVisible: true, detailVisible: true, pageOverflow: 0 })
+    }
+  }
 })

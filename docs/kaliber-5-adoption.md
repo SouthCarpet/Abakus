@@ -41,7 +41,7 @@ triedy zachovávajú doterajšie rozmery a rozloženie:
 - `.ab-filter-select`: šírka výberu vo filtroch vrátane kategórie.
 
 Pravidlo šírky priamych tlačidiel sekcie používa existujúcu `.ab-btn`.
-Rozloženie, funkcie, klávesy a ukladanie dát sa nemenia.
+Funkcie, klávesy a ukladanie dát sa nemenia. Opravy úzkeho registra sú uvedené nižšie.
 
 ## Rozhranie ikon (A2)
 
@@ -70,3 +70,15 @@ Rozloženie, funkcie, klávesy a ukladanie dát sa nemenia.
 - Čiary legendy grafu a stĺpce kategórií zostávajú kresbami grafu.
 - Licencia Phosphor (MIT) je v `assets/icons/PHOSPHOR-LICENSE.txt` a
   `THIRD_PARTY_NOTICES.md`. Generátor licencií zachováva aj tieto poznámky.
+
+## Opravy po vizuálnej kontrole (fix1)
+
+- `DangerBadge.children`: text problémového odznaku. Malá skrytá ikona `danger` nahrádza bodku; `.ab-badge-danger` používa farbu chyby a odstráni pôvodnú pseudo bodku.
+- `Card.badgeDanger`: voliteľná hodnota `boolean`, predvolene `false`. Import ju zapne len pre stav `error` (Chyba).
+- Odznaky kontroly výpisu zobrazia `danger` pri chybe načítania a pri stave `needs_attention`. Odznak kontrolného súčtu ju zobrazí pri `off_by`. Správny súčet si ponechá bodku.
+- Ďalší problémový odznak je `RecurringTable`, stav `missing` (Chýba platba). Stav `active` ostáva s bodkou. Zmeny ceny, odhad ukončenia a neznáme údaje sú informácie, nie potvrdené chyby.
+- Karta nesediaceho súčtu v Prehľade má statický `InlineAlert` typu `error` bez novej živej roly. Názov chýb zápisu auditu ostáva odsekom a dostane malú skrytú ikonu `danger` cez `.ab-notice-title`.
+- Oba výbery v dialógu kategórie používajú `k-select-wrap` a `k-select-chevron`. O aplikácii používa priamu ikonu `k-chevron` v súhrne, ktorú spoločný Kaliber pri otvorení otočí.
+- Pri šírke 600 až 1100 px má `.ab-register` pevnú tabuľkovú mriežku. Text a akcie sa môžu zalomiť; suma, výber kategórie a poznámka ostávajú v regióne. Detailný zdrojový text používa zalomenie. Pri 1280 px zostáva automatická šírka stĺpcov.
+- Varovania v porovnaní kategórií tvoria jeden statický `InlineAlert` so zoznamom `.ab-warning-list`. Pri úplných dátach a uzavretom období sa nezobrazí.
+- Regresné testy `fix1` overujú odznaky, obe chybové správy, šípky a zoznam varovaní. `layout-probe.mjs` meria pri 1024 × 680 a 1280 × 820 sumu, otvorený detail, posun regiónu aj presah stránky.

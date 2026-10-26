@@ -4,6 +4,11 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
 ## Unreleased
 
+- Problémové odznaky importu a chýbajúcej pravidelnej platby majú ikonu chyby namiesto zelenej bodky. Nesediaci kontrolný súčet v Prehľade a chyby zápisu auditu v Nastaveniach majú tiež ikonu chyby. Odznak správneho súčtu si ponecháva bodku.
+- Výbery v dialógu kategórie a sekcia O aplikácii majú šípku rozbalenia.
+- Pri šírke okna 1024 px sa suma aj rozbalený detail transakcie zmestia bez vodorovného posúvania tabuľky. Rozloženie pri 1280 px sa nemení.
+- Upozornenia v porovnaní výdavkov podľa kategórií sú v jednom hlásení s krátkym zoznamom.
+
 - Základ vzhľadu Kaliber 5.0.1: aktívna záložka má zvýraznenú linku, malé stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Obnovené tokeny pridávajú prekrytie vypnutých ovládačov a rozmery ikon.
 - Ikony používajú spoločný súbor Kaliber (Phosphor a vlastné kresby). Chybové stavy a neúspešné vrátenie akcie majú ikonu nebezpečenstva. Hlásenia pri nesprávnom vstupe majú varovanie. Názvy tlačidiel pre čítačku obrazovky ostávajú zachované.
 

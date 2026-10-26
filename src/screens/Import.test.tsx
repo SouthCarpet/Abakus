@@ -428,3 +428,32 @@ describe('Statement list: review status (point 21)', () => {
     expect(await screen.findByText('Kontrola sa nenačítala')).toBeInTheDocument()
   })
 })
+
+
+// Oracle: fix1 F1 requires a danger sprite on problem badges, never the active dot.
+describe('fix1 problem badges', () => {
+  it('marks the failed import status with a small hidden danger icon', () => {
+    render(<ImportResultCard report={{ ...base, status: 'error' }} onPassword={vi.fn()} onAddAccount={vi.fn()} />)
+    const badge = screen.getByText('Chyba')
+    expect(badge.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+    expect(badge.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(badge.querySelector('svg')).toHaveClass('k-icon--sm')
+    expect(badge).toHaveClass('ab-badge-danger')
+  })
+  it('marks a bad checksum and attention review, but keeps the OK checksum dot', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow({ checksum: { status: 'off_by', off_by: 150 } }), historyRow({ statement_id: 6 })])
+    vi.mocked(api.statementReview).mockResolvedValue({ statement_id: 5, checksum: { status: 'ok' }, parser_warnings: [], unassigned_count: 1, suggested_count: 0, status: 'needs_attention' })
+    render(<Import />)
+    const review = await screen.findAllByRole('button', { name: 'Vyžaduje pozornosť' })
+    for (const badge of review) expect(badge.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+    const bad = screen.getByText(/nesedí/i)
+    expect(bad.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+    expect(screen.getByText('Kontrolný súčet sedí').querySelector('svg')).toBeNull()
+  })
+  it('marks a failed review load with the danger icon', async () => {
+    vi.mocked(api.statementHistory).mockResolvedValueOnce([historyRow()])
+    vi.mocked(api.statementReview).mockRejectedValueOnce(new Error('offline'))
+    render(<Import />)
+    expect((await screen.findByText('Kontrola sa nenačítala')).querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+  })
+})
