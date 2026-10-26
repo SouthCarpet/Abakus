@@ -1,7 +1,6 @@
 # Kaliber 5.0.1: základ vzhľadu
 
-Pracovná vetva preberá Kaliber 5.0.1 (plán 125, kroky A1 a A2).
-Číslo vydanej appky zostáva 0.2.0. Historický plán 091 a poznámky
+Abakus 0.3.0 preberá Kaliber 5.0.1 (plán 125, kroky A1 a A2). Historický plán 091 a poznámky
 k vydaniu 0.2.0 opisujú vtedajší Kaliber r4.
 
 - `src/tokens.css` je bajtová kópia výstupu `design-tokens css --app abakus`.

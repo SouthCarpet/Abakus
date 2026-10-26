@@ -2,7 +2,7 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
-## Unreleased
+## 0.3.0 (2026-10-27)
 
 - Problémové odznaky importu a chýbajúcej pravidelnej platby majú ikonu chyby namiesto zelenej bodky. Nesediaci kontrolný súčet v Prehľade a chyby zápisu auditu v Nastaveniach majú tiež ikonu chyby. Odznak správneho súčtu si ponecháva bodku.
 - Všetky natívne výbery majú šípku rozbalenia: vytvorenie a úprava kategórie, účty, PDF export a interval pravidelnej platby. Šípku má aj sekcia O aplikácii.

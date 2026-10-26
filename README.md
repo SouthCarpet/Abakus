@@ -15,7 +15,7 @@ Lokálna desktopová appka na PDF výpisy z Tatra banky.
 
 Abakus is a local Windows desktop app for Tatra banka PDF statements. It imports statements, checks checksums, assigns categories with learned rules, tracks recurring payments, stores notes, and builds PDF reports with charts. Bank data stays on your computer. The only network use is an opt-in update check (at start, when Settings > About opens and on its button, only after you turn it on) and a user-triggered installer download from GitHub Releases. Both are written to the in-app network log. There is no telemetry.
 
-Version 0.2.0 is the current release. The working branch uses the Kaliber 5.0.1 foundation: active tabs have an accent line, state and navigation marks are round, and the off switch has no glyph. Icons now use the Kaliber sprite. Error states use the danger icon; inline alerts use the icon for their meaning. See [the adoption notes](docs/kaliber-5-adoption.md). It also adopts the Kaliber design language, revision 4: Fira Sans font, header tabs, Help on F1, an About section, a shared theme key and a keyboard set for the transaction register. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
+Version 0.3.0 uses the Kaliber 5.0.1 foundation: active tabs have an accent line, state and navigation marks are round, and the off switch has no glyph. Icons now use the Kaliber sprite. Error states use the danger icon; inline alerts use the icon for their meaning. See [the adoption notes](docs/kaliber-5-adoption.md). It keeps the features introduced with Kaliber revision 4: Fira Sans font, header tabs, Help on F1, an About section, a shared theme key and a keyboard set for the transaction register. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
 
 ## Čo to je
 
@@ -23,15 +23,15 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 ## Stav
 
-**0.2.0.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+**0.3.0.** Vydanie s Kaliber 5.0.1. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a ikonové tlačidlo na zmazanie; rovnako je zmazanie pravidla a výpisu v riadku tiché ikonové tlačidlo s názvom. Červené tlačidlo je až v potvrdzovacom dialógu. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
 Pribudol aj tichý riadok **Nová verzia** v hlavičke appky, viditeľný na každej obrazovke; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) nájde novšie vydanie, a vedie do sekcie **O aplikácii**. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
 
-Pracovná vetva používa základ Kaliber 5.0.1: aktívna záložka má linku, stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Ikony berie zo sady ikon Kaliber. Chybové stavy majú ikonu chyby a upozornenia ikonu podľa svojho významu. Pozri [poznámky k prevzatiu](docs/kaliber-5-adoption.md).
+Verzia 0.3.0 používa základ Kaliber 5.0.1: aktívna záložka má linku, stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Ikony berie zo sady ikon Kaliber. Chybové stavy majú ikonu chyby a upozornenia ikonu podľa svojho významu. Pozri [poznámky k prevzatiu](docs/kaliber-5-adoption.md).
 
-Verzia 0.2.0 tiež preberá jazyk dizajnu Kaliber, revíziu 4: písmo Fira Sans, plochý register bez tieňov, súhrnnú tabuľku namiesto dlaždíc a rovnaké miesto pre navigáciu, Pomocníka, vzhľad a O aplikácii ako v ostatných appkách rodiny. Opis je v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy). Plán a kontrolný zoznam sú v [docs/plan-091-kaliber-r3.md](docs/plan-091-kaliber-r3.md).
+Verzia 0.2.0 zaviedla jazyk dizajnu Kaliber, revíziu 4: písmo Fira Sans, plochý register bez tieňov, súhrnnú tabuľku namiesto dlaždíc a rovnaké miesto pre navigáciu, Pomocníka, vzhľad a O aplikácii ako v ostatných appkách rodiny. Opis je v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy). Plán a kontrolný zoznam sú v [docs/plan-091-kaliber-r3.md](docs/plan-091-kaliber-r3.md).
 
 ## Prečo
 
@@ -234,10 +234,10 @@ Od vydania 0.1.4 obsahuje každé vydanie na GitHub súbor `SHA256SUMS.txt`. Vyd
 Kontrola stiahnutého súboru v PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\abakus-setup-0.2.0.exe
+Get-FileHash -Algorithm SHA256 .\abakus-setup-0.3.0.exe
 ```
 
-Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.2.0 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
+Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.3.0 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
 
 Známe kontrolné súčty SHA-256 pre **0.1.3**:
 
