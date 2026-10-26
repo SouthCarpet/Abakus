@@ -1,3 +1,4 @@
+import { InlineAlert } from '../components/InlineAlert'
 import { useEffect, useRef, useState } from 'react'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
@@ -84,7 +85,7 @@ function UpdateAvailable({ release }: { release: Release }) {
           {updateButtonLabel(phase, release.tag)}
         </Button>
       ) : null}
-      {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
     </div>
   )
 }
@@ -475,7 +476,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
   return (
     <div className="ab-screen">
       <PageHead title="Nastavenia" meta="Účty, údaje, záloha, vzhľad a aktualizácie. Verzia je v časti O aplikácii." />
-      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
       {exportMessage ? <p role="status">{exportMessage}</p> : null}
       <fieldset disabled={action.busy} className="ab-section">
@@ -581,7 +582,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
             <option value="business">Firemný</option>
           </select>
         </Field>
-        {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
+        {error ? <InlineAlert>{error}</InlineAlert> : null}
       </Dialog>
       <Dialog
         open={editTarget !== null}
@@ -610,7 +611,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
             <option value="business">Firemný</option>
           </select>
         </Field>
-        {editError ? <p role="alert" className="ab-text-danger">{editError}</p> : null}
+        {editError ? <InlineAlert>{editError}</InlineAlert> : null}
         {editError && editTarget && editKind !== editTarget.kind ? (
           <label className="ab-checkbox">
             <input type="checkbox" checked={editAcknowledge} onChange={(e) => setEditAcknowledge(e.target.checked)} />

@@ -5,7 +5,7 @@ Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 ## Unreleased
 
 - Základ vzhľadu Kaliber 5.0.1: aktívna záložka má zvýraznenú linku, malé stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Obnovené tokeny pridávajú prekrytie vypnutých ovládačov a rozmery ikon.
-- Pripravený súbor ikon `public/kaliber-icons.svg`. Výmena ikon nasleduje samostatne.
+- Ikony používajú spoločný súbor Kaliber (Phosphor a vlastné kresby). Chybové stavy a neúspešné vrátenie akcie majú ikonu nebezpečenstva. Hlásenia pri nesprávnom vstupe majú varovanie. Názvy tlačidiel pre čítačku obrazovky ostávajú zachované.
 
 ## 0.2.0 (2026-10-18)
 

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { useEscapeLayer } from '../kaliber/escape'
-import { ChevronGlyph } from '../kaliber/icons'
+import { Icon } from '../kaliber/icons'
 
 export interface MenuItem {
   label: string
@@ -67,7 +67,7 @@ export function MoreMenu({ items, label = 'Ďalšie' }: { items: MenuItem[]; lab
         }}
       >
         {label}
-        <ChevronGlyph />
+        <Icon name="chevron-down" small className="k-chevron" />
       </button>
       <div
         ref={listRef}

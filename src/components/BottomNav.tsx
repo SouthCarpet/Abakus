@@ -1,14 +1,15 @@
+import { Icon, type IconName } from '../kaliber/icons'
 import type { Screen } from '../App'
 import { usePhone } from '../kaliber/usePhone'
 
 // Kaliber R31: on a phone the sections are the bottom navigation, icon and text always
 // visible. The current target has the fill step, bold text and the dot.
-const ICONS: Record<Screen, string> = {
-  transactions: 'M4 6h16M4 12h16M4 18h10',
-  overview: 'M6 20V11M12 20V4M18 20v-6',
-  import: 'M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14',
-  categories: 'M4 4h8l8 8-8 8-8-8z',
-  settings: 'M4 8h16M4 16h16M9 5v6M15 13v6',
+const ICONS: Record<Screen, IconName> = {
+  transactions: 'list',
+  overview: 'chart-bar',
+  import: 'import',
+  categories: 'folder',
+  settings: 'settings',
 }
 
 export function BottomNav({ tabs, current, onSelect }: {
@@ -28,7 +29,7 @@ export function BottomNav({ tabs, current, onSelect }: {
           aria-current={tab.id === current ? 'page' : undefined}
           onClick={() => onSelect(tab.id)}
         >
-          <svg className="ab-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d={ICONS[tab.id]} /></svg>
+          <Icon name={ICONS[tab.id]} />
           <span className="k-bottom-nav-label">{tab.label}</span>
         </button>
       ))}

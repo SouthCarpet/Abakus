@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useEffect, useMemo, useState } from 'react'
 import type { Account, AccountKind, StatementHistoryRow, Summary } from '../../api'
 import { api } from '../../api'
@@ -44,7 +45,7 @@ function ComparisonSection({
   previousCoverageIncomplete: boolean
 }) {
   if (!comparisonRange) return null
-  if (previousError) return <p role="alert">{previousError}</p>
+  if (previousError) return <InlineAlert>{previousError}</InlineAlert>
   if (!comparison) return null
   return (
     <CategoryComparisonCard
@@ -122,8 +123,8 @@ export function InsightsPanel({
 
   return (
     <div className="ab-section">
-      {accountsError ? <p role="alert">{accountsError}</p> : null}
-      {historyError ? <p role="alert">{historyError}</p> : null}
+      {accountsError ? <InlineAlert>{accountsError}</InlineAlert> : null}
+      {historyError ? <InlineAlert>{historyError}</InlineAlert> : null}
       {history ? <CoverageCard coverages={coverages} allTime={window === null} /> : null}
       {history ? <BalanceHistoryCard statements={balanceRows} /> : null}
       <ComparisonSection

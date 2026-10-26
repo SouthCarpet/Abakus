@@ -1,3 +1,5 @@
+import { InlineAlert } from '../components/InlineAlert'
+import { Icon } from '../kaliber/icons'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { Account, AccountKind, Category, RuleView, Status, TxFilter, TxKind, TxRow } from '../api'
 import { api, formatEur } from '../api'
@@ -220,9 +222,7 @@ function SelectField({ id, label, value, onChange, children }: { id: string; lab
         <select id={id} className="k-select k-well ab-filter-select" value={value} onChange={(e) => onChange(e.target.value)}>
           {children}
         </select>
-        <svg className="k-select-chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        </svg>
+        <Icon name="chevron-down" small className="k-select-chevron" />
       </span>
     </div>
   )
@@ -300,10 +300,10 @@ function SeedRuleRedirect({ row, categories, onChanged, onCreate }: { row: TxRow
     }
   }
 
-  if (!loaded || !rule) return error ? <p role="alert">{error}</p> : null
+  if (!loaded || !rule) return error ? <InlineAlert>{error}</InlineAlert> : null
   return (
     <div className="ab-row">
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
       <span>Zaradené podľa slovníka: {rule.parent_name ? `${rule.parent_name} / ${rule.category_name}` : rule.category_name}</span>
       <CategoryPicker
         label={`Presmerovať pravidlo transakcie ${row.id}`}
@@ -809,7 +809,7 @@ export function Transactions({
   async function undoAssignment(id: string) {
     const outcome = await api.undoLastAssignment(id)
     forgetUndo()
-    toast(outcome ? `Vrátených transakcií: ${outcome.restored_rows}.` : 'Vrátenie sa nepodarilo, akcia už nie je aktuálna.')
+    toast(outcome ? `Vrátených transakcií: ${outcome.restored_rows}.` : 'Vrátenie sa nepodarilo, akcia už nie je aktuálna.', undefined, outcome ? 'success' : 'error')
     if (!outcome) return
     redoBulk.current = lastBulk.current
     reloadAfterWrite()

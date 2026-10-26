@@ -20,7 +20,6 @@ html, body, #root { height: 100%; }
 .ab-bottom-nav { z-index: 10; }
 .ab-bottom-nav .ab-bottom-nav-item { border: 0; background: transparent; font: inherit; font-size: var(--text-xs); cursor: pointer; min-width: 0; padding: 0 var(--space-1); }
 .ab-bottom-nav .ab-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); }
-.ab-nav-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: square; }
 
 /* ---- layout helpers ---------------------------------------------------------- */
 .ab-section { display: flex; flex-direction: column; gap: var(--space-2); }

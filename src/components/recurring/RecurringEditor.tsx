@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import type { Category, TxRow } from '../../api'
 import type {
@@ -204,7 +205,7 @@ function EditorStatus({ loadError, busy, error, refreshError }: { loadError: str
 
 function Alert({ text }: { text: string }) {
   if (!text) return null
-  return <p role="alert">{text}</p>
+  return <InlineAlert>{text}</InlineAlert>
 }
 
 function SelectedMembership({

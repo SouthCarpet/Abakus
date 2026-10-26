@@ -1,3 +1,4 @@
+import { Icon } from '../kaliber/icons'
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import type { Category } from '../api'
 import { groupCategories, type CategoryGroup } from '../lib/categories'
@@ -116,9 +117,7 @@ export function CategoryPicker({
         onKeyDown={(event) => onTriggerKey(event, disabled, setOpen, setQuery)}
       >
         {triggerText}
-        <svg className="category-picker__chevron" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        </svg>
+        <Icon name="chevron-down" small className="category-picker__chevron" />
       </button>
       {open ? (
         <PickerPanel

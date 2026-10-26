@@ -1,3 +1,4 @@
+import { InlineAlert } from '../components/InlineAlert'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -10,7 +11,7 @@ import { countPhrase, pluralSk, tx, vb } from '../lib/plural'
 import { ariaKeys, withKey } from '../kaliber/bindings'
 import { startActivity } from '../kaliber/activity'
 import { useDeleteKey } from '../kaliber/deleteKey'
-import { TrashGlyph } from '../kaliber/icons'
+import { Icon } from '../kaliber/icons'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
@@ -56,7 +57,7 @@ function WarningsList({ warnings }: { warnings: string[] }) {
 // A17/F4: shows the backend's own failure text instead of the generic "Chyba" badge alone.
 function ImportErrorMessage({ report }: { report: ImportReport }) {
   if (!report.message) return null
-  return <p className="ab-text-danger">{report.message}</p>
+  return <InlineAlert announce={false}>{report.message}</InlineAlert>
 }
 
 function LockedAction({
@@ -296,7 +297,7 @@ function StatementRow({
         title="Zmaže výpis natrvalo."
         onClick={() => onDelete(statement)}
       >
-        <TrashGlyph />
+        <Icon name="delete" />
       </Button>
     </div>
   )
@@ -562,7 +563,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
         meta="Výpisy Tatra banky v PDF. Spracovanie beží len v tomto počítači."
         primary={<PickButton busy={[action.busy, deletion.busy].some(Boolean)} onPick={() => void action.run(pickFiles)} />}
       />
-      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
       {action.busy ? <p role="status">Prebieha import...</p> : null}
       <fieldset disabled={action.busy || deletion.busy} className="ab-section">
         <div className="k-well ab-dropzone">
@@ -600,8 +601,8 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
           </>
         }
       >
-        {previewError ? <p role="alert">{previewError}</p> : <DeleteStatementBody preview={deletePreview} />}
-        {deletion.error ? <p role="alert">{deletion.error}</p> : null}
+        {previewError ? <InlineAlert>{previewError}</InlineAlert> : <DeleteStatementBody preview={deletePreview} />}
+        {deletion.error ? <InlineAlert>{deletion.error}</InlineAlert> : null}
         {deletion.busy ? <p role="status">Odstraňuje sa...</p> : null}
         <p>Pôvodné bankové PDF súbory sa neodstránia.</p>
       </Dialog>

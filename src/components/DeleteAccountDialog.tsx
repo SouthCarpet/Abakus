@@ -1,3 +1,4 @@
+import { InlineAlert } from './InlineAlert'
 import { useEffect, useState } from 'react'
 import { api, type Account, type AccountDeletePreview } from '../api'
 import { useAction } from '../lib/useAction'
@@ -47,7 +48,7 @@ export function DeleteAccountDialog({ account, onClose, onDeleted }: {
       ? <Button onClick={() => void action.run(refreshDeleted)} disabled={action.busy}>Obnoviť údaje</Button>
       : <Button variant="danger" disabled={action.busy || !preview || confirmation !== preview.label} onClick={() => void action.run(remove)}>Natrvalo zmazať účet</Button>}
   </>}>
-    {previewError ? <><p role="alert">{previewError}</p><Button onClick={() => setAttempt((v) => v + 1)}>Skúsiť znova</Button></> : null}
+    {previewError ? <><InlineAlert>{previewError}</InlineAlert><Button onClick={() => setAttempt((v) => v + 1)}>Skúsiť znova</Button></> : null}
     {!preview && !previewError ? <p role="status">Načítava sa náhľad odstránenia...</p> : null}
     {preview ? <>
       <p>Účet: {preview.label}. Výpisy: {preview.statement_count}. Transakcie: {preview.transaction_count}, potvrdené: {preview.confirmed_count}. Odstránené pravidlá: {preview.rules_deleted}.</p>

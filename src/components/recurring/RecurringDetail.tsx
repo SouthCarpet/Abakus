@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useEffect, useRef, useState } from 'react'
 import { formatDate, formatEur } from '../../lib/format'
 import { actualChargeLabel, categoryStatusLabel, stateLabel } from '../../lib/recurring-labels'
@@ -108,7 +109,7 @@ export function RecurringDetailDialog({
         </div>
         <p>{scopeLabel}</p>
         {loading ? <p role="status">Načítava sa detail...</p> : null}
-        {error ? <p role="alert">{error}</p> : null}
+        {error ? <InlineAlert>{error}</InlineAlert> : null}
         {detail ? <DetailBody detail={detail} /> : null}
       </div>
     </Dialog>

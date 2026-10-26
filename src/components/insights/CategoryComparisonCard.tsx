@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import type { CategoryComparison } from '../../lib/insights/comparison'
 import { formatDate, formatEur } from '../../lib/format'
 import { Card } from '../Card'
@@ -22,9 +23,9 @@ export function CategoryComparisonCard({
         {`Aktuálne obdobie: ${formatDate(comparison.currentRange.from)}–${formatDate(comparison.currentRange.to)}. `}
         {`Predchádzajúce (rovnaký počet dní): ${formatDate(comparison.previousRange.from)}–${formatDate(comparison.previousRange.to)}.`}
       </p>
-      {comparison.incomplete ? <p className="ab-text-danger">Vybrané obdobie ešte nie je uzavreté. Porovnanie je predbežné.</p> : null}
-      {currentCoverageIncomplete ? <p className="ab-text-danger">Aktuálnemu obdobiu chýbajú výpisy aspoň pre jeden účet.</p> : null}
-      {previousCoverageIncomplete ? <p className="ab-text-danger">Predchádzajúcemu obdobiu chýbajú výpisy aspoň pre jeden účet.</p> : null}
+      {comparison.incomplete ? <InlineAlert kind="warning" announce={false}>Vybrané obdobie ešte nie je uzavreté. Porovnanie je predbežné.</InlineAlert> : null}
+      {currentCoverageIncomplete ? <InlineAlert kind="warning" announce={false}>Aktuálnemu obdobiu chýbajú výpisy aspoň pre jeden účet.</InlineAlert> : null}
+      {previousCoverageIncomplete ? <InlineAlert kind="warning" announce={false}>Predchádzajúcemu obdobiu chýbajú výpisy aspoň pre jeden účet.</InlineAlert> : null}
       <div className="ab-table-scroll">
         <table className="k-table">
           <thead>

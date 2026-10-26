@@ -1,3 +1,4 @@
+import { InlineAlert } from './InlineAlert'
 import { useState } from 'react'
 import { api, type Account, type AccountKind, type ImportReport } from '../api'
 import { useAction } from '../lib/useAction'
@@ -93,7 +94,7 @@ export function SetupAccountDialog({
         <PasswordInput value={password} onChange={setPassword} />
       </Field>
       <p>Heslo sa uloží do Správcu poverení systému Windows. Nechajte prázdne, ak výpisy nemajú heslo.</p>
-      {action.error ? <p role="alert" className="ab-text-danger">{action.error}</p> : null}
+      {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
     </Dialog>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useEscapeLayer } from '../kaliber/escape'
 import { BINDINGS } from '../kaliber/bindings'
 import { keyLabel } from '../kaliber/keys'
-import { CloseGlyph } from '../kaliber/icons'
+import { Icon } from '../kaliber/icons'
 import { trapTab } from '../kaliber/focusTrap'
 
 export type HelpScreen = 'transactions' | 'overview' | 'import' | 'categories' | 'settings'
@@ -92,7 +92,7 @@ export function HelpPanel({ open, screen, onClose }: { open: boolean; screen: He
       <div className="k-drawer" role="dialog" aria-modal="true" aria-labelledby="ab-help-title" ref={panelRef}>
         <div className="k-drawer-head">
           <h2 className="k-dialog-title" id="ab-help-title">Pomocník</h2>
-          <button type="button" className="k-x-btn" aria-label="Zavrieť pomocníka" onClick={onClose}><CloseGlyph /></button>
+          <button type="button" className="k-x-btn" aria-label="Zavrieť pomocníka" onClick={onClose}><Icon name="close" /></button>
         </div>
         <div className="k-drawer-body">
           <input

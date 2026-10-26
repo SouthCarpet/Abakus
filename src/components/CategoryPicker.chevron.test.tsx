@@ -15,6 +15,9 @@ describe('category picker expand mark', () => {
     const chevron = trigger.querySelector('svg.category-picker__chevron')
     expect(chevron).not.toBeNull()
     expect(chevron).toHaveAttribute('aria-hidden', 'true')
+    // Oracle: A2 requires the sprite chevron, small beside body text.
+    expect(chevron).toHaveClass('k-icon', 'k-icon--sm')
+    expect(chevron?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
     fireEvent.click(trigger)
     expect(trigger.querySelector('svg.category-picker__chevron')).not.toBeNull()
   })

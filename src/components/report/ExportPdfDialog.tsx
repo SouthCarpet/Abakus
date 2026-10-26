@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, type Account } from '../../api'
 import { reportApi, type PdfReportOutcome, type ReportDocumentScope, type ReportPreview, type ReportRequest } from '../../lib/report-api'
@@ -185,7 +186,7 @@ function ExportDialogContent(props: ExportDialogContentProps) {
       </Field>
     </fieldset>
     <DocumentScopeChoice busy={busy} draft={draft} updateDraft={updateDraft} />
-    {invalidPeriod ? <p role="alert">Zadajte platný kalendárny {draft.period === 'year' ? 'rok' : 'mesiac'}.</p> : null}
+    {invalidPeriod ? <InlineAlert kind="warning">Zadajte platný kalendárny {draft.period === 'year' ? 'rok' : 'mesiac'}.</InlineAlert> : null}
     {draft.period === 'six_months' ? <p>Report zahŕňa šesť po sebe idúcich mesiacov končiacich vo vybranom mesiaci.</p> : null}
     {draft.period === 'all_time' ? <p>{selectedPeriodLabel(draft)} použije všetky uložené dátumy transakcií vo zvolených účtoch.</p> : null}
     <OperationStatus busy={accountsLoading} error={accountsError}>Načítavajú sa účty...</OperationStatus>

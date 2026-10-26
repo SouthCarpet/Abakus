@@ -1,3 +1,4 @@
+import { InlineAlert } from './InlineAlert'
 import { useEffect, useState } from 'react'
 import type { Category, CategoryKind } from '../api'
 import { api } from '../api'
@@ -77,7 +78,7 @@ export function CategoryDialog({
         </>
       }
     >
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
       <Field label="Názov">
         <input className="k-input k-well" aria-label="Názov kategórie" value={name} onChange={(e) => setName(e.target.value)} />
       </Field>

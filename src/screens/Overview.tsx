@@ -1,3 +1,4 @@
+import { InlineAlert } from '../components/InlineAlert'
 import { useEffect, useState } from 'react'
 import type { Account, AccountKind, BadChecksum, StatementHistoryRow, Status, Summary } from '../api'
 import { api, formatEur } from '../api'
@@ -250,8 +251,8 @@ export function Overview({
         </div>
       </div>
 
-      {error ? <p role="alert">{error}</p> : null}
-      {summaryError ? <p role="alert">{summaryError}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      {summaryError ? <InlineAlert>{summaryError}</InlineAlert> : null}
       <StatementReminderBanner
         accounts={reminderAccounts}
         statements={reminderHistory}
