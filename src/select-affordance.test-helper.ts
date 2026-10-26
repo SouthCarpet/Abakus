@@ -2,7 +2,7 @@ import { expect } from 'vitest'
 
 // Check all native selects on the rendered route, including future additions.
 export function expectSelectChevrons(root: ParentNode = document) {
-  const selects = root.querySelectorAll('select.k-select')
+  const selects = root.querySelectorAll('select')
   expect(selects.length).toBeGreaterThan(0)
   for (const select of selects) {
     const wrap = select.closest('.k-select-wrap')

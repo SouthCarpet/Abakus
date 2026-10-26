@@ -90,3 +90,12 @@ Funkcie, klávesy a ukladanie dát sa nemenia. Opravy úzkeho registra sú uvede
 - Tabuľka Zostatky z výpisov v Prehľade používa pri `off_by` existujúci `DangerBadge`. Ostatné stavy ostávajú textom.
 - Nepribudol žiadny token, verejný parameter ani nová trieda. Tri kópie Kaliber ostávajú nezmenené.
 - Testy `fix2` otvárajú formuláre z Kategórií, Nastavení, Importu, Prehľadu a panelu pravidelných platieb. Spoločná kontrola overí všetky natívne výbery na otvorenej obrazovke alebo vo formulári vrátane budúcich doplnení. Geometrická sonda otvorí Import pri 1024 × 680 a 1280 × 820 s jedným `off_by` a dvoma správnymi súčtami a overí polohu všetkých tlačidiel zmazania.
+
+## Opravy po tretej vizuálnej kontrole (fix3)
+
+- Riadky výpisov v Importe majú pri šírke 600 až 1100 px pre každý textový stĺpec spodnú hranicu v `ch`, ktorá pojme najdlhšie slovo. Slová sa zalomia len medzi slovami. Pravidlo `overflow-wrap: anywhere` zmizlo z buniek riadku. Len bunka účtu má `overflow-wrap: break-word`, lebo označenie účtu môže byť dlhý reťazec bez medzier (IBAN). Tlačidlo „Zobraziť transakcie“ sa pri úzkom stĺpci zalomí a rastie do výšky.
+- Register transakcií pri šírke 600 až 1100 px už nemá `overflow-wrap: anywhere` na každej bunke. Platí len pre bunku obchodníka a bunku účtu, kde sa môže vyskytnúť dlhý reťazec bez medzier.
+- Dialóg Exportovať PDF sa nemenil. `.ab-dialog-wide` má `overflow: auto` a `max-height`, takže sa pri 1024 × 680 posúva ako celok a „Uložiť PDF“ je po posunutí v okne. Dokazuje to geometrická kontrola.
+- Testovacia pomôcka `expectSelectChevrons` kontroluje každý natívny `select`, nielen `select.k-select`.
+- Geometrická sonda meria text každej bunky Importu a registra pri 1024 × 680 a 1280 × 820: každý riadok textu leží v bunke aj v riadku, bunka sa neposúva sama v sebe a žiadne slovo nie je rozdelené medzi riadky (dva susedné znaky jedného slova na rôznych riadkoch). Dlhý reťazec od 20 znakov bez medzier sa smie zlomiť. Takto by sa zachytilo „Vyžad / uje“.
+- Nepribudol žiadny token, verejný parameter ani nová trieda. Tri kópie Kaliber ostávajú nezmenené.
