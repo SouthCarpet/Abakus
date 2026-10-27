@@ -229,7 +229,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
   .ab-table-scroll .ab-round-row, .ab-table-scroll .ab-round-row-head { min-width: 0; display: grid; grid-template-columns: minmax(6ch, .9fr) minmax(8ch, 1.1fr) minmax(5ch, .4fr) minmax(11ch, .8fr) minmax(9ch, .85fr) minmax(13ch, 1.4fr) minmax(17ch, 1.5fr) minmax(11ch, 1.2fr) max(var(--control-h), var(--k-hit)); align-items: center; }
   .ab-round-row > *, .ab-round-row-head > * { min-width: 0; }
   .ab-round-row > :nth-child(2) { overflow-wrap: break-word; }
-  .ab-round-row > .k-card-badge { white-space: normal; }
+  .ab-round-row > .ab-round-badge { white-space: normal; }
   .ab-round-row > button:not(.ab-icon-hit) { white-space: normal; height: auto; min-height: max(var(--control-h), var(--k-hit)); padding: var(--space-1); }
   .ab-round-row-head > :last-child { grid-column: span 2; }
 }

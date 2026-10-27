@@ -285,7 +285,7 @@ function StatementRow({
       <span className="k-num">č. {statement.number}</span>
       <span className="k-num">{countPhrase(statement.transaction_count, tx.transakcia)}</span>
       <span className="k-num">{formatEur(statement.total_cents)}</span>
-      <span className={danger ? 'k-card-badge ab-badge-danger' : 'k-card-badge'}>{danger ? <Icon name="danger" small /> : null}{checksumLabel(statement.checksum)}</span>
+      <span className={danger ? 'k-card-badge ab-round-badge ab-badge-danger' : 'k-card-badge ab-round-badge'}>{danger ? <Icon name="danger" small /> : null}{checksumLabel(statement.checksum)}</span>
       <StatementReviewChip statementId={statement.statement_id} />
       <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
         Zobraziť transakcie
