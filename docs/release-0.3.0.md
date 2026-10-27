@@ -16,7 +16,7 @@ Podrobnosti sú v [poznámkach k prevzatiu Kaliber](kaliber-5-adoption.md). Obme
 
 ## Overenie
 
-Vetva pred prípravou vydania prešla nezávislou kontrolou kódu aj vzhľadu. Lokálne kontroly prešli: lint, frontendový build, 657 frontendových testov (11 vynechaných), 662 Rust testov a Clippy s varovaniami ako chybami. Repo nemá CI workflow. Výsledky a presný commit zostavy sú v správe k vydaniu.
+Vetva pred prípravou vydania prešla nezávislou kontrolou kódu aj vzhľadu. Lokálne kontroly prešli: lint, frontendový build, 668 frontendových testov vrátane geometrických testov v prehliadači, 662 Rust testov a Clippy s varovaniami ako chybami. Repo nemá CI workflow.
 
 ## Inštalátor
 
@@ -25,4 +25,5 @@ Vetva pred prípravou vydania prešla nezávislou kontrolou kódu aj vzhľadu. L
 - Inštalátor je pre aktuálneho používateľa a nepotrebuje práva správcu. Nie je podpísaný. Údaje a heslá zostávajú na počítači.
 - Inštalátor ani zostavená aplikácia sa pri príprave tohto kandidáta nespúšťajú. Natívne prijatie zostáva na používateľovi.
 
-Hash finálneho inštalátora je v `SHA256SUMS.txt`. Kontrolné súčty baleného `abakus.exe` a `pdfium.dll`, presný commit a veľkosť balíka sú v správe k vydaniu.
+- Inštalátor `abakus-setup-0.3.0.exe` (10 266 065 B) je zostavený z commitu `5bb400d`: SHA-256 `eb3cb1272c20023798c2a791f46b8cf35434d494bed610c8bec20b1da7fa2b08`. Balený `abakus.exe` má SHA-256 `f6d642d9112a15ec073867de0453f7cc9bd1af14d418c02302bc66d2e9ced271`, `pdfium.dll` má `215c405d13963395b38872a656a18f161a294e80bbcaa00849b842f524e5474b`. Riadok `SHA256SUMS.txt` je publikovaný s vydaním na GitHub.
+- Commit po `5bb400d` mení len tieto poznámky. Kód zostavy sa nezmenil.
