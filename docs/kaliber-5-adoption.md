@@ -98,3 +98,7 @@ Funkcie, klávesy a ukladanie dát sa nemenia. Opravy úzkeho registra sú uvede
 - Testovacia pomôcka `expectSelectChevrons` kontroluje každý natívny `select`, nielen `select.k-select`.
 - Geometrická sonda meria text každej bunky Importu a registra pri 1024 × 680 a 1280 × 820: každý riadok textu leží v bunke aj v riadku, bunka sa neposúva sama v sebe a žiadne slovo nie je rozdelené medzi riadky (dva susedné znaky jedného slova na rôznych riadkoch). Dlhý reťazec od 20 znakov bez medzier sa smie zlomiť. Takto by sa zachytilo „Vyžad / uje“.
 - Nepribudol žiadny token, verejný parameter ani nová trieda. Tri kópie Kaliber ostávajú nezmenené.
+
+## Po vydaní 0.3.0
+
+- Odznak kontrolného súčtu v riadku výpisu má navyše vlastnú triedu `.ab-round-badge`. Pravidlo pre úzky riadok (`white-space: normal`) cieli na ňu namiesto spoločnej `.k-card-badge`, lebo kontrola `check_refs` nedovolí deklarovať spoločnú triedu Kaliber mimo `kaliber.css`. Špecifickosť a deklarácie sa nezmenili.
