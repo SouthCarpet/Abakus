@@ -14,6 +14,25 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outPath = join(root, "THIRD_PARTY_NOTICES.md");
 
+const UI_NOTICE = `## Fira Sans (user interface)
+
+The user interface uses the static \`FiraSans-*.ttf\` files, the typeface of
+the Kaliber design language. They are licensed under the SIL Open Font
+License 1.1. The full license is
+[\`assets/fonts/fira-sans/OFL.txt\`](assets/fonts/fira-sans/OFL.txt).
+
+## Phosphor Icons and Kaliber drawings (user interface)
+
+\`public/kaliber-icons.svg\` is the Kaliber 5.0.1 sprite. It contains
+Phosphor Regular icons and own Kaliber drawings. Phosphor Icons uses
+the MIT License below. Own Kaliber drawings are part of the Kaliber design language.
+
+\`\`\`text
+${readFileSync(join(root, "assets/icons/PHOSPHOR-LICENSE.txt"), "utf8").trim()}
+\`\`\`
+
+`;
+
 const PDFIUM_NOTICE = `## PDFium
 
 Abakus bundles a Windows x64 \`pdfium.dll\` from the
@@ -317,6 +336,7 @@ taken from the lockfile or from \`node_modules/*/package.json\`.
 
 ${PDFIUM_NOTICE}
 ${NOTO_NOTICE}
+${UI_NOTICE}
 ## Rust crates
 
 ${table(rustRows)}

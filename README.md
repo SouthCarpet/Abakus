@@ -15,7 +15,7 @@ Lokálna desktopová appka na PDF výpisy z Tatra banky.
 
 Abakus is a local Windows desktop app for Tatra banka PDF statements. It imports statements, checks checksums, assigns categories with learned rules, tracks recurring payments, stores notes, and builds PDF reports with charts. Bank data stays on your computer. The only network use is an opt-in update check (at start, when Settings > About opens and on its button, only after you turn it on) and a user-triggered installer download from GitHub Releases. Both are written to the in-app network log. There is no telemetry.
 
-Version 0.2.0 is the current release. It also adopts the Kaliber design language, revision 4: Fira Sans font, header tabs, Help on F1, an About section, a shared theme key and a keyboard set for the transaction register. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
+Version 0.3.0 uses the Kaliber 5.0.1 foundation: active tabs have an accent line, state and navigation marks are round, and the off switch has no glyph. Icons now use the Kaliber sprite. Error states use the danger icon; inline alerts use the icon for their meaning. See [the adoption notes](docs/kaliber-5-adoption.md). It keeps the features introduced with Kaliber revision 4: Fira Sans font, header tabs, Help on F1, an About section, a shared theme key and a keyboard set for the transaction register. Version 0.1.4 added the in-app updater, the AGPL-3.0 licence and the public documentation. Source is at [https://github.com/SouthCarpet/Abakus](https://github.com/SouthCarpet/Abakus). The license is GNU AGPL-3.0-or-later. Install the per-user Windows installer from GitHub Releases. Administrator rights are not required.
 
 ## Čo to je
 
@@ -23,13 +23,15 @@ Abakus číta mesačné PDF výpisy z Tatra banky. Rozdelí transakcie do kateg�
 
 ## Stav
 
-**0.2.0.** Aktuálne vydanie. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+**0.3.0.** Vydanie s Kaliber 5.0.1. Aktualizácia v aplikácii, licencia AGPL-3.0 a verejná dokumentácia pribudli v 0.1.4. Appka beží na Windows. Zostava je Tauri 2, Rust a React. Zoznam zmien je v [CHANGELOG.md](CHANGELOG.md). Obmedzenia sú v [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 Vo verzii 0.2.0 pribudlo ovládanie zmeny cieľa naučených pravidiel, náhľadu a zmazania pravidla, aj explicitného zmazania kategórie po potvrdení náhľadu. V **Kategóriách** má každý riadok kompaktné ikonové tlačidlo na archiváciu a ikonové tlačidlo na zmazanie; rovnako je zmazanie pravidla a výpisu v riadku tiché ikonové tlačidlo s názvom. Červené tlačidlo je až v potvrdzovacom dialógu. Zmazanie kategórie presunie aj potvrdené transakcie z celej vetvy do nezaradených; dialóg pred zmazaním uvedie presný počet. Pravidlá a ich záznamy pôvodu pre zmazanú vetvu sa odstránia. Voľby pravidelných platieb ostanú uložené. Interný prevod sa nikdy nemení. Hromadné potvrdenie návrhov má v Transakciách tlačidlo Potvrdiť vybrané; vrátiť späť ho zatiaľ nemožno. Technické kontrakty sú v [docs/plan-091-rule-editing.md](docs/plan-091-rule-editing.md), [docs/plan-091-category-delete.md](docs/plan-091-category-delete.md) a [docs/plan-091-bulk-confirmation.md](docs/plan-091-bulk-confirmation.md).
 
 Pribudol aj tichý riadok **Nová verzia** v hlavičke appky, viditeľný na každej obrazovke; ukáže sa, len keď kontrola aktualizácií (ktorá ostáva vypnutá, kým ju sami nezapnete) nájde novšie vydanie, a vedie do sekcie **O aplikácii**. Zoznam **Sieťová aktivita** v Nastaveniach po 10 riadkoch zbalí zvyšok pod tlačidlo **Zobraziť všetky**. V **Importe** je teraz úplný zoznam všetkých výpisov namiesto ostatných ôsmich: každý riadok má sumu, odznak kontrolného súčtu, odznak kontroly výpisu s rozbaliteľným zoznamom otvorených položiek, tlačidlo na zobrazenie transakcií a na zmazanie. Staršie výpisy sú zbalené pod tlačidlom **Staršie výpisy**.
 
-Verzia 0.2.0 tiež preberá jazyk dizajnu Kaliber, revíziu 4: písmo Fira Sans, plochý register bez tieňov, súhrnnú tabuľku namiesto dlaždíc a rovnaké miesto pre navigáciu, Pomocníka, vzhľad a O aplikácii ako v ostatných appkách rodiny. Opis je v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy). Plán a kontrolný zoznam sú v [docs/plan-091-kaliber-r3.md](docs/plan-091-kaliber-r3.md).
+Verzia 0.3.0 používa základ Kaliber 5.0.1: aktívna záložka má linku, stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Ikony berie zo sady ikon Kaliber. Chybové stavy majú ikonu chyby a upozornenia ikonu podľa svojho významu. Pozri [poznámky k prevzatiu](docs/kaliber-5-adoption.md).
+
+Verzia 0.2.0 zaviedla jazyk dizajnu Kaliber, revíziu 4: písmo Fira Sans, plochý register bez tieňov, súhrnnú tabuľku namiesto dlaždíc a rovnaké miesto pre navigáciu, Pomocníka, vzhľad a O aplikácii ako v ostatných appkách rodiny. Opis je v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy). Plán a kontrolný zoznam sú v [docs/plan-091-kaliber-r3.md](docs/plan-091-kaliber-r3.md).
 
 ## Prečo
 
@@ -74,7 +76,7 @@ Databáza je `%LOCALAPPDATA%\Abakus\abakus.db`. V Nastaveniach vytvorte **Záloh
 
 ## Rozhranie a klávesy
 
-- **Navigácia:** päť záložiek v hlavičke: **Transakcie** (otvorí sa ako prvá), **Prehľad**, **Import**, **Kategórie**, **Nastavenia** (posledné, aj Ctrl+čiarka). V úzkom okne do 599 px sa záložky presunú do dolnej navigácie s ikonou a textom, aktuálna obrazovka má štvorcovú značku.
+- **Navigácia:** päť záložiek v hlavičke: **Transakcie** (otvorí sa ako prvá), **Prehľad**, **Import**, **Kategórie**, **Nastavenia** (posledné, aj Ctrl+čiarka). V úzkom okne do 599 px sa záložky presunú do dolnej navigácie s ikonou a textom, aktuálna obrazovka má kruhovú značku.
 - **Hlavička obrazovky:** veľký názov, pod ním jeden tlmený riadok popisu, vpravo jedna hlavná akcia a menu **Ďalšie**. Prehľad má hlavnú akciu **Exportovať PDF**, Import **Vybrať PDF**, Kategórie **Nová kategória**. Transakcie ukazujú v popise vybrané obdobie a účet (napríklad „Obdobie: všetky dátumy. Všetky účty.“) a majú v menu **Ďalšie** položky **Obnoviť**, **Exportovať filtrované CSV** a **Exportovať PDF**.
 - **Nástroje hlavičky:** prepínač so slnkom a mesiacom (rýchla zmena vzhľadu) a tichý riadok **Nová verzia**, keď kontrola nájde novšie vydanie.
 - **Pätička:** stav práce (napríklad počas importu, potom „Import dokončený, súbory: N. 14:05“) a odkaz **Pomocník**. Pomocník (aj F1) otvorí panel vpravo s hľadaním, témami podľa obrazovky a zoznamom klávesov.
@@ -122,7 +124,7 @@ Vo výbere transakcií pribudlo tlačidlo **Potvrdiť vybrané**. Potvrdí odhad
 
 Po hromadnom priradení kategórie sa vpravo dole na 8 sekúnd zobrazí hlásenie s tlačidlom **Späť**. Vráti práve vykonané priradenie a obnoví tabuľku. Rovnako funguje Ctrl+Z, aj keď hlásenie už zmizlo. Ctrl+Y alebo Ctrl+Shift+Z vrátené priradenie znova vykoná. Späť platí len pre poslednú takú akciu v tomto behu appky: zmizne po použití, keď ho nahradí ďalšie hromadné priradenie alebo po inom zápise. Hromadné potvrdenie zatiaľ vrátiť nemožno.
 
-Keď má tabuľka nezaradené platby, appka nad ňou ukáže tmavý riadok „3 platby čakajú na zaradenie“ s tlačidlom Zaradiť podľa obchodníka. Tlačidlo otvorí skupiny podľa obchodníka, napríklad „Twitch: 15 platieb“. Kliknutie na skupinu vyberie presne jej riadky, takže ich hneď môžete hromadne priradiť alebo potvrdiť. Riadok aj skupiny zmiznú, keď nezaradené platby v tabuľke nie sú. Stav každej platby má vlastný znak (prázdny štvorec: Nezaradené, polovičný: Odhad, plný: Potvrdené, preškrtnutý: Prevod) a počty používajú správny tvar (1 platba, 2 platby, 5 platieb). Rovnako sa skloňujú potvrdenia mazania (Zmaže sa aj 1 pravidlo, Zmažú sa aj 2 pravidlá, Zmaže sa aj 5 pravidiel; Odstráni sa 1 transakcia, Odstránia sa 2 transakcie, Odstráni sa 5 transakcií).
+Keď má tabuľka nezaradené platby, appka nad ňou ukáže tmavý riadok „3 platby čakajú na zaradenie“ s tlačidlom Zaradiť podľa obchodníka. Tlačidlo otvorí skupiny podľa obchodníka, napríklad „Twitch: 15 platieb“. Kliknutie na skupinu vyberie presne jej riadky, takže ich hneď môžete hromadne priradiť alebo potvrdiť. Riadok aj skupiny zmiznú, keď nezaradené platby v tabuľke nie sú. Stav každej platby má vlastný znak (prázdny kruh: Nezaradené, polovičný: Odhad, plný: Potvrdené, preškrtnutý: Prevod) a počty používajú správny tvar (1 platba, 2 platby, 5 platieb). Rovnako sa skloňujú potvrdenia mazania (Zmaže sa aj 1 pravidlo, Zmažú sa aj 2 pravidlá, Zmaže sa aj 5 pravidiel; Odstráni sa 1 transakcia, Odstránia sa 2 transakcie, Odstráni sa 5 transakcií).
 
 V tabuľke Transakcií fungujú šípky, Home, End, PgUp a PgDn. Presúvajú zvýraznený riadok. Enter potvrdí odhad zvýrazneného riadku rovnako ako tlačidlo **Potvrdiť**. Medzerník, Shift+šípky, Shift+klik a Ctrl+A menia výber, Esc ho zruší. Tieto klávesy nič nerobia, keď je fokus v poli na hľadanie, v poznámke alebo vo vyhľadávaní kategórie. Nad tabuľkou je len krátka nápoveda „Šípky a medzerník: pohyb a výber. Viac: F1.“. Úplný zoznam je v Pomocníkovi (F1) a v sekcii [Rozhranie a klávesy](#rozhranie-a-klávesy). Pravidlá tvorby pravidiel a postup **Zaradiť podľa obchodníka** sú tiež v Pomocníkovi, téma Transakcie.
 
@@ -232,10 +234,10 @@ Od vydania 0.1.4 obsahuje každé vydanie na GitHub súbor `SHA256SUMS.txt`. Vyd
 Kontrola stiahnutého súboru v PowerShell:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\abakus-setup-0.2.0.exe
+Get-FileHash -Algorithm SHA256 .\abakus-setup-0.3.0.exe
 ```
 
-Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.2.0 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
+Porovnajte výstup s riadkom v `SHA256SUMS.txt` daného vydania. Kontrolné súčty pre 0.3.0 sú v `SHA256SUMS.txt` tohto vydania na GitHub, nie v tomto súbore (zostavujú sa až pri vydaní).
 
 Známe kontrolné súčty SHA-256 pre **0.1.3**:
 

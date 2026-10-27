@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import type { Category } from '../../api'
 import { api } from '../../api'
@@ -82,8 +83,8 @@ export function RecurringCategoryFields({
         Zaradiť kategóriu
       </Button>
       {busy ? <p role="status">Zaraďuje sa kategória...</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
-      {refreshError ? <p role="alert">Kategória je zaradená, obnovenie zlyhalo: {refreshError}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      {refreshError ? <InlineAlert>Kategória je zaradená, obnovenie zlyhalo: {refreshError}</InlineAlert> : null}
       {createdCategory !== null && error ? (
         <p>Kategória ostala vytvorená. Skúste znova zaradenie, nevytvára sa znova.</p>
       ) : null}

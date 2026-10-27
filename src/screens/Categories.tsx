@@ -1,3 +1,4 @@
+import { InlineAlert } from '../components/InlineAlert'
 import { useEffect, useRef, useState } from 'react'
 import type { Category, CategoryKind, RuleView } from '../api'
 import { api } from '../api'
@@ -8,7 +9,7 @@ import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
 import { PageHead } from '../components/PageHead'
 import { countPhrase, pluralSk, tx, vb } from '../lib/plural'
-import { ArchiveGlyph, TrashGlyph } from '../kaliber/icons'
+import { Icon } from '../kaliber/icons'
 import { useDeleteKey } from '../kaliber/deleteKey'
 import { toast } from '../kaliber/toast'
 import { useAction } from '../lib/useAction'
@@ -79,7 +80,7 @@ export function RulesTable({
                   title="Zmaže pravidlo."
                   onClick={() => onDelete(rule)}
                 >
-                  <TrashGlyph />
+                  <Icon name="delete" />
                 </Button>
               ) : null}
             </td>
@@ -139,7 +140,7 @@ function CategoryRow({
         // stays plain "Archivovať" (unchanged for existing archive tests),
         // the native title carries the hover explanation.
         <Button variant="ghost" className="k-icon-btn ab-icon-hit" aria-label="Archivovať" title={ARCHIVE_TITLE} onClick={() => onArchive(category)}>
-          <ArchiveGlyph />
+          <Icon name="archive" />
         </Button>
       ) : null}
       {!category.system ? (
@@ -151,7 +152,7 @@ function CategoryRow({
           title="Zmaže kategóriu natrvalo."
           onClick={() => onDeleteRequest(category)}
         >
-          <TrashGlyph />
+          <Icon name="delete" />
         </Button>
       ) : null}
     </div>
@@ -304,7 +305,7 @@ function CategoryEditDialog({
         )
       }
     >
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
       {preview ? (
         <div className="ab-section">
           <p>Zmena druhu ovplyvní {countPhrase(preview.affected_categories, tx.kategoria)} a {countPhrase(preview.transaction_count, tx.transakcia)} (z toho {countPhrase(preview.confirmed_count, tx.potvrdene)}).</p>
@@ -316,31 +317,37 @@ function CategoryEditDialog({
             <input className="k-input k-well" aria-label="Upraviť názov kategórie" value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Nadradená kategória">
-            <select
-              aria-label="Upraviť nadradenú kategóriu"
-              className="k-select k-well"
-              value={parentId ?? ''}
-              onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">Hlavná kategória</option>
-              {parentOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <span className="k-select-wrap">
+              <select
+                aria-label="Upraviť nadradenú kategóriu"
+                className="k-select k-well"
+                value={parentId ?? ''}
+                onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Hlavná kategória</option>
+                {parentOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <Icon name="chevron-down" small className="k-select-chevron" />
+            </span>
           </Field>
           <Field label="Druh">
-            <select
-              aria-label="Upraviť druh kategórie"
-              className="k-select k-well"
-              value={effectiveKind}
-              disabled={selectedParent !== null}
-              onChange={(e) => setKind(e.target.value as CategoryKind)}
-            >
-              <option value="expense">{CATEGORY_KIND_LABELS_SHORT.expense}</option>
-              <option value="income">{CATEGORY_KIND_LABELS_SHORT.income}</option>
-            </select>
+            <span className="k-select-wrap">
+              <select
+                aria-label="Upraviť druh kategórie"
+                className="k-select k-well"
+                value={effectiveKind}
+                disabled={selectedParent !== null}
+                onChange={(e) => setKind(e.target.value as CategoryKind)}
+              >
+                <option value="expense">{CATEGORY_KIND_LABELS_SHORT.expense}</option>
+                <option value="income">{CATEGORY_KIND_LABELS_SHORT.income}</option>
+              </select>
+              <Icon name="chevron-down" small className="k-select-chevron" />
+            </span>
           </Field>
         </>
       )}
@@ -411,8 +418,8 @@ function CategoryDeleteDialog({
         </>
       }
     >
-      {error ? <p role="alert">{error}</p> : null}
-      {previewError ? <p role="alert">{previewError}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      {previewError ? <InlineAlert>{previewError}</InlineAlert> : null}
       {!preview && !previewError ? <p role="status">Načítava sa náhľad zmazania...</p> : null}
       {preview ? (
         <div className="ab-section">
@@ -488,8 +495,8 @@ function RuleDeleteDialog({
         </>
       }
     >
-      {error ? <p role="alert">{error}</p> : null}
-      {previewError ? <p role="alert">{previewError}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      {previewError ? <InlineAlert>{previewError}</InlineAlert> : null}
       {!preview && !previewError ? <p role="status">Načítava sa náhľad zmazania...</p> : null}
       {preview ? (
         <p>{`Otvorených riadkov s týmto pravidlom: ${preview.open_rule_references}. Po zmazaní sa zmení zaradenie pri ${preview.open_classification_changes} riadkoch.`}</p>
@@ -593,7 +600,7 @@ export function Categories() {
         meta="Kategórie platieb a pravidlá, ktoré z nich vznikli."
         primary={<Button variant="primary" disabled={action.busy} onClick={() => setAddOpen(true)}>Nová kategória</Button>}
       />
-      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
       <fieldset disabled={action.busy} className="ab-section">
         <div className="ab-row" style={{ alignItems: 'stretch' }}>
@@ -640,15 +647,18 @@ export function Categories() {
           </>
         }
       >
-        {action.error ? <p role="alert">{action.error}</p> : null}
+        {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
         <Field label="Názov">
           <input className="k-input k-well" value={newName} onChange={(e) => setNewName(e.target.value)} />
         </Field>
         <Field label="Druh">
-          <select className="k-select k-well" value={newKind} onChange={(e) => setNewKind(e.target.value as CategoryKind)}>
-            <option value="expense">{CATEGORY_KIND_LABELS.expense}</option>
-            <option value="income">{CATEGORY_KIND_LABELS.income}</option>
-          </select>
+          <span className="k-select-wrap">
+            <select className="k-select k-well" value={newKind} onChange={(e) => setNewKind(e.target.value as CategoryKind)}>
+              <option value="expense">{CATEGORY_KIND_LABELS.expense}</option>
+              <option value="income">{CATEGORY_KIND_LABELS.income}</option>
+            </select>
+            <Icon name="chevron-down" small className="k-select-chevron" />
+          </span>
         </Field>
       </Dialog>
 
@@ -667,7 +677,7 @@ export function Categories() {
           </>
         }
       >
-        {action.error ? <p role="alert">{action.error}</p> : null}
+        {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
         <Field label="Názov">
           <input className="k-input k-well" value={subName} onChange={(e) => setSubName(e.target.value)} />
         </Field>
@@ -688,7 +698,7 @@ export function Categories() {
           </>
         }
       >
-        {action.error ? <p role="alert">{action.error}</p> : null}
+        {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
         <p>{archiveTarget?.name}</p>
         <p>{ARCHIVE_CONFIRM_TEXT}</p>
       </Dialog>

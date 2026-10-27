@@ -1,6 +1,7 @@
 import type { StatementHistoryRow } from '../../api'
 import { checksumLabel, formatDate, formatEur } from '../../lib/format'
 import { Card } from '../Card'
+import { DangerBadge } from '../DangerBadge'
 
 export function BalanceHistoryCard({ statements }: { statements: StatementHistoryRow[] }) {
   if (statements.length === 0) {
@@ -27,7 +28,7 @@ export function BalanceHistoryCard({ statements }: { statements: StatementHistor
                 <td>{s.number}</td>
                 <td>{formatDate(s.period_end)}</td>
                 <td className="k-num k-cell-number">{s.closing_cents === null ? 'Nedostupný' : formatEur(s.closing_cents)}</td>
-                <td>{checksumLabel(s.checksum)}</td>
+                <td>{s.checksum.status === 'off_by' ? <DangerBadge>{checksumLabel(s.checksum)}</DangerBadge> : checksumLabel(s.checksum)}</td>
               </tr>
             ))}
           </tbody>

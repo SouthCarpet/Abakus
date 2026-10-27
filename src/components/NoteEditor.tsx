@@ -1,3 +1,4 @@
+import { InlineAlert } from './InlineAlert'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { Button } from './Button'
@@ -90,11 +91,11 @@ export function NoteEditor({ txId, initialNote, onSaved }: {
         </Button>
         <span className="ab-field-label">{codePoints} / {NOTE_MAX_CODE_POINTS} znakov</span>
       </div>
-      {overLimit ? <p role="alert">Poznámka je príliš dlhá, skráťte ju.</p> : null}
+      {overLimit ? <InlineAlert kind="warning">Poznámka je príliš dlhá, skráťte ju.</InlineAlert> : null}
       {status === 'saving' ? <p role="status">Ukladá sa...</p> : null}
       {status === 'saved' && !refreshError ? <p role="status">Poznámka uložená.</p> : null}
-      {status === 'error' ? <p role="alert">{error}</p> : null}
-      {refreshError ? <p role="alert">Poznámka je uložená, obnovenie zoznamu zlyhalo: {refreshError}</p> : null}
+      {status === 'error' ? <InlineAlert>{error}</InlineAlert> : null}
+      {refreshError ? <InlineAlert>Poznámka je uložená, obnovenie zoznamu zlyhalo: {refreshError}</InlineAlert> : null}
     </div>
   )
 }

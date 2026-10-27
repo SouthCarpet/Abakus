@@ -29,8 +29,6 @@
 .category-picker__trigger:disabled .category-picker__chevron { color: var(--color-text-muted); }
 
 .category-picker__trigger:disabled {
-  background: var(--color-disabled-fill);
-  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 

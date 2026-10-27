@@ -18,6 +18,7 @@ export interface ToastItem {
   id: number
   text: string
   action?: ToastAction
+  kind: 'success' | 'error'
   leaving: boolean
 }
 
@@ -30,9 +31,9 @@ function emit() {
   listeners.forEach((listen) => listen())
 }
 
-export function toast(text: string, action?: ToastAction): number {
+export function toast(text: string, action?: ToastAction, kind: ToastItem['kind'] = 'success'): number {
   const id = nextId++
-  items = [...items, { id, text, action, leaving: false }]
+  items = [...items, { id, text, action, kind, leaving: false }]
   timers.set(id, setTimeout(() => dismissToast(id), action ? TOAST_ACTION_TIME : TOAST_TIME))
   emit()
   return id

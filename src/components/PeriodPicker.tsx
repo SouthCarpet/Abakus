@@ -1,3 +1,4 @@
+import { InlineAlert } from './InlineAlert'
 import { useCallback, useId, useState } from 'react'
 import { PERIOD_LABELS, validPeriod, type PeriodKind } from '../lib/period'
 import { Button } from './Button'
@@ -56,7 +57,7 @@ export function PeriodPicker({ value, onChange }: { value: PeriodValue; onChange
           ))}
         </div>
       </div>
-      {!validPeriod(value) ? <p role="alert">Zadajte platný začiatok a koniec obdobia. Začiatok nesmie byť po konci.</p> : null}
+      {!validPeriod(value) ? <InlineAlert kind="warning">Zadajte platný začiatok a koniec obdobia. Začiatok nesmie byť po konci.</InlineAlert> : null}
       {value.kind === 'custom' ? (
         <>
           <input

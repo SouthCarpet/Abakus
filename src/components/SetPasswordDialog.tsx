@@ -1,3 +1,4 @@
+import { InlineAlert } from './InlineAlert'
 import { useState } from 'react'
 import { api, type Account } from '../api'
 import { useAction } from '../lib/useAction'
@@ -70,8 +71,8 @@ export function SetPasswordDialog({ account, onClose, onSaved }: {
     <Field label="Zopakovať heslo">
       <PasswordInput value={confirm} onChange={setConfirm} maxLength={PASSWORD_MAX_CHARS} />
     </Field>
-    {tooLong ? <p role="alert" className="ab-text-danger">Limit je 512 znakov.</p> : null}
-    {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
+    {tooLong ? <InlineAlert kind="warning">Limit je 512 znakov.</InlineAlert> : null}
+    {error ? <InlineAlert>{error}</InlineAlert> : null}
     {saved ? <p role="status">Heslo je uložené v Správcovi poverení.</p> : null}
   </Dialog>
 }

@@ -1,3 +1,5 @@
+import { Icon } from '../kaliber/icons'
+import { InlineAlert } from './InlineAlert'
 import { useState } from 'react'
 import { api, type Account, type AccountKind, type ImportReport } from '../api'
 import { useAction } from '../lib/useAction'
@@ -84,16 +86,19 @@ export function SetupAccountDialog({
         <input className="k-input k-well" value={label} onChange={(e) => setLabel(e.target.value)} />
       </Field>
       <Field label="Druh účtu">
-        <select className="k-select k-well" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
-          <option value="personal">Osobný</option>
-          <option value="business">Firemný</option>
-        </select>
+        <span className="k-select-wrap">
+          <select className="k-select k-well" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
+            <option value="personal">Osobný</option>
+            <option value="business">Firemný</option>
+          </select>
+          <Icon name="chevron-down" small className="k-select-chevron" />
+        </span>
       </Field>
       <Field label="Heslo k výpisom">
         <PasswordInput value={password} onChange={setPassword} />
       </Field>
       <p>Heslo sa uloží do Správcu poverení systému Windows. Nechajte prázdne, ak výpisy nemajú heslo.</p>
-      {action.error ? <p role="alert" className="ab-text-danger">{action.error}</p> : null}
+      {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
     </Dialog>
   )
 }

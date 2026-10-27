@@ -1,3 +1,4 @@
+import { expectSelectChevrons } from '../../select-affordance.test-helper'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { recurringApi } from '../../lib/recurring-api'
@@ -266,4 +267,14 @@ describe('RecurringPanel confirm, ignore, reset and saved-refresh failure', () =
     await waitFor(() => expect(screen.queryByText('Uložené, obnovenie zlyhalo')).not.toBeInTheDocument())
     expect(recurringApi.save).toHaveBeenCalledTimes(1)
   })
+})
+
+it('fix2 shows the cadence arrow after opening the editor from the recurring panel', async () => {
+  vi.mocked(recurringApi.overview).mockResolvedValue({ ...EMPTY_OVERVIEW, rows: [R14_ESTIMATE] })
+  vi.mocked(recurringApi.detail).mockResolvedValue({ row: R14_ESTIMATE, transactions: [txRow({ id: 44 })], matching_transaction_ids: [44], compatible_transactions: [] })
+  render(<RecurringPanel period={ALL} accountKind="all" today="2026-09-07" />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Zmeniť interval Hosting' }))
+  const select = await screen.findByLabelText('Interval')
+  expect(select.closest('.k-select-wrap')?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  expectSelectChevrons()
 })

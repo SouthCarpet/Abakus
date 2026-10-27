@@ -1,3 +1,4 @@
+import { InlineAlert } from '../components/InlineAlert'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -10,7 +11,8 @@ import { countPhrase, pluralSk, tx, vb } from '../lib/plural'
 import { ariaKeys, withKey } from '../kaliber/bindings'
 import { startActivity } from '../kaliber/activity'
 import { useDeleteKey } from '../kaliber/deleteKey'
-import { TrashGlyph } from '../kaliber/icons'
+import { Icon } from '../kaliber/icons'
+import { DangerBadge } from '../components/DangerBadge'
 import { Card } from '../components/Card'
 import { Dialog } from '../components/Dialog'
 import { Field } from '../components/Field'
@@ -56,7 +58,7 @@ function WarningsList({ warnings }: { warnings: string[] }) {
 // A17/F4: shows the backend's own failure text instead of the generic "Chyba" badge alone.
 function ImportErrorMessage({ report }: { report: ImportReport }) {
   if (!report.message) return null
-  return <p className="ab-text-danger">{report.message}</p>
+  return <InlineAlert announce={false}>{report.message}</InlineAlert>
 }
 
 function LockedAction({
@@ -143,6 +145,7 @@ export function ImportResultCard({
     <Card
       title={fileName(report.path)}
       badge={importStatusLabel(report.status)}
+      badgeDanger={report.status === 'error'}
       footer={
         canContinue ? (
           <Button variant="primary" onClick={() => onContinue?.(report.statementId ?? undefined)}>
@@ -230,7 +233,7 @@ function StatementReviewChip({ statementId }: { statementId: number }) {
     return () => { active = false }
   }, [statementId])
 
-  if (error) return <span className="k-card-badge ab-text-danger">Kontrola sa nenačítala</span>
+  if (error) return <DangerBadge>Kontrola sa nenačítala</DangerBadge>
   if (!review) return <span className="k-card-badge">Načítava sa kontrola…</span>
 
   const items = reviewOpenItems(review)
@@ -239,11 +242,11 @@ function StatementReviewChip({ statementId }: { statementId: number }) {
     <span className="ab-review-chip">
       <Button
         variant="ghost"
-        className={danger ? 'k-card-badge ab-text-danger' : 'k-card-badge'}
+        className={danger ? 'k-card-badge ab-badge-danger' : 'k-card-badge'}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {REVIEW_STATUS_LABEL[review.status]}
+        {danger ? <Icon name="danger" small /> : null}{REVIEW_STATUS_LABEL[review.status]}
       </Button>
       {open ? (
         <span className="ab-review-detail">
@@ -282,7 +285,7 @@ function StatementRow({
       <span className="k-num">č. {statement.number}</span>
       <span className="k-num">{countPhrase(statement.transaction_count, tx.transakcia)}</span>
       <span className="k-num">{formatEur(statement.total_cents)}</span>
-      <span className={danger ? 'k-card-badge ab-text-danger' : 'k-card-badge'}>{checksumLabel(statement.checksum)}</span>
+      <span className={danger ? 'k-card-badge ab-badge-danger' : 'k-card-badge'}>{danger ? <Icon name="danger" small /> : null}{checksumLabel(statement.checksum)}</span>
       <StatementReviewChip statementId={statement.statement_id} />
       <Button variant="ghost" onClick={() => onNavigate(statement.statement_id)}>
         Zobraziť transakcie
@@ -296,7 +299,7 @@ function StatementRow({
         title="Zmaže výpis natrvalo."
         onClick={() => onDelete(statement)}
       >
-        <TrashGlyph />
+        <Icon name="delete" />
       </Button>
     </div>
   )
@@ -562,7 +565,7 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
         meta="Výpisy Tatra banky v PDF. Spracovanie beží len v tomto počítači."
         primary={<PickButton busy={[action.busy, deletion.busy].some(Boolean)} onPick={() => void action.run(pickFiles)} />}
       />
-      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
       {action.busy ? <p role="status">Prebieha import...</p> : null}
       <fieldset disabled={action.busy || deletion.busy} className="ab-section">
         <div className="k-well ab-dropzone">
@@ -600,8 +603,8 @@ export function Import({ onNavigateToTransactions, pickRequest, onPickRequestHan
           </>
         }
       >
-        {previewError ? <p role="alert">{previewError}</p> : <DeleteStatementBody preview={deletePreview} />}
-        {deletion.error ? <p role="alert">{deletion.error}</p> : null}
+        {previewError ? <InlineAlert>{previewError}</InlineAlert> : <DeleteStatementBody preview={deletePreview} />}
+        {deletion.error ? <InlineAlert>{deletion.error}</InlineAlert> : null}
         {deletion.busy ? <p role="status">Odstraňuje sa...</p> : null}
         <p>Pôvodné bankové PDF súbory sa neodstránia.</p>
       </Dialog>

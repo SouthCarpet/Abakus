@@ -59,3 +59,10 @@ describe('RecurringTable Akcie column layout', () => {
     expect(restoreButton.closest('.ab-row')).toHaveClass('ab-recurring-actions')
   })
 })
+
+// Oracle: fix1 badge sweep, a missing payment is a problem, an active payment keeps its dot.
+it('fix1 uses danger for missing payments and keeps the active dot', () => {
+  render(<RecurringTable caption="Platby" rows={[recurringRow({ state: 'missing' }), recurringRow({ series_key: 'active', state: 'active' })]} busy={false} onDetail={() => {}} onConfirm={() => {}} onEdit={() => {}} onIgnore={() => {}} onReset={() => {}} />)
+  expect(screen.getByText('Chýba platba').querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+  expect(screen.getByText('Aktívna').querySelector('svg')).toBeNull()
+})

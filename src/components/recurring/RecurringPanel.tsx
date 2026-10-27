@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AccountKind, Category } from '../../api'
 import { api } from '../../api'
@@ -115,9 +116,9 @@ export function RecurringPanel({
       <p>{overview ? snapshotCaption(overview) : 'Panel pravidelných platieb.'}</p>
       {overview?.unfinished_period ? <p>Obdobie ešte neskončilo</p> : null}
       {loading ? <p role="status">Načítavajú sa pravidelné platby...</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
-      {mutError ? <p role="alert">{mutError}</p> : null}
-      {refreshError ? <p role="alert">Uložené, obnovenie zlyhalo: {refreshError}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      {mutError ? <InlineAlert>{mutError}</InlineAlert> : null}
+      {refreshError ? <InlineAlert>Uložené, obnovenie zlyhalo: {refreshError}</InlineAlert> : null}
       {refreshError ? (
         <Button variant="secondary" disabled={busy} onClick={() => void runMutation(lastMutation.current ?? 'refresh', async () => undefined)}>
           Obnoviť prehľad

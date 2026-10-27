@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useEffect, useMemo, useState } from 'react'
 import type { AccountKind, Summary } from '../../api'
 import { api, formatEur } from '../../api'
@@ -86,8 +87,8 @@ export function YearComparisonCard({ accountKind, today }: { accountKind: Accoun
           </Button>
         ))}
       </div>
-      {rangeError ? <p role="alert">{rangeError}</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
+      {rangeError ? <InlineAlert>{rangeError}</InlineAlert> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
       {ranges && current && previous ? (
         <div className="ab-table-scroll">
           <table className="k-table">

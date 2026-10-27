@@ -2,6 +2,19 @@
 
 Najnovšia verzia je hore. Text opisuje, čo vidí používateľ.
 
+## 0.3.0 (2026-10-27)
+
+- Problémové odznaky importu a chýbajúcej pravidelnej platby majú ikonu chyby namiesto zelenej bodky. Nesediaci kontrolný súčet v Prehľade a chyby zápisu auditu v Nastaveniach majú tiež ikonu chyby. Odznak správneho súčtu si ponecháva bodku.
+- Všetky natívne výbery majú šípku rozbalenia: vytvorenie a úprava kategórie, účty, PDF export a interval pravidelnej platby. Šípku má aj sekcia O aplikácii.
+- Pri šírke okna 1024 px sa suma aj rozbalený detail transakcie zmestia bez vodorovného posúvania tabuľky. Rozloženie pri 1280 px sa nemení.
+- Pri šírke okna 1024 px zostáva tlačidlo zmazania každého výpisu v karte Importu aj pri nesediacom kontrolnom súčte. Texty sa zalomia len medzi slovami, napríklad „Vyžaduje pozornosť“, a ostanú vo svojej bunke aj riadku. Rozloženie pri 1280 px sa nemení.
+- Tabuľka transakcií pri šírke 1024 px láme slová len medzi slovami. Dlhý reťazec bez medzier (názov obchodníka, účet) sa smie zlomiť uprostred.
+- Nesediaci kontrolný súčet v tabuľke Zostatky z výpisov má ikonu a farbu chyby.
+- Upozornenia v porovnaní výdavkov podľa kategórií sú v jednom hlásení s krátkym zoznamom.
+
+- Základ vzhľadu Kaliber 5.0.1: aktívna záložka má zvýraznenú linku, malé stavové a navigačné značky sú kruhové a vypnutý prepínač nemá znak. Obnovené tokeny pridávajú prekrytie vypnutých ovládačov a rozmery ikon.
+- Ikony používajú spoločný súbor Kaliber (Phosphor a vlastné kresby). Chybové stavy a neúspešné vrátenie akcie majú ikonu nebezpečenstva. Hlásenia pri nesprávnom vstupe majú varovanie. Názvy tlačidiel pre čítačku obrazovky ostávajú zachované.
+
 ## 0.2.0 (2026-10-18)
 
 - Nový vzhľad podľa jazyka dizajnu Kaliber, revízia 4: písmo Fira Sans, plochý register s linkami, súhrnná tabuľka namiesto dlaždíc v Prehľade a päť záložiek v hlavičke. Appka sa otvorí na **Transakciách**.

@@ -2,8 +2,8 @@ import type { Status } from '../api'
 import { statusLabel } from '../lib/categories'
 
 // Kaliber R28: the shape carries the state, the word names it, colour only supplements.
-// Nezaradené: empty square. Odhad: half square. Potvrdené: full square.
-// Prevod (outside the totals): square with a line through it.
+// Nezaradené: empty dot. Odhad: half dot. Potvrdené: full dot.
+// Prevod (outside the totals): dot with a line through it.
 const MARK_CLASS: Record<Status, string> = {
   unassigned: 'k-mark',
   suggested: 'k-mark k-mark--half',

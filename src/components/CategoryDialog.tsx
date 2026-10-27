@@ -1,3 +1,5 @@
+import { Icon } from '../kaliber/icons'
+import { InlineAlert } from './InlineAlert'
 import { useEffect, useState } from 'react'
 import type { Category, CategoryKind } from '../api'
 import { api } from '../api'
@@ -77,36 +79,42 @@ export function CategoryDialog({
         </>
       }
     >
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
       <Field label="Názov">
         <input className="k-input k-well" aria-label="Názov kategórie" value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
       <Field label="Nadradená kategória">
-        <select
-          aria-label="Nadradená kategória"
-          className="k-select k-well"
-          value={parentId ?? ''}
-          onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">Nová hlavná kategória</option>
-          {parents.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <span className="k-select-wrap">
+          <select
+            aria-label="Nadradená kategória"
+            className="k-select k-well"
+            value={parentId ?? ''}
+            onChange={(e) => setParentId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Nová hlavná kategória</option>
+            {parents.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <Icon name="chevron-down" small className="k-select-chevron" />
+        </span>
       </Field>
       <Field label="Druh">
-        <select
-          aria-label="Druh kategórie"
-          className="k-select k-well"
-          value={effectiveKind}
-          disabled={selectedParent !== null}
-          onChange={(e) => setKind(e.target.value as CategoryKind)}
-        >
-          <option value="expense">{CATEGORY_KIND_LABELS.expense}</option>
-          <option value="income">{CATEGORY_KIND_LABELS.income}</option>
-        </select>
+        <span className="k-select-wrap">
+          <select
+            aria-label="Druh kategórie"
+            className="k-select k-well"
+            value={effectiveKind}
+            disabled={selectedParent !== null}
+            onChange={(e) => setKind(e.target.value as CategoryKind)}
+          >
+            <option value="expense">{CATEGORY_KIND_LABELS.expense}</option>
+            <option value="income">{CATEGORY_KIND_LABELS.income}</option>
+          </select>
+          <Icon name="chevron-down" small className="k-select-chevron" />
+        </span>
       </Field>
     </Dialog>
   )

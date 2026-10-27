@@ -1,3 +1,4 @@
+import { expectSelectChevrons } from '../select-affordance.test-helper'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -589,4 +590,36 @@ describe('Settings: restore refetches the account list', () => {
     expect(await screen.findByText('Účet B')).toBeInTheDocument()
     expect(screen.queryByText('Účet A')).not.toBeInTheDocument()
   })
+})
+
+
+// Oracle: fix1 requires the audit-failure notice and the gallery disclosure chevron.
+it('fix1 gives audit failures a danger icon', async () => {
+  mockApi()
+  vi.mocked(api.netAuditFailures).mockResolvedValueOnce([auditFailure])
+  render(<Settings />)
+  const title = await screen.findByText('Neúspešné zápisy auditu')
+  expect(title.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-danger')
+  expect(title.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+})
+it('fix1 gives About a chevron and still opens through the summary', async () => {
+  mockApi()
+  render(<Settings />)
+  const summary = screen.getByText('O aplikácii').closest('summary')!
+  expect(summary.querySelector('.k-chevron use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  fireEvent.click(summary)
+  await waitFor(() => expect(summary.parentElement).toHaveAttribute('open'))
+})
+
+it('fix2 shows chevrons in account forms opened from Settings', async () => {
+  mockApi({ listAccounts: vi.fn().mockResolvedValue([{ id: 1, iban: 'SK00', kind: 'personal', label: 'Osobný', has_password: false }]) })
+  render(<Settings />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Upraviť' }))
+  const edit = screen.getByLabelText('Typ účtu')
+  expect(edit.closest('.k-select-wrap')?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  fireEvent.click(screen.getByRole('button', { name: 'Zrušiť' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Pridať účet' }))
+  const add = screen.getByLabelText('Druh účtu')
+  expect(add.closest('.k-select-wrap')?.querySelector('use')).toHaveAttribute('href', '/kaliber-icons.svg#k-icon-chevron-down')
+  expectSelectChevrons()
 })

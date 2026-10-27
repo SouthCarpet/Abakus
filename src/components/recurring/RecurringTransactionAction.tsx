@@ -1,3 +1,4 @@
+import { InlineAlert } from '../InlineAlert'
 import { useState } from 'react'
 import type { Category, TxRow } from '../../api'
 import { isRecurringEligible, localTodayIso } from '../../lib/recurring-labels'
@@ -63,7 +64,7 @@ function RecurringTransactionActionReady({
         Pravidelná platba
       </Button>
       {busy ? <p role="status">Načítava sa pravidelnosť...</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
       <RecurringEditor
         source={source}
         categories={categories}

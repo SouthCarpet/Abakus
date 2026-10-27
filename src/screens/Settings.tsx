@@ -1,3 +1,5 @@
+import { Icon } from '../kaliber/icons'
+import { InlineAlert } from '../components/InlineAlert'
 import { useEffect, useRef, useState } from 'react'
 import { files } from '../lib/files'
 import { useAction } from '../lib/useAction'
@@ -84,7 +86,7 @@ function UpdateAvailable({ release }: { release: Release }) {
           {updateButtonLabel(phase, release.tag)}
         </Button>
       ) : null}
-      {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
     </div>
   )
 }
@@ -136,7 +138,6 @@ function About({ checkUpdates, preferenceLoaded, checking, release, onToggle, on
         <span className="k-switch-track" aria-hidden="true">
           <span className="k-switch-bg" />
           <span className="k-switch-mark k-switch-mark--on" />
-          <span className="k-switch-mark k-switch-mark--off" />
           <span className="k-switch-thumb" />
         </span>
         <span className="k-switch-text">Kontrolovať aktualizácie (GitHub)</span>
@@ -168,7 +169,7 @@ function AuditFailuresSection({ failures }: { failures: AuditFailure[] }) {
   if (failures.length === 0) return null
   return (
     <div className="ab-section">
-      <p className="k-card-title ab-text-danger">Neúspešné zápisy auditu</p>
+      <p className="k-card-title ab-text-danger ab-notice-title"><Icon name="danger" small />Neúspešné zápisy auditu</p>
       <table className="k-table">
         <thead>
           <tr>
@@ -476,7 +477,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
   return (
     <div className="ab-screen">
       <PageHead title="Nastavenia" meta="Účty, údaje, záloha, vzhľad a aktualizácie. Verzia je v časti O aplikácii." />
-      {action.error ? <p role="alert">{action.error}</p> : null}
+      {action.error ? <InlineAlert>{action.error}</InlineAlert> : null}
       {action.busy ? <p role="status">Prebieha operácia...</p> : null}
       {exportMessage ? <p role="status">{exportMessage}</p> : null}
       <fieldset disabled={action.busy} className="ab-section">
@@ -539,6 +540,7 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
             <summary className="k-disclosure-summary">
               <h3 id="ab-settings-about">O aplikácii</h3>
               <FoundBadge release={release} />
+              <Icon name="chevron-down" small className="k-chevron" />
             </summary>
             <div className="k-disclosure-body ab-section">
               <About
@@ -577,12 +579,15 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
           <input className="k-input k-well" value={label} onChange={(e) => setLabel(e.target.value)} />
         </Field>
         <Field label="Druh účtu">
-          <select className="k-select k-well" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
-            <option value="personal">Osobný</option>
-            <option value="business">Firemný</option>
-          </select>
+          <span className="k-select-wrap">
+            <select className="k-select k-well" value={kind} onChange={(e) => setKind(e.target.value as AccountKind)}>
+              <option value="personal">Osobný</option>
+              <option value="business">Firemný</option>
+            </select>
+            <Icon name="chevron-down" small className="k-select-chevron" />
+          </span>
         </Field>
-        {error ? <p role="alert" className="ab-text-danger">{error}</p> : null}
+        {error ? <InlineAlert>{error}</InlineAlert> : null}
       </Dialog>
       <Dialog
         open={editTarget !== null}
@@ -606,12 +611,15 @@ export function Settings({ onRestored, aboutOpen: initialAboutOpen }: { onRestor
           <input className="k-input k-well" value={editTarget ? maskIban(editTarget.iban) : ''} disabled readOnly />
         </Field>
         <Field label="Typ účtu">
-          <select className="k-select k-well" value={editKind} onChange={(e) => changeEditKind(e.target.value as AccountKind)}>
-            <option value="personal">Osobný</option>
-            <option value="business">Firemný</option>
-          </select>
+          <span className="k-select-wrap">
+            <select className="k-select k-well" value={editKind} onChange={(e) => changeEditKind(e.target.value as AccountKind)}>
+              <option value="personal">Osobný</option>
+              <option value="business">Firemný</option>
+            </select>
+            <Icon name="chevron-down" small className="k-select-chevron" />
+          </span>
         </Field>
-        {editError ? <p role="alert" className="ab-text-danger">{editError}</p> : null}
+        {editError ? <InlineAlert>{editError}</InlineAlert> : null}
         {editError && editTarget && editKind !== editTarget.kind ? (
           <label className="ab-checkbox">
             <input type="checkbox" checked={editAcknowledge} onChange={(e) => setEditAcknowledge(e.target.checked)} />

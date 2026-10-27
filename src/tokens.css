@@ -12,6 +12,7 @@
   --color-text-muted: oklch(0.4 0.012 260);
   --color-disabled-text: oklch(0.54 0 0);
   --color-disabled-fill: oklch(0.9 0 0);
+  --color-disabled-overlay: oklch(0.8 0 0 / 0.5);
   --color-scrim: oklch(0.18 0.012 260 / 0.4);
   --color-ink: oklch(0.22 0.025 145);
   --color-on-ink: oklch(0.96 0.008 145);
@@ -99,14 +100,19 @@
   --motion-sequence-moves: 3;
   --control-h: 32px;
   --control-h-touch: 44px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke-units: 16;
+  --icon-grid-units: 256;
 }
 [data-theme="dark"] {
   color-scheme: dark;
-  --color-background: oklch(0.17 0.012 260);
-  --color-well: oklch(0.135 0.012 260);
-  --color-surface-raised: oklch(0.21 0.012 260);
-  --color-surface-hover: oklch(0.25 0.012 260);
-  --color-surface-active: oklch(0.29 0.012 260);
+  --color-background: oklch(0.145 0.012 260);
+  --color-well: oklch(0.11 0.012 260);
+  --color-surface-raised: oklch(0.185 0.012 260);
+  --color-surface-hover: oklch(0.225 0.012 260);
+  --color-surface-active: oklch(0.265 0.012 260);
   --color-border: oklch(0.33 0.012 260);
   --color-border-strong: oklch(0.7 0.012 260);
   --color-control: oklch(0.6 0.012 260);
@@ -114,6 +120,7 @@
   --color-text-muted: oklch(0.82 0.012 260);
   --color-disabled-text: oklch(0.62 0 0);
   --color-disabled-fill: oklch(0.27 0 0);
+  --color-disabled-overlay: oklch(0.36 0 0 / 0.5);
   --color-scrim: oklch(0.05 0.012 260 / 0.55);
   --color-ink: oklch(0.33 0.035 145);
   --color-on-ink: oklch(0.96 0.008 145);

@@ -1,3 +1,4 @@
+import { Icon } from '../kaliber/icons'
 import { useEffect } from 'react'
 import { dismissToast, liveToasts, removeToast, useToasts } from '../kaliber/toast'
 import { useEscapeLayer } from '../kaliber/escape'
@@ -25,12 +26,12 @@ export function Toasts() {
       {items.map((item) => (
         <div
           key={item.id}
-          className={`k-well k-toast ${item.leaving ? 'is-leaving' : 'is-entering'}`}
+          className={`k-well k-toast ${item.kind === 'error' ? 'k-toast--error ' : ''}${item.leaving ? 'is-leaving' : 'is-entering'}`}
           role="status"
           data-toast={item.id}
           onAnimationEnd={() => { if (item.leaving) removeToast(item.id) }}
         >
-          <span className="k-toast-dot" aria-hidden="true" />
+          <span className="k-toast-dot" aria-hidden="true">{item.kind === 'error' ? <Icon name="danger" small /> : null}</span>
           <span>{item.text}</span>
           {item.action ? (
             <button

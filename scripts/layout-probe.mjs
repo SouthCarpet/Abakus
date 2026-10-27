@@ -1,4 +1,4 @@
-// Layout probe (plan 091 r4): measures the Transakcie screen in a real Chromium against the
+// Layout probe (plan 091 r4): measures the Transakcie and Import screens in a real Chromium against the
 // Vite dev server, with a mocked Tauri invoke. Prints one JSON object on stdout.
 // Used by src/layout-geometry.test.ts. Prints {"skipped": "<reason>"} when no browser is at hand.
 // Browser: ABAKUS_CHROMIUM (path to the executable) or the Playwright cache of this machine.
@@ -44,7 +44,7 @@ const mock = (scenario) => {
       id: i + 1, account_id: 1, account_kind: 'personal', statement_number: 10, posted_date: `2026-10-${String(1 + (i % 28)).padStart(2, '0')}`,
       tx_date: `2026-10-${String(1 + (i % 28)).padStart(2, '0')}`, kind: income ? 'transfer_in' : 'card',
       amount_cents: income ? 185000 : -(1250 + i * 733), orig_amount_cents: null, orig_currency: null,
-      merchant_raw: status === 'transfer' ? 'Prevod' : merchants[i % merchants.length], place: 'Bratislava', counterparty_name: null, counterparty_iban: null,
+      merchant_raw: status === 'transfer' ? 'Prevod' : merchants[i % merchants.length], place: i === 6 ? 'PLATBA-KARTOU-SK3112000000198742637541-OBCHODNIK' : 'Bratislava', counterparty_name: null, counterparty_iban: null,
       category_id: status === 'unassigned' ? null : cat.id, category_name: status === 'unassigned' ? null : cat.name, parent_name: null,
       status, source: 'rule', raw_block: '', note: '',
     }
@@ -52,8 +52,9 @@ const mock = (scenario) => {
   const accounts = [{ id: 1, iban: 'SK3112000000198742637541', kind: 'personal', label: 'Bežný účet', has_password: false }]
   const handlers = {
     list_accounts: accounts, list_categories: cats, list_rules: [], list_transactions: tx,
-    statement_history: [], recent_statements: [], bad_checksums: [], get_check_updates: false, net_log: [], net_audit_failures: [],
+    statement_history: [0, 1, 2].map((i) => ({ statement_id: i + 1, account_id: 1, account_label: 'Bežný účet (demo)', account_kind: 'personal', number: 10 - i, period_start: '2026-10-01', period_end: '2026-10-31', opening_cents: 0, closing_cents: 10000, transaction_count: 48, total_cents: -65000, checksum: i === 0 ? { status: 'off_by', off_by: 150 } : { status: 'ok' } })), statement_review: { checksum: { status: 'ok' }, parser_warnings: [], unassigned_count: 2, suggested_count: 1, status: 'needs_attention' }, recent_statements: [], bad_checksums: [], get_check_updates: false, net_log: [], net_audit_failures: [],
     data_dir: 'C:\\Users\\demo\\AppData\\Roaming\\Abakus',
+    preview_pdf_report: { range: { from: '2026-10-01', to: '2026-10-31' }, scope_label: 'Všetky účty', accounts: [{ id: 1, label: 'Bežný účet (demo)', kind: 'personal', iban_suffix: '7541' }], transaction_count: 48, latest_transaction_date: '2026-10-26', captured_at: '2026-10-26T20:00:00+02:00', unfinished_period: true, accounts_without_statements: 0, accounts_with_gaps: 0, unverified_statement_count: 1, invalid_statement_range_count: 0 },
   }
   window.__TAURI_INTERNALS__ = {
     metadata: { currentWindow: { label: 'main' }, currentWebview: { windowLabel: 'main', label: 'main' } },
@@ -63,7 +64,7 @@ const mock = (scenario) => {
 }
 
 async function openRegister(browser, width, scenario) {
-  const ctx = await browser.newContext({ viewport: { width, height: 900 } })
+  const ctx = await browser.newContext({ viewport: { width, height: width === 1024 ? 680 : width === 1280 ? 820 : 900 } })
   await ctx.addInitScript(mock, scenario)
   await ctx.addInitScript(() => { try { localStorage.setItem('kaliber-theme', 'light'); localStorage.setItem('abakus.period', JSON.stringify({ kind: 'all' })) } catch { /* private mode */ } })
   const page = await ctx.newPage()
@@ -80,6 +81,150 @@ async function goToRegister(page, url, scenario) {
 // The click area of a checkbox: its wrapping label when it has one, else the box itself.
 const size = (input) => input.evaluate((el) => { const r = (el.closest('label') ?? el).getBoundingClientRect(); return { width: Math.round(r.width * 10) / 10, height: Math.round(r.height * 10) / 10 } })
 
+// Text layout audit, run in the page. For every row under `rowSelector` and every direct child (cell) of
+// it: (1) each text line box (Range.getClientRects of the text nodes) lies inside its cell and its row,
+// (2) the cell does not scroll inside itself, (3) no word is split across lines. A word is split when two
+// neighbouring non-space characters of one text node sit on different lines. "Vyžad / uje" is such a
+// pair: "d" and "u" are neighbours, and "u" starts a lower line.
+function auditText(root, rowSelector) {
+  const tolerance = 1
+  const found = { outside: [], scrolling: [], splitWords: [] }
+  const inside = (r, box) => r.left >= box.left - tolerance && r.right <= box.right + tolerance && r.top >= box.top - tolerance && r.bottom <= box.bottom + tolerance
+  const rounded = (r) => `${Math.round(r.left)}-${Math.round(r.right)} x ${Math.round(r.top)}-${Math.round(r.bottom)}`
+  const textNodes = (cell) => {
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT)
+    const nodes = []
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) if (node.textContent.trim()) nodes.push(node)
+    return nodes
+  }
+  const charRect = (node, index) => {
+    const range = document.createRange()
+    range.setStart(node, index)
+    range.setEnd(node, index + 1)
+    return range.getBoundingClientRect()
+  }
+  // A token of 20 or more characters without spaces (an IBAN, a bank descriptor) may break inside.
+  const inLongToken = (text, i) => text.slice(text.lastIndexOf(' ', i) + 1).split(' ')[0].length >= 20
+  const splitAt = (node, i) => {
+    const text = node.textContent
+    if (/\s/.test(text[i]) || /\s/.test(text[i + 1]) || inLongToken(text, i)) return false
+    const a = charRect(node, i)
+    const b = charRect(node, i + 1)
+    if (a.height === 0 || b.height === 0) return false // hidden text has no line box
+    return b.top >= a.top + a.height / 2
+  }
+  const auditNode = (node, label, cellBox, rowBox) => {
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    for (const rect of range.getClientRects()) {
+      if (!inside(rect, cellBox) || !inside(rect, rowBox)) found.outside.push(`${label} (text ${rounded(rect)}, cell ${rounded(cellBox)})`)
+    }
+    const text = node.textContent
+    for (let i = 0; i + 1 < text.length; i += 1) if (splitAt(node, i)) found.splitWords.push(`${label}: ${text.slice(Math.max(0, i - 3), i + 4)}`)
+  }
+  const auditCell = (row, cell, rowBox) => {
+    const cellBox = cell.getBoundingClientRect()
+    const label = `${row.dataset.rowId ?? row.className} > ${cell.textContent.trim().slice(0, 24)}`
+    if (cell.scrollWidth > cell.clientWidth + tolerance || cell.scrollHeight > cell.clientHeight + tolerance) {
+      found.scrolling.push(`${label} (${cell.scrollWidth}/${cell.clientWidth} x ${cell.scrollHeight}/${cell.clientHeight})`)
+    }
+    for (const node of textNodes(cell)) auditNode(node, label, cellBox, rowBox)
+  }
+  let cells = 0
+  for (const row of root.querySelectorAll(rowSelector)) {
+    const rowBox = row.getBoundingClientRect()
+    for (const cell of row.querySelectorAll(':scope > *')) {
+      cells += 1
+      auditCell(row, cell, rowBox)
+    }
+  }
+  return { cells, outside: [...new Set(found.outside)], scrolling: [...new Set(found.scrolling)], splitWords: [...new Set(found.splitWords)] }
+}
+
+async function registerFit(page) {
+  return page.evaluate(({ audit }) => {
+    const auditText = new Function(`return ${audit}`)()
+    const region = document.querySelector('[aria-label="Transakcie"][role="region"]')
+    const table = region.querySelector('table')
+    const amount = table.querySelector('tbody tr[data-row-id] .ab-money').getBoundingClientRect()
+    const bounds = region.getBoundingClientRect()
+    const note = table.querySelector('textarea')?.getBoundingClientRect()
+    return { overflow: region.scrollWidth - region.clientWidth, scrollLeft: region.scrollLeft,
+      amountVisible: amount.left >= bounds.left && amount.right <= bounds.right,
+      detailVisible: !note || (note.left >= bounds.left && note.right <= bounds.right),
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      text: auditText(table, 'thead tr, tbody tr[data-row-id]') }
+  }, { audit: auditText.toString() })
+}
+
+async function measureOpenDetail(page, width) {
+  const closed = await registerFit(page)
+  await page.locator('tbody tr[data-row-id="1"] input[type=checkbox]').check()
+  await page.locator('tbody tr[data-row-id="1"]').getByRole('button', { name: /detail/i }).click()
+  await page.locator('textarea').waitFor()
+  const open = await registerFit(page)
+  if (process.env.ABAKUS_SHOT_DIR) await page.screenshot({ path: join(process.env.ABAKUS_SHOT_DIR, `detail-${width}.png`), fullPage: true })
+  return { closed, open }
+}
+
+async function importFit(browser, url, width) {
+  const { ctx, page } = await openRegister(browser, width, 'base')
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 170000 })
+    await page.locator('nav[aria-label="Sekcie"]').getByRole('button', { name: 'Import', exact: true }).click()
+    const card = page.getByRole('region', { name: 'Všetky výpisy', exact: true })
+    await card.getByText('Kontrolný súčet nesedí o 1,50 €', { exact: true }).waitFor()
+    await card.getByText('Vyžaduje pozornosť', { exact: true }).first().waitFor()
+    return await card.evaluate((el, { audit }) => {
+      const auditText = new Function(`return ${audit}`)()
+      const bounds = el.getBoundingClientRect()
+      const buttons = [...el.querySelectorAll('button[aria-label^="Zmazať výpis"]')]
+      return { rowCount: buttons.length, deleteInside: buttons.map(button => {
+        const rect = button.getBoundingClientRect()
+        return rect.left >= bounds.left && rect.right <= bounds.right
+      }), text: auditText(el, '.ab-round-row, .ab-round-row-head') }
+    }, { audit: auditText.toString() })
+  } finally { await ctx.close() }
+}
+
+// The PDF export dialog opened from Overview: it must fit the window or scroll with "Uložiť PDF" reachable.
+async function pdfDialogFit(browser, url, width) {
+  const { ctx, page } = await openRegister(browser, width, 'base')
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 170000 })
+    await page.locator('nav[aria-label="Sekcie"]').getByRole('button', { name: 'Prehľad', exact: true }).click()
+    await page.getByRole('button', { name: 'Exportovať PDF', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Exportovať PDF' })
+    await dialog.getByRole('heading', { name: 'Náhľad', exact: true }).waitFor()
+    await page.waitForTimeout(400)
+    const measure = () => dialog.evaluate((el) => {
+      const view = { w: window.innerWidth, h: window.innerHeight }
+      const box = el.getBoundingClientRect()
+      const save = [...el.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Uložiť PDF').getBoundingClientRect()
+      return {
+        dialogInside: box.top >= 0 && box.bottom <= view.h && box.left >= 0 && box.right <= view.w,
+        saveInside: save.top >= box.top && save.bottom <= box.bottom && save.top >= 0 && save.bottom <= view.h && save.left >= 0 && save.right <= view.w,
+      }
+    })
+    const first = await measure()
+    await dialog.evaluate((el) => { for (const node of [el, ...el.querySelectorAll('*')]) if (node.scrollHeight > node.clientHeight + 1 && ['auto', 'scroll'].includes(getComputedStyle(node).overflowY)) node.scrollTop = node.scrollHeight })
+    const scrolled = await measure()
+    return { openedVisible: first, afterScroll: scrolled }
+  } finally { await ctx.close() }
+}
+
+async function importSizes(browser, url) {
+  const sizes = {}
+  for (const width of [1024, 1280]) sizes[width] = await importFit(browser, url, width)
+  return sizes
+}
+
+async function pdfSizes(browser, url) {
+  const sizes = {}
+  for (const width of [1024, 1280]) sizes[width] = await pdfDialogFit(browser, url, width)
+  return sizes
+}
+
 async function main() {
   const playwright = loadPlaywright()
   const executablePath = findBrowser()
@@ -91,13 +236,13 @@ async function main() {
   await server.listen()
   const url = `http://127.0.0.1:${server.httpServer.address().port}/`
   const browser = await playwright.chromium.launch({ headless: true, executablePath })
-  const out = { firstRowTop: {}, overflowX: {}, hit: {} }
+  const out = { firstRowTop: {}, overflowX: {}, hit: {}, minimum: {}, imports: {}, pdf: {} }
   try {
-    for (const width of [1440, 1024]) {
+    for (const width of [1440, 1280, 1024]) {
       const { ctx, page } = await openRegister(browser, width, 'base')
       await goToRegister(page, url, 'base')
       out.firstRowTop[width] = await page.evaluate(() => Math.round(document.querySelector('tbody tr[data-row-id]').getBoundingClientRect().top + window.scrollY))
-      if (process.env.ABAKUS_SHOT_DIR) await page.screenshot({ path: join(process.env.ABAKUS_SHOT_DIR, `register-${width}.png`), clip: { x: 0, y: 0, width, height: 760 } })
+      if (process.env.ABAKUS_SHOT_DIR) await page.screenshot({ path: join(process.env.ABAKUS_SHOT_DIR, `register-${width}.png`), fullPage: true })
       // The search field shows its whole placeholder: text width against the room inside the field.
       out.search = out.search ?? {}
       out.search[width] = await page.evaluate(() => {
@@ -114,9 +259,14 @@ async function main() {
         const r = document.querySelector(sel)?.getBoundingClientRect()
         return [sel, r ? [Math.round(r.top + window.scrollY), Math.round(r.bottom + window.scrollY)] : null]
       })))
+      if (width === 1024 || width === 1280) {
+        out.minimum[width] = await measureOpenDetail(page, width)
+      }
       out.overflowX[width] = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
       await ctx.close()
     }
+    out.imports = await importSizes(browser, url)
+    out.pdf = await pdfSizes(browser, url)
     for (const scenario of ['long', 'empty']) {
       const { ctx, page } = await openRegister(browser, 1440, scenario)
       await goToRegister(page, url, scenario)

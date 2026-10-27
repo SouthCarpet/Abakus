@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { MoonGlyph, SunGlyph } from '../kaliber/icons'
+import { Icon } from '../kaliber/icons'
 import { useTheme, type ThemePreference } from '../kaliber/theme'
 
 // Kaliber R20: two theme controls, one state (`kaliber-theme`, src/kaliber/theme.ts).
@@ -22,8 +22,8 @@ export function ThemeSwitch() {
       <span className="k-switch-track" aria-hidden="true">
         <span className="k-switch-bg k-theme-part" />
         <span className="k-switch-thumb k-theme-part">
-          <SunGlyph className="k-sun k-theme-part" />
-          <MoonGlyph className="k-moon k-theme-part" />
+          <Icon name="sun" className="k-sun k-theme-part" />
+          <Icon name="moon" className="k-moon k-theme-part" />
         </span>
       </span>
     </label>
@@ -43,7 +43,7 @@ export function ThemeMode() {
   return (
     <fieldset className="k-radio-group ab-theme-mode">
       <legend className="k-group-legend k-sr-only">Vzhľad</legend>
-      <div className="k-segmented">
+      <div className="k-segmented ab-theme-segmented">
         {MODES.map((mode) => (
           <label key={mode.value} className="k-segmented-item">
             <input

@@ -18,9 +18,8 @@ html, body, #root { height: 100%; }
 /* R31: on a phone the five sections sit in the bottom navigation; the page reserves its 56 px. */
 .ab-app:has(.ab-bottom-nav) { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 .ab-bottom-nav { z-index: 10; }
-.ab-bottom-nav .k-bottom-nav-item { border: 0; background: transparent; font: inherit; font-size: var(--text-xs); cursor: pointer; min-width: 0; padding: 0 var(--space-1); }
-.ab-bottom-nav .k-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); }
-.ab-nav-icon { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: square; }
+.ab-bottom-nav .ab-bottom-nav-item { border: 0; background: transparent; font: inherit; font-size: var(--text-xs); cursor: pointer; min-width: 0; padding: 0 var(--space-1); }
+.ab-bottom-nav .ab-bottom-nav-item[aria-current="page"] { background: var(--color-surface-selected); }
 
 /* ---- layout helpers ---------------------------------------------------------- */
 .ab-section { display: flex; flex-direction: column; gap: var(--space-2); }
@@ -31,8 +30,8 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-text-success { color: var(--color-success); }
 .ab-card-body { display: flex; flex-direction: column; gap: var(--space-2); }
 /* A command button keeps its own width; it never stretches over the whole sheet. */
-.ab-card-body > .k-btn, .ab-section > .k-btn { align-self: flex-start; width: auto; padding: 0 var(--space-4); }
-.ab-theme-mode .k-segmented { max-width: 28rem; }
+.ab-card-body > .ab-btn, .ab-section > .ab-btn { align-self: flex-start; width: auto; padding: 0 var(--space-4); }
+.ab-theme-mode .ab-theme-segmented { max-width: 28rem; }
 
 /* ---- fields ------------------------------------------------------------------- */
 .ab-field { display: flex; flex-direction: column; gap: var(--space-1); }
@@ -61,7 +60,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-category-name { flex: 1 1 0; min-width: 0; }
 /* ---- the register screen (Transakcie, r4 gallery screen abakus-transakcie) ------------ */
 .ab-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
-.ab-head > .k-page-head { margin-bottom: 0; }
+.ab-head > .ab-page-head { margin-bottom: 0; }
 .ab-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .ab-flush { padding: 0; overflow: hidden; }
 .ab-pad { padding: var(--space-4); }
@@ -69,9 +68,9 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-filters { display: grid; gap: var(--space-4); padding: var(--space-4); }
 .ab-filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-4); }
 .ab-filter-field { flex: 1 1 9.5rem; min-width: 0; }
-.ab-filter-field .k-select-wrap { display: grid; min-width: 0; }
-.ab-filter-field .k-input { width: 100%; }
-.ab-filter-field .k-select { min-width: 0; width: 100%; }
+.ab-filter-field .ab-filter-select-wrap { display: grid; min-width: 0; }
+.ab-filter-field .ab-filter-input { width: 100%; }
+.ab-filter-field .ab-filter-select { min-width: 0; width: 100%; }
 /* The register search shows its whole placeholder: it takes the rest of the filter row. */
 .ab-filter-search { flex: 3 1 13rem; }
 .ab-filter-clear { margin-left: auto; min-height: var(--k-hit); font: inherit; font-size: var(--text-sm); background: transparent; border: 0; padding: 0 var(--space-2); cursor: pointer; }
@@ -92,7 +91,7 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 .ab-act { white-space: nowrap; }
 .ab-act > * + * { margin-left: var(--space-3); }
 .ab-narrow-only { display: none !important; }
-/* R28: a transfer (outside the totals) is a square with a line through it. */
+/* R28: a transfer (outside the totals) is a dot with a line through it. */
 .ab-mark--transfer::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--color-text); }
 .ab-ledger-end { max-width: 26rem; margin-left: auto; }
 .ab-ledger-cap { margin: 0 0 var(--space-2); }
@@ -192,3 +191,45 @@ fieldset.ab-section { border: 0; padding: 0; margin: 0; min-width: 0; }
 /* ---- page head and menu ------------------------------------------------------------- */
 .ab-menu-item { justify-content: space-between; gap: var(--space-4); }
 .ab-menu-key { color: var(--color-text-muted); font-size: var(--text-xs); }
+
+/* Problem badges use a danger shape instead of the shared active dot. */
+.ab-badge-danger { color: var(--color-danger); }
+.ab-badge-danger::before { content: none; }
+.ab-notice-title { display: flex; align-items: center; gap: var(--space-2); }
+.ab-warning-list { margin: 0; padding-left: var(--space-4); list-style: disc; }
+
+/* At the minimum desktop width, wrap register content within the available columns.
+   The wider desktop register retains its existing automatic column widths. */
+@media (min-width: 600px) and (max-width: 1100px) {
+  .ab-register { table-layout: fixed; width: 100%; }
+  /* Words break only between words. Only the cells that hold a long token without spaces (a merchant
+     descriptor, an account label) may break inside it. */
+  .ab-register .ab-merch, .ab-register td.ab-muted { overflow-wrap: anywhere; }
+  .ab-register th:first-child { width: 5%; }
+  .ab-register th:nth-child(2) { width: 10%; }
+  .ab-register th:nth-child(3) { width: 10%; }
+  .ab-register th:nth-child(4) { width: 14%; }
+  .ab-register th:nth-child(5) { width: 17%; }
+  .ab-register th:nth-child(6) { width: 12%; }
+  .ab-register th:nth-child(7) { width: 15%; }
+  .ab-register th:nth-child(8) { width: 12%; }
+  .ab-register th:last-child { width: 5%; }
+  .ab-register td:last-child > .ab-btn { padding-left: var(--space-1); padding-right: var(--space-1); }
+  .ab-register .ab-cat, .ab-register .ab-money { min-width: 0; }
+  .ab-register .ab-act { white-space: normal; }
+  .ab-register .ab-act > * + * { margin-left: 0; }
+  .ab-register select, .ab-register textarea { min-width: 0; max-width: 100%; }
+  .ab-register pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+}
+
+/* Keep all statement actions visible at the minimum desktop window. Each text track has a floor that
+   holds its longest word, so a label wraps only between words. Only the account label may break inside
+   a long token without spaces (an IBAN). */
+@media (min-width: 600px) and (max-width: 1100px) {
+  .ab-table-scroll .ab-round-row, .ab-table-scroll .ab-round-row-head { min-width: 0; display: grid; grid-template-columns: minmax(6ch, .9fr) minmax(8ch, 1.1fr) minmax(5ch, .4fr) minmax(11ch, .8fr) minmax(9ch, .85fr) minmax(13ch, 1.4fr) minmax(17ch, 1.5fr) minmax(11ch, 1.2fr) max(var(--control-h), var(--k-hit)); align-items: center; }
+  .ab-round-row > *, .ab-round-row-head > * { min-width: 0; }
+  .ab-round-row > :nth-child(2) { overflow-wrap: break-word; }
+  .ab-round-row > .k-card-badge { white-space: normal; }
+  .ab-round-row > button:not(.ab-icon-hit) { white-space: normal; height: auto; min-height: max(var(--control-h), var(--k-hit)); padding: var(--space-1); }
+  .ab-round-row-head > :last-child { grid-column: span 2; }
+}
