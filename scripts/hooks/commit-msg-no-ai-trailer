@@ -1,0 +1,13 @@
+#!/bin/sh
+# Rule: no-ai-trailer. Reject a commit message with an AI co-author trailer.
+# Git passes the message file as $1. Comment lines are ignored (git strips them).
+rule="no-ai-trailer"
+msg="$1"
+[ -f "$msg" ] || exit 0
+bad=$(grep -v '^#' "$msg" | grep -i -E '^Co-Authored-By:[[:space:]]*Claude|Generated with \[Claude Code\]' | head -n 1)
+if [ -n "$bad" ]; then
+    echo "commit-msg rule '$rule': remove this line from the message:" >&2
+    echo "  $bad" >&2
+    exit 1
+fi
+exit 0
